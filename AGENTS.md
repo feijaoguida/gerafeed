@@ -1,9 +1,54 @@
-<!-- BEGIN:nextjs-agent-rules -->
+# AGENTS.md. News Curator
 
-# This is NOT the Next.js you know
+## Missão
+Você é um agente de desenvolvimento trabalhando no News Curator. O projeto é um monólito Next.js simples para coleta manual de notícias RSS, processamento com IA, revisão humana e publicação em WordPress.
 
-This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.
+## Antes de qualquer alteração
+1. Leia `SPEC.md`.
+2. Leia `MEMORY.md`.
+3. Leia `PROGRESS.md`.
+4. Identifique a única task `IN_PROGRESS`. Se não existir, escolha a primeira task `TODO`.
+5. Leia o arquivo da task antes de implementar.
 
-This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
+## Regras
+- Trabalhe em uma task por vez.
+- Implemente somente o escopo da task atual.
+- Não adicione infraestrutura não prevista.
+- Não use NestJS, Redis, RabbitMQ, BullMQ, Docker, Cron ou microserviços no MVP.
+- Preserve TypeScript estrito.
+- Secrets nunca podem chegar ao client.
+- Prefira a solução mais simples que satisfaça os requisitos.
+- Não declare uma task como concluída sem executar sua Definition of Done.
+- Registre evidências objetivas ao terminar.
+- Se surgir trabalho fora do escopo, registre em `Discovered Work` em vez de implementá-lo automaticamente.
+- Decisões arquiteturais permanentes devem ser registradas em `docs/decisions.md`.
+- Atualize `PROGRESS.md` após cada task.
+- Atualize `MEMORY.md` somente quando surgir conhecimento permanente.
 
-<!-- END:nextjs-agent-rules -->
+## Definition of Done
+Uma task só pode virar `DONE` quando:
+- todos os critérios da task forem atendidos;
+- TypeScript passar;
+- lint passar;
+- testes aplicáveis passarem;
+- integração aplicável tiver sido validada;
+- evidências forem registradas.
+
+## Evidência
+Use fatos verificáveis. Exemplo:
+- `src/lib/rss.ts` criado.
+- Feed real processado com sucesso.
+- 5 itens retornados.
+- `npm run lint`: PASS.
+- `npx tsc --noEmit`: PASS.
+
+Não escreva apenas “funcionando”.
+
+## Falhas
+Se não for possível concluir:
+- mantenha a task `IN_PROGRESS` ou marque `BLOCKED`;
+- registre o erro;
+- registre o que foi tentado;
+- registre a próxima ação.
+
+Nunca remova um critério para fazer uma task parecer concluída.

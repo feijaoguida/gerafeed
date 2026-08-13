@@ -1,0 +1,69 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum ArticleStatus {
+  PENDING
+  REJECTED
+  PUBLISHED
+}
+
+model Source {
+  id        String    @id @default(cuid())
+  name      String
+  rssUrl    String
+  active    Boolean   @default(true)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  articles  Article[]
+}
+
+model WordPressCategory {
+  id                String    @id @default(cuid())
+  wordpressId       Int       @unique
+  name              String
+  slug              String
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  suggestedArticles Article[] @relation("SuggestedCategory")
+  selectedArticles  Article[] @relation("SelectedCategory")
+}
+
+model Article {
+  id                  String             @id @default(cuid())
+  sourceId            String
+  source              Source             @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+  originalUrl         String             @unique
+  originalTitle       String
+  originalDescription String?
+  originalImageUrl    String?
+  originalPublishedAt DateTime?
+  title               String?
+  summary             String?
+  content             String?
+  suggestedCategoryId String?
+  suggestedCategory   WordPressCategory? @relation("SuggestedCategory", fields: [suggestedCategoryId], references: [id], onDelete: SetNull)
+  categoryId          String?
+  category            WordPressCategory? @relation("SelectedCategory", fields: [categoryId], references: [id], onDelete: SetNull)
+  tags                String[]
+  seoFocusKeyword     String?
+  seoTitle            String?
+  seoDescription      String?
+  aiScore             Float?
+  status              ArticleStatus      @default(PENDING)
+  wordpressPostId     Int?
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
+}
+
+model Configuration {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  value     Json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
