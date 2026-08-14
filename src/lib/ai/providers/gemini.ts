@@ -4,7 +4,7 @@ import {
   GenerateArticleInput,
   GeneratedArticle,
   AIConnectionResult,
-  SYSTEM_PROMPT_EDITORIAL,
+  buildSystemPrompt,
 } from "../types";
 
 export class GeminiProvider implements AIProvider {
@@ -20,6 +20,7 @@ export class GeminiProvider implements AIProvider {
   }
 
   async generateArticle(input: GenerateArticleInput): Promise<GeneratedArticle> {
+    const systemPrompt = buildSystemPrompt(input.promptSettings);
     const userPrompt = `Analise e reescreva a seguinte notícia:
 
 Título Original: ${input.originalTitle}
@@ -39,7 +40,7 @@ ${JSON.stringify(input.categories, null, 2)}
           {
             role: "user",
             parts: [
-              { text: `${SYSTEM_PROMPT_EDITORIAL}\n\n${userPrompt}` }
+              { text: `${systemPrompt}\n\n${userPrompt}` }
             ]
           }
         ],

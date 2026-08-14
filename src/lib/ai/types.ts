@@ -2,6 +2,7 @@ export interface GenerateArticleInput {
   originalTitle: string;
   originalDescription?: string | null;
   categories: Array<{ id: string; name: string; slug: string }>;
+  promptSettings?: PromptSettings;
 }
 
 export interface GeneratedArticle {
@@ -40,12 +41,53 @@ export interface AIProvider {
   testConnection(): Promise<AIConnectionResult>;
 }
 
-export const SYSTEM_PROMPT_EDITORIAL = `Você é um jornalista sênior e editor-chefe experiente em um portal de notícias de tecnologia e negócios.
+export interface PromptSettings {
+  portalArea: string;
+  customPortalArea: string;
+  writingStyles: string[];
+  customWritingStyle: string;
+}
 
-Sua tarefa é analisar a notícia original recebida via RSS e reescrever um artigo totalmente autoral, atraente, otimizado para leitores humanos e estruturado para motores de busca (Yoast SEO).
+export const DEFAULT_PROMPT_SETTINGS: PromptSettings = {
+  portalArea: "Tecnologia",
+  customPortalArea: "",
+  writingStyles: ["Informativo", "Atraente"],
+  customWritingStyle: "",
+};
+
+export function buildSystemPrompt(settings?: PromptSettings): string {
+  let areaText = "tecnologia e negócios";
+  if (settings) {
+    if (settings.portalArea === "Outro" && settings.customPortalArea?.trim()) {
+      areaText = settings.customPortalArea.trim();
+    } else if (settings.portalArea && settings.portalArea !== "Outro" && settings.portalArea.trim()) {
+      areaText = settings.portalArea.trim();
+    }
+  }
+
+  let stylesText = "atraente";
+  if (settings && Array.isArray(settings.writingStyles) && settings.writingStyles.length > 0) {
+    const resolvedStyles: string[] = [];
+    for (const style of settings.writingStyles) {
+      if (style === "Outro") {
+        if (settings.customWritingStyle?.trim()) {
+          resolvedStyles.push(settings.customWritingStyle.trim().toLowerCase());
+        }
+      } else if (style.trim()) {
+        resolvedStyles.push(style.trim().toLowerCase());
+      }
+    }
+    if (resolvedStyles.length > 0) {
+      stylesText = resolvedStyles.join(", ");
+    }
+  }
+
+  return `Você é um jornalista sênior e editor-chefe experiente em um portal de notícias de ${areaText}.
+
+Sua tarefa é analisar a notícia original recebida via RSS e reescrever um artigo totalmente autoral, ${stylesText}, otimizado para leitores humanos e estruturado para motores de busca (Yoast SEO).
 
 Diretrizes Obrigatórias:
-1. Relevância: Avalie se a notícia é relevante para um portal de tecnologia e negócios.
+1. Relevância: Avalie se a notícia é relevante para um portal de ${areaText}.
 2. Título Editorial: Crie um título forte, chamativo e natural em Português do Brasil.
 3. Resumo / Excerpt: Escreva um resumo conciso de 2 a 3 frases.
 4. Conteúdo HTML: Escreva um artigo completo em HTML (usando tags <p>, <h2>, <h3>, <ul>, <li>, <strong>). Não inclua a tag <h1>.
@@ -69,3 +111,7 @@ Você deve responder exclusivamente em formato JSON válido contendo a seguinte 
   "seoTitle": "...",
   "seoDescription": "..."
 }`;
+}
+
+export const SYSTEM_PROMPT_EDITORIAL = buildSystemPrompt();
+

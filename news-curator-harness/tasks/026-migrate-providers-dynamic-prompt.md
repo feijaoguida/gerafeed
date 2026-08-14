@@ -1,7 +1,7 @@
 # Task 026. Migrate Providers to Dynamic Prompt
 
 ## Status
-TODO
+DONE
 
 ## Objetivo
 Migrar os 4 providers de IA para usar `buildSystemPrompt()` em vez da constante `SYSTEM_PROMPT_EDITORIAL`, e integrar o carregamento das configurações no fluxo de processamento de artigos.
@@ -22,19 +22,27 @@ A task 025 cria a função `buildSystemPrompt(settings?)` e a API de configuraç
 - Sem configuração salva no banco, o fluxo deve funcionar com os defaults (retrocompatível).
 
 ## Definition of Done
-- [ ] `GenerateArticleInput` inclui `promptSettings?: PromptSettings`.
-- [ ] OpenAI provider usa `buildSystemPrompt(input.promptSettings)`.
-- [ ] Gemini provider usa `buildSystemPrompt(input.promptSettings)`.
-- [ ] Anthropic provider usa `buildSystemPrompt(input.promptSettings)`.
-- [ ] OpenAI-Compatible provider usa `buildSystemPrompt(input.promptSettings)`.
-- [ ] `processArticleWithAi` carrega `aiPromptSettings` do banco e repassa ao provider.
-- [ ] Sem config no banco → processamento funciona com prompt padrão (retrocompatível).
-- [ ] Com config no banco → prompt reflete área e estilos escolhidos.
-- [ ] TypeScript PASS.
-- [ ] Lint PASS.
+- [x] `GenerateArticleInput` inclui `promptSettings?: PromptSettings`.
+- [x] OpenAI provider usa `buildSystemPrompt(input.promptSettings)`.
+- [x] Gemini provider usa `buildSystemPrompt(input.promptSettings)`.
+- [x] Anthropic provider usa `buildSystemPrompt(input.promptSettings)`.
+- [x] OpenAI-Compatible provider usa `buildSystemPrompt(input.promptSettings)`.
+- [x] `processArticleWithAi` carrega `aiPromptSettings` do banco e repassa ao provider.
+- [x] Sem config no banco → processamento funciona com prompt padrão (retrocompatível).
+- [x] Com config no banco → prompt reflete área e estilos escolhidos.
+- [x] TypeScript PASS.
+- [x] Lint PASS.
 
 ## Evidence
-(A ser preenchido na conclusão)
+- `GenerateArticleInput` em `src/lib/ai/types.ts` atualizado com `promptSettings?: PromptSettings`.
+- Os 4 providers (`openai.ts`, `gemini.ts`, `anthropic.ts`, `openai-compatible.ts`) migrados para chamar `buildSystemPrompt(input.promptSettings)`.
+- `processArticleWithAi` em `src/lib/ai.ts` atualizado para carregar `aiPromptSettings` da tabela `Configuration` e injetar em `generateArticle`.
+- Script de teste de integração `scripts/test-dynamic-prompt-migration.ts` executado com 100% de sucesso em servidor mock:
+  - Validados os 4 provedores com e sem `promptSettings`.
+  - Validado `processArticleWithAi` com banco limpo (prompt padrão) e com preferências customizadas (prompt dinâmico).
+- `npx tsc --noEmit`: PASS
+- `npm run lint`: PASS
 
 ## Discovered Work
-(A ser preenchido na conclusão)
+Nenhum.
+

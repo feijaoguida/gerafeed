@@ -42,15 +42,15 @@ No momento de montar o conteúdo final para o WordPress, o sistema deve concaten
 `<br><br><p><em>Fonte: {Nome da Fonte}</em></p>` (ou formato equivalente) no final do `content`.
 
 ## 8. Definition of Done global (Phase 3)
-- [ ] Schema do Prisma atualizado (Source.creditName, Article.modifiedImageUrl).
-- [ ] Cadastro de RSS refatorado para incluir campo Fonte.
-- [ ] Configuração de Estratégia de Imagem criada no banco e na UI.
-- [ ] Pipeline de processamento de imagem implementado (Sharp para inversão/filtros ou integração IA).
-- [ ] Tela de aprovação exibindo as duas versões da imagem lado a lado.
-- [ ] Seleção de imagem final pelo usuário.
-- [ ] Artigo publicado contendo a atribuição (Fonte) no final do texto.
-- [ ] Imagem correta enviada ao WordPress.
-- [ ] TypeScript PASS, Lint PASS.
+- [x] Schema do Prisma atualizado (Source.creditName, Article.modifiedImageUrl).
+- [x] Cadastro de RSS refatorado para incluir campo Fonte.
+- [x] Configuração de Estratégia de Imagem criada no banco e na UI.
+- [x] Pipeline de processamento de imagem implementado (Sharp para inversão/filtros ou integração IA).
+- [x] Tela de aprovação exibindo as duas versões da imagem lado a lado.
+- [x] Seleção de imagem final pelo usuário.
+- [x] Artigo publicado contendo a atribuição (Fonte) no final do texto.
+- [x] Imagem correta enviada ao WordPress.
+- [x] TypeScript PASS, Lint PASS.
 
 ---
 
@@ -137,14 +137,14 @@ Novo endpoint `GET/POST /api/ai/prompt-settings`:
 - **POST**: Valida (max 3 estilos, max 100 chars nos campos livres) e salva sob a chave `aiPromptSettings`.
 
 ## 7. Definition of Done global (Phase 4)
-- [ ] Endpoint `GET/POST /api/ai/prompt-settings` criado e funcional.
-- [ ] Configuração salva na chave `aiPromptSettings` da tabela `Configuration`.
-- [ ] `buildSystemPrompt(settings?)` gera prompt dinâmico.
-- [ ] Prompt sem configuração usa defaults (retrocompatível).
-- [ ] Todos os 4 providers usam `buildSystemPrompt` em vez da constante fixa.
-- [ ] Página `/settings/ai` com 2 abas (Conexão + Prompt Editorial).
-- [ ] Seleção de área do portal funcional com opção "Outro".
-- [ ] Seleção de até 3 estilos de escrita funcional com opção "Outro".
-- [ ] Campos "Outro" validados (max 100 caracteres).
-- [ ] Preview do prompt na UI.
-- [ ] TypeScript PASS, Lint PASS.
+- [x] Endpoint `GET/POST /api/ai/prompt-settings` criado e funcional.
+- [x] Configuração salva na chave `aiPromptSettings` da tabela `Configuration`.
+- [x] `buildSystemPrompt(settings?)` gera prompt dinâmico.
+- [x] Prompt sem configuração usa defaults (retrocompatível).
+- [x] Todos os 4 providers usam `buildSystemPrompt` em vez da constante fixa.
+- [x] Página `/settings/ai` com 2 abas (Conexão + Prompt Editorial).
+- [x] Seleção de área do portal funcional com opção "Outro".
+- [x] Seleção de até 3 estilos de escrita funcional com opção "Outro".
+- [x] Campos "Outro" validados (max 100 caracteres).
+- [x] Preview do prompt na UI.
+- [x] TypeScript PASS, Lint PASS.

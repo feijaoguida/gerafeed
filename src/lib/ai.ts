@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { getConfig } from "@/lib/config";
+import { PromptSettings } from "./ai/types";
 import { getActiveAIProvider } from "./ai/service";
 import { processAndStoreImage } from "./imageProcessor";
 
@@ -35,11 +36,15 @@ export async function processArticleWithAi(articleId: string) {
     select: { id: true, name: true, slug: true },
   });
 
+  const promptConfig = await getConfig<PromptSettings>("aiPromptSettings");
+  const promptSettings = promptConfig || undefined;
+
   const provider = await getActiveAIProvider();
   const aiResult = await provider.generateArticle({
     originalTitle: article.originalTitle,
     originalDescription: article.originalDescription,
     categories,
+    promptSettings,
   });
 
   // Validate suggested category exists in available list

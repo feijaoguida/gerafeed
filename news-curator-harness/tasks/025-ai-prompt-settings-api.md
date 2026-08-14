@@ -1,7 +1,7 @@
 # Task 025. AI Prompt Settings API
 
 ## Status
-TODO
+DONE
 
 ## Objetivo
 Criar o endpoint backend e a função de construção dinâmica do prompt editorial.
@@ -31,19 +31,31 @@ Atualmente o `SYSTEM_PROMPT_EDITORIAL` é uma constante fixa em `src/lib/ai/type
 - Manter o export `SYSTEM_PROMPT_EDITORIAL` como alias para `buildSystemPrompt()` (sem args) para não quebrar imports existentes.
 
 ## Definition of Done
-- [ ] Endpoint `GET /api/ai/prompt-settings` retorna configurações salvas (ou defaults).
-- [ ] Endpoint `POST /api/ai/prompt-settings` valida e salva na chave `aiPromptSettings`.
-- [ ] Validação: máximo 3 estilos, máximo 100 chars nos campos livres.
-- [ ] Interface `PromptSettings` criada.
-- [ ] Função `buildSystemPrompt(settings?)` criada e exportada.
-- [ ] `buildSystemPrompt()` sem args retorna prompt idêntico ao `SYSTEM_PROMPT_EDITORIAL` original.
-- [ ] `buildSystemPrompt(settings)` com args injeta área e estilos no prompt.
-- [ ] Export `SYSTEM_PROMPT_EDITORIAL` preservado como alias retrocompatível.
-- [ ] TypeScript PASS.
-- [ ] Lint PASS.
+- [x] Endpoint `GET /api/ai/prompt-settings` retorna configurações salvas (ou defaults).
+- [x] Endpoint `POST /api/ai/prompt-settings` valida e salva na chave `aiPromptSettings`.
+- [x] Validação: máximo 3 estilos, máximo 100 chars nos campos livres.
+- [x] Interface `PromptSettings` criada.
+- [x] Função `buildSystemPrompt(settings?)` criada e exportada.
+- [x] `buildSystemPrompt()` sem args retorna prompt idêntico ao `SYSTEM_PROMPT_EDITORIAL` original.
+- [x] `buildSystemPrompt(settings)` com args injeta área e estilos no prompt.
+- [x] Export `SYSTEM_PROMPT_EDITORIAL` preservado como alias retrocompatível.
+- [x] TypeScript PASS.
+- [x] Lint PASS.
 
 ## Evidence
-(A ser preenchido na conclusão)
+- `src/lib/ai/types.ts` atualizado com interface `PromptSettings`, `DEFAULT_PROMPT_SETTINGS`, função `buildSystemPrompt` e alias `SYSTEM_PROMPT_EDITORIAL`.
+- `src/app/api/ai/prompt-settings/route.ts` criado implementando `GET` e `POST` com validação de payload (max 3 estilos, max 100 caracteres para campos de texto).
+- Script de teste automatizado `scripts/test-ai-prompt-settings.ts` criado e executado com sucesso:
+  - `buildSystemPrompt()` sem args produz saída idêntica ao `SYSTEM_PROMPT_EDITORIAL` canônico.
+  - `buildSystemPrompt(customSettings)` injeta área do portal e lista de estilos corretamente.
+  - Opções `Outro` com texto livre personalizam área e estilo conforme especificado.
+  - `GET /api/ai/prompt-settings` retorna defaults quando banco está limpo e dados salvos quando configurado.
+  - `POST /api/ai/prompt-settings` rejeita > 3 estilos com status 400.
+  - `POST /api/ai/prompt-settings` rejeita `customPortalArea` > 100 caracteres com status 400.
+  - `POST /api/ai/prompt-settings` rejeita `customWritingStyle` > 100 caracteres com status 400.
+  - `POST` e persistência no banco validados com persistência e recuperação via Prisma / `Configuration`.
+- `npx tsc --noEmit`: PASS
+- `npm run lint`: PASS
 
 ## Discovered Work
-(A ser preenchido na conclusão)
+Nenhum.

@@ -5,7 +5,7 @@ import {
   GenerateArticleInput,
   GeneratedArticle,
   AIConnectionResult,
-  SYSTEM_PROMPT_EDITORIAL,
+  buildSystemPrompt,
 } from "../types";
 
 export class OpenAIProvider implements AIProvider {
@@ -22,6 +22,7 @@ export class OpenAIProvider implements AIProvider {
   }
 
   async generateArticle(input: GenerateArticleInput): Promise<GeneratedArticle> {
+    const systemPrompt = buildSystemPrompt(input.promptSettings);
     const userPrompt = `Analise e reescreva a seguinte notícia:
 
 Título Original: ${input.originalTitle}
@@ -34,7 +35,7 @@ ${JSON.stringify(input.categories, null, 2)}
     const response = await this.client.chat.completions.create({
       model: this.model,
       messages: [
-        { role: "system", content: SYSTEM_PROMPT_EDITORIAL },
+        { role: "system", content: systemPrompt },
         { role: "user", content: userPrompt },
       ],
       response_format: { type: "json_object" },

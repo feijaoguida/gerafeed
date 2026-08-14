@@ -25,10 +25,10 @@
 
 ## AI Provider
 - Interface `AIProvider` agnóstica de fornecedor.
-- **Phase 4 (Planejada)**: `SYSTEM_PROMPT_EDITORIAL` será transformado em função `buildSystemPrompt(settings?)` para construção dinâmica do prompt com base nas preferências do usuário (área do portal e estilos de escrita).
+- **Phase 4 (Concluída)**: `buildSystemPrompt(settings?)` implementado para construção dinâmica do prompt com base nas preferências do usuário (área do portal e estilos de escrita). Todos os 4 provedores de IA (OpenAI, Gemini, Anthropic, OpenAI-Compatible) e o pipeline `processArticleWithAi` consomem as configurações de prompt salvas no banco.
 - Nova chave `aiPromptSettings` na tabela `Configuration` armazena as preferências do prompt editorial (`portalArea`, `customPortalArea`, `writingStyles`, `customWritingStyle`).
-- Endpoint `GET/POST /api/ai/prompt-settings` para gerenciar as configurações.
-- Página `/settings/ai` terá 2 abas: "Conexão" (existente) e "Prompt Editorial" (nova).
+- Endpoint `GET/POST /api/ai/prompt-settings` criado para gerenciar e validar as configurações.
+- Página `/settings/ai` possui 2 abas: "Conexão" (credenciais do provedor) e "Prompt Editorial" (área do portal, estilos de escrita com limite de 3 seleções, opções livres e preview em tempo real).
 
 ## WordPress
 - Publicação usa REST API nativa (`/wp-json/wp/v2/`).

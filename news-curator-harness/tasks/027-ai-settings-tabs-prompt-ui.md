@@ -1,7 +1,7 @@
 # Task 027. AI Settings Tabs and Prompt Editorial UI
 
 ## Status
-TODO
+DONE
 
 ## Objetivo
 Refatorar a página de configurações de IA (`/settings/ai`) para ter 2 abas e criar a interface visual da aba "Prompt Editorial" com seleção de área do portal, estilos de escrita e preview do prompt.
@@ -31,22 +31,33 @@ As tasks 025 e 026 criaram o backend (API, função `buildSystemPrompt`, integra
 - Feedback de sucesso/erro com os mesmos padrões de alert da aba Conexão.
 
 ## Definition of Done
-- [ ] Página `/settings/ai` exibe 2 abas (Conexão e Prompt Editorial).
-- [ ] Aba "Conexão" preservada e funcional (sem regressão).
-- [ ] Aba "Prompt Editorial" exibe radio buttons para área do portal.
-- [ ] Opção "Outro" para área com campo de texto (max 100 chars).
-- [ ] Aba exibe checkboxes para estilos de escrita.
-- [ ] Limite de 3 estilos de escrita validado na UI (bloqueio visual).
-- [ ] Opção "Outro" para estilo com campo de texto (max 100 chars).
-- [ ] Preview read-only do prompt gerado é exibido.
-- [ ] Botão "Salvar" persiste configurações via API.
-- [ ] Carregamento inicial popula campos com dados salvos.
-- [ ] Feedback visual de sucesso/erro.
-- [ ] TypeScript PASS.
-- [ ] Lint PASS.
+- [x] Página `/settings/ai` exibe 2 abas (Conexão e Prompt Editorial).
+- [x] Aba "Conexão" preservada e funcional (sem regressão).
+- [x] Aba "Prompt Editorial" exibe radio buttons para área do portal.
+- [x] Opção "Outro" para área com campo de texto (max 100 chars).
+- [x] Aba exibe checkboxes para estilos de escrita.
+- [x] Limite de 3 estilos de escrita validado na UI (bloqueio visual).
+- [x] Opção "Outro" para estilo com campo de texto (max 100 chars).
+- [x] Preview read-only do prompt gerado é exibido.
+- [x] Botão "Salvar" persiste configurações via API.
+- [x] Carregamento inicial popula campos com dados salvos.
+- [x] Feedback visual de sucesso/erro.
+- [x] TypeScript PASS.
+- [x] Lint PASS.
 
 ## Evidence
-(A ser preenchido na conclusão)
+- `src/app/settings/ai/page.tsx` refatorado com sistema de 2 abas (Conexão e Prompt Editorial).
+- Aba "Conexão" totalmente preservada (seleção de provedor, chaves, modelo, teste de conexão).
+- Aba "Prompt Editorial" implementada com:
+  - Grid de radio buttons para seleção da área do portal com opção "Outro" e input com limite de 100 caracteres.
+  - Grid de checkboxes para estilos de escrita com bloqueio visual estrito a no máximo 3 seleções e opção "Outro".
+  - Preview dinâmico do system prompt em tempo real.
+  - Carregamento inicial automático via `GET /api/ai/prompt-settings`.
+  - Salvamento via `POST /api/ai/prompt-settings` com feedbacks visuais de loading, erro e sucesso.
+- Script de teste `scripts/test-settings-ai-ui.ts`: PASS (100%).
+- `npx tsc --noEmit`: PASS.
+- `npm run lint`: PASS.
+- `npm run build`: PASS.
 
 ## Discovered Work
-(A ser preenchido na conclusão)
+Nenhum.

@@ -4,7 +4,7 @@ import {
   GenerateArticleInput,
   GeneratedArticle,
   AIConnectionResult,
-  SYSTEM_PROMPT_EDITORIAL,
+  buildSystemPrompt,
 } from "../types";
 
 export class AnthropicProvider implements AIProvider {
@@ -20,6 +20,7 @@ export class AnthropicProvider implements AIProvider {
   }
 
   async generateArticle(input: GenerateArticleInput): Promise<GeneratedArticle> {
+    const systemPrompt = buildSystemPrompt(input.promptSettings);
     const userPrompt = `Analise e reescreva a seguinte notícia:
 
 Título Original: ${input.originalTitle}
@@ -41,7 +42,7 @@ ${JSON.stringify(input.categories, null, 2)}
       body: JSON.stringify({
         model: this.model,
         max_tokens: 2048,
-        system: `${SYSTEM_PROMPT_EDITORIAL}\n\nResponda APENAS em JSON válido sem marcações markdown extra.`,
+        system: `${systemPrompt}\n\nResponda APENAS em JSON válido sem marcações markdown extra.`,
         messages: [{ role: "user", content: userPrompt }],
       }),
     });

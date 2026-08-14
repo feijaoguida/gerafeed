@@ -19,15 +19,15 @@ Configurable System (Concluído)
 Media & Attribution 100% Concluído.
 
 ## Phase 4
-Prompt Customization — TODO
+Prompt Customization — 100% Concluído.
 
 Tasks:
-- 025-ai-prompt-settings-api — TODO
-- 026-migrate-providers-dynamic-prompt — TODO
-- 027-ai-settings-tabs-prompt-ui — TODO
+- 025-ai-prompt-settings-api — DONE
+- 026-migrate-providers-dynamic-prompt — DONE
+- 027-ai-settings-tabs-prompt-ui — DONE
 
 ## Pending
-- Phase 4: Tasks 025, 026, 027
+- Nenhuma
 
 ## Completed
 - Phase 1
@@ -38,6 +38,10 @@ Tasks:
   - 022-image-processing-pipeline
   - 023-article-editor-images
   - 024-article-generation-attribution
+- Phase 4:
+  - 025-ai-prompt-settings-api
+  - 026-migrate-providers-dynamic-prompt
+  - 027-ai-settings-tabs-prompt-ui
 
 ## In Progress
 - Nenhuma
@@ -46,10 +50,17 @@ Tasks:
 - Nenhuma
 
 ## Last Evidence
-Phase 3 (Media & Attribution) finalizada com sucesso!
-- Task 024 (024-article-generation-attribution) concluída.
-- Atribuição de crédito de fonte original e upload de mídia destacada (`featured_media`) para o WordPress.
+Phase 4 (Prompt Customization) finalizada com sucesso!
+- Task 025: Endpoint `GET/POST /api/ai/prompt-settings` e `buildSystemPrompt` dinâmico implementados.
+- Task 026: Todos os 4 provedores de IA e `processArticleWithAi` migrados para consumir configurações dinâmicas de prompt editorial.
+- Task 027: Interface de configurações `/settings/ai` com 2 abas ("Conexão" e "Prompt Editorial"), seleção de área com opção livre, seleção de até 3 estilos com opção livre, preview dinâmico e persistência via API.
+- Testes automatizados executados e validados:
+  - `scripts/test-ai-prompt-settings.ts`: PASS
+  - `scripts/test-dynamic-prompt-migration.ts`: PASS
+  - `scripts/test-settings-ai-ui.ts`: PASS
 - `npx tsc --noEmit`: PASS
 - `npm run lint`: PASS
 - `npm run build`: PASS
+
+
 

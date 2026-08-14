@@ -4,7 +4,7 @@ import {
   GenerateArticleInput,
   GeneratedArticle,
   AIConnectionResult,
-  SYSTEM_PROMPT_EDITORIAL,
+  buildSystemPrompt,
 } from "../types";
 
 export class OpenAICompatibleProvider implements AIProvider {
@@ -20,6 +20,7 @@ export class OpenAICompatibleProvider implements AIProvider {
   }
 
   async generateArticle(input: GenerateArticleInput): Promise<GeneratedArticle> {
+    const systemPrompt = buildSystemPrompt(input.promptSettings);
     const userPrompt = `Analise e reescreva a seguinte notícia:
 
 Título Original: ${input.originalTitle}
@@ -47,7 +48,7 @@ ${JSON.stringify(input.categories, null, 2)}
       body: JSON.stringify({
         model: this.model,
         messages: [
-          { role: "system", content: SYSTEM_PROMPT_EDITORIAL },
+          { role: "system", content: systemPrompt },
           { role: "user", content: userPrompt },
         ],
         temperature: 0.7,
