@@ -13,6 +13,7 @@ import {
   Rss,
   Globe,
   Sparkles,
+  Image as ImageIcon,
   Menu,
   X,
 } from "lucide-react";
@@ -178,6 +179,19 @@ export function Sidebar() {
               >
                 <Sparkles className="w-4 h-4 text-emerald-400" />
                 Inteligência Artificial
+              </Link>
+
+              <Link
+                href="/settings/images"
+                onClick={() => setIsMobileOpen(false)}
+                className={`flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-medium transition ${
+                  isActive("/settings/images")
+                    ? "bg-indigo-600/20 text-indigo-300 border border-indigo-500/30"
+                    : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/60"
+                }`}
+              >
+                <ImageIcon className="w-4 h-4 text-purple-400" />
+                Estratégia de Imagens
               </Link>
             </div>
           </nav>

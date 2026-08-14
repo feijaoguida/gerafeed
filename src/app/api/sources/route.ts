@@ -16,7 +16,7 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { name, rssUrl, active = true } = body;
+    const { name, creditName, rssUrl, active = true } = body;
 
     if (!name || typeof name !== "string" || !name.trim()) {
       return NextResponse.json({ error: "Nome da fonte é obrigatório" }, { status: 400 });
@@ -29,6 +29,7 @@ export async function POST(request: Request) {
     const source = await prisma.source.create({
       data: {
         name: name.trim(),
+        creditName: typeof creditName === "string" ? creditName.trim() || null : null,
         rssUrl: rssUrl.trim(),
         active: Boolean(active),
       },

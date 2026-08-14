@@ -1,12 +1,26 @@
 import { NextResponse } from "next/server";
+import { prisma } from "@/lib/prisma";
 import { publishArticleToWordPress } from "@/lib/wordpress";
 
 export async function POST(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const { id } = await params;
+
+    try {
+      const body = await request.json();
+      if (typeof body?.selectedImage === "string" && ["ORIGINAL", "MODIFIED"].includes(body.selectedImage.toUpperCase())) {
+        await prisma.article.update({
+          where: { id },
+          data: { selectedImage: body.selectedImage.toUpperCase() },
+        });
+      }
+    } catch {
+      // Body is optional
+    }
+
     const result = await publishArticleToWordPress(id);
     return NextResponse.json(result);
   } catch (error) {

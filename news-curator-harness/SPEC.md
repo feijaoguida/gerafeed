@@ -1,192 +1,150 @@
-# News Curator. Phase 2
+# News Curator. Phase 3
 
 ## 1. Objetivo
-Evoluir o MVP para configurações visuais e IA desacoplada de fornecedor.
+Evoluir o sistema para gerenciar mídias (imagens) de forma inteligente e garantir a devida atribuição (créditos) às fontes originais.
 
 Nesta fase:
-- menu lateral;
-- configurações;
-- WordPress visual;
-- configuração central;
-- criptografia;
-- helper encrypt/decrypt;
-- AIProvider;
-- OpenAI;
-- Gemini;
-- Anthropic;
-- OpenAI Compatible;
-- tela de IA;
-- teste de conexão;
-- migração do processamento.
+- Campo "Fonte" no cadastro de RSS.
+- Configuração global de estratégia de imagens (Original vs. Processada/IA).
+- Processamento de imagens (inversão, filtros sutis ou IA) para diferenciação.
+- Comparação visual (Original x Alterada) na tela de aprovação.
+- Inserção automática dos créditos no final do artigo gerado.
 
-## 2. AI Provider
-Fluxo:
-
-Article Processing
-→ AIProviderFactory
-→ AIProvider
-→ OpenAI / Gemini / Anthropic / OpenAI Compatible
-
-O código editorial depende da interface, não do fornecedor.
+## 2. AI Provider e Processamento
+O fluxo existente de `AIProvider` permanece. A novidade é a etapa de processamento de imagem que ocorre após a coleta e antes (ou durante) a aprovação.
 
 ## 3. Configuração central
-Criar `Configuration`:
-
-- id
-- key
-- value
-- createdAt
-- updatedAt
-
-`key` deve ser única.
-
-Exemplos:
-- `wordpressConnection`
-- `aiProvider`
-
-Pode usar JSON/JSONB para value se isso simplificar a evolução. Secrets nunca ficam plaintext.
+Adicionar nova chave na tabela `Configuration`:
+- `imageSettings` (JSON)
+  Exemplo de valor: `{ "strategy": "MODIFIED", "modificationType": "FLIP_HORIZONTAL" }`
 
 ## 4. WordPress
-Tela `Configurações > WordPress`.
-
-Campos:
-- URL
-- Usuário
-- Application Password
-
-Ações:
-- Salvar
-- Testar conexão
-- Sincronizar categorias
-
-Application Password deve ser criptografada.
+A publicação no WordPress agora deve enviar a imagem escolhida (Original ou Alterada) como `featured_media`. O upload da imagem para o media library do WP deve ocorrer na aprovação, ou a URL externa deve ser usada (se o WP estiver configurado para aceitar).
 
 ## 5. Criptografia
-Criar helper central:
+Sem mudanças estruturais nesta fase.
 
-```ts
-encrypt(value: string): string
-decrypt(value: string): string
-```
+## 6. Telas e UI
+### Cadastro de RSS
+Adicionar campo opcional "Fonte". Descrição: "Usado para informar no final das Matérias".
 
-Preferir AES-256-GCM.
+### Configurações de Imagem
+Nova aba ou seção em Configurações para escolher a estratégia padrão de imagens.
 
-`ENCRYPTION_KEY` é a chave principal e nunca vai para o banco.
+### Editor de Aprovação
+O painel de edição do artigo deve exibir:
+- Imagem Original (com label).
+- Imagem Alterada (com label).
+Permitir que o usuário selecione qual versão será publicada (radio button ou seleção visual).
 
-Um SALT/contexto pode ser constante/versionado e participar da derivação, mas não é segunda chave secreta.
+## 7. Geração e Atribuição
+No momento de montar o conteúdo final para o WordPress, o sistema deve concatenar automaticamente:
+`<br><br><p><em>Fonte: {Nome da Fonte}</em></p>` (ou formato equivalente) no final do `content`.
 
-Importante:
-- não usar SALT como substituto da key;
-- nonce/IV novo para cada criptografia;
-- armazenar os metadados necessários para decrypt;
-- ciphertext autenticado;
-- não criar criptografia própria;
-- não logar secrets.
+## 8. Definition of Done global (Phase 3)
+- [ ] Schema do Prisma atualizado (Source.creditName, Article.modifiedImageUrl).
+- [ ] Cadastro de RSS refatorado para incluir campo Fonte.
+- [ ] Configuração de Estratégia de Imagem criada no banco e na UI.
+- [ ] Pipeline de processamento de imagem implementado (Sharp para inversão/filtros ou integração IA).
+- [ ] Tela de aprovação exibindo as duas versões da imagem lado a lado.
+- [ ] Seleção de imagem final pelo usuário.
+- [ ] Artigo publicado contendo a atribuição (Fonte) no final do texto.
+- [ ] Imagem correta enviada ao WordPress.
+- [ ] TypeScript PASS, Lint PASS.
 
-Formato versionado pode ser:
-`v1:iv:ciphertext:authTag`
+---
 
-Se for desejado um segundo segredo real, usar `PEPPER` separado em environment variable.
+# News Curator — Phase 4: Prompt Customization
 
-## 6. AIProvider
-Interface conceitual:
+## 1. Objetivo
+Permitir que o usuário personalize o prompt editorial da IA diretamente pela interface, sem necessidade de alterar código. O `SYSTEM_PROMPT_EDITORIAL`, atualmente uma constante fixa em `src/lib/ai/types.ts`, passará a ser construído dinamicamente com base nas preferências do usuário.
 
-```ts
-interface AIProvider {
-  generateArticle(input: GenerateArticleInput): Promise<GeneratedArticle>;
-  testConnection(): Promise<AIConnectionResult>;
-}
-```
+Nesta fase:
+- Personalização da **área do portal** (ex: Tecnologia, Política, Humor, etc.).
+- Seleção de até **3 estilos de escrita** (ex: Informativo, Atraente, Sério, etc.).
+- Opção de informar valores personalizados (texto livre, máximo 100 caracteres) para área e estilo.
+- Preview do prompt gerado na interface.
+- O prompt sem configuração deve usar defaults retrocompatíveis (portal de tecnologia e negócios, estilo atraente).
 
-Criar factory/registry.
+## 2. Configuração central
+Nova chave na tabela `Configuration`:
+- `aiPromptSettings` (JSON)
+  Exemplo de valor:
+  ```json
+  {
+    "portalArea": "Tecnologia",
+    "customPortalArea": "",
+    "writingStyles": ["Informativo", "Atraente"],
+    "customWritingStyle": ""
+  }
+  ```
 
-### OpenAI
-API key + model. Base URL padrão quando aplicável.
+Sem alterações no schema do Prisma — usa a tabela `Configuration` existente.
 
-### Gemini
-Adapter específico, escondendo diferenças da API.
+## 3. Opções pré-definidas
 
-### Anthropic
-Adapter específico, escondendo diferenças da API.
+### Áreas do Portal
+- Tecnologia
+- Negócios
+- Política
+- Ciência
+- Saúde
+- Entretenimento
+- Esportes
+- Educação
+- Humor
+- Meio Ambiente
+- Outro (texto livre, max 100 caracteres)
 
-### OpenAI Compatible
-Configuração:
-- apiKey
-- baseUrl
-- model
+### Estilos de Escrita (selecionar até 3)
+- Informativo
+- Atraente
+- Sério
+- Alegre
+- Humorístico
+- Analítico
+- Provocativo
+- Casual
+- Técnico
+- Persuasivo
+- Outro (texto livre, max 100 caracteres)
 
-Permite OpenRouter, DeepSeek, Kimi e outros endpoints compatíveis.
+## 4. Prompt dinâmico
+A constante `SYSTEM_PROMPT_EDITORIAL` deve ser transformada em uma função `buildSystemPrompt(settings?)` que:
+- Sem argumentos: retorna o prompt padrão atual (retrocompatível).
+- Com argumentos: injeta a área e os estilos escolhidos no texto do prompt.
 
-## 7. Tela de IA
-`Configurações > Inteligência Artificial`
+Os 4 providers (OpenAI, Gemini, Anthropic, OpenAI-Compatible) devem usar a função em vez da constante.
 
-Campos:
-- Provider
-- API Key
-- Base URL quando aplicável
-- Model
+A função `processArticleWithAi` em `src/lib/ai.ts` deve carregar `aiPromptSettings` do banco via `getConfig` e repassar ao provider.
 
-API Key nunca deve ser exibida após salva. Mostrar estado/máscara e permitir substituição.
+## 5. Telas e UI
+### Página de configurações de IA (`/settings/ai`)
+A página existente deve ser refatorada em **2 abas**:
 
-Ações:
-- Salvar
-- Testar conexão
+**Aba 1 — Conexão** (conteúdo atual, sem alteração funcional)
+- Seleção do provedor, API Key, Model, Base URL.
 
-## 8. Teste de conexão
-Cada provider implementa `testConnection()`.
-Executar server-side.
-Nunca retornar secrets.
+**Aba 2 — Prompt Editorial** (nova)
+- Seleção da área do portal (radio buttons + campo "Outro").
+- Seleção de estilos de escrita (checkboxes, máximo 3 + campo "Outro").
+- Preview read-only do trecho do prompt gerado.
+- Botão "Salvar Configurações do Prompt".
 
-## 9. Migração
-Antes:
-`processArticle → OpenAI`
+## 6. API
+Novo endpoint `GET/POST /api/ai/prompt-settings`:
+- **GET**: Retorna as configurações salvas.
+- **POST**: Valida (max 3 estilos, max 100 chars nos campos livres) e salva sob a chave `aiPromptSettings`.
 
-Depois:
-`processArticle → AIProviderFactory → AIProvider → provider`
-
-O resultado editorial existente deve permanecer compatível.
-
-## 10. Sidebar
-Sugestão:
-
-Dashboard
-
-Notícias
-- Pendentes
-- Publicadas
-- Rejeitadas
-
-Configurações
-- Fontes RSS
-- WordPress
-- Inteligência Artificial
-
-## 11. Segurança
-Nunca enviar ao client:
-- API Key
-- Application Password
-- ENCRYPTION_KEY
-
-Descriptografar somente no servidor e somente quando necessário.
-
-## 12. Definition of Done global
-- [ ] Sidebar
-- [ ] Configuração WordPress
-- [ ] Configuration no banco
-- [ ] Application Password criptografada
-- [ ] Helper crypto
-- [ ] Testes crypto
-- [ ] AIProvider
-- [ ] OpenAI
-- [ ] Gemini
-- [ ] Anthropic
-- [ ] OpenAI Compatible
-- [ ] Tela IA
-- [ ] API Key criptografada
-- [ ] Teste de conexão
-- [ ] Processamento usa AIProvider
-- [ ] Nenhum secret no client/log
-- [ ] TypeScript PASS
-- [ ] Lint PASS
-- [ ] Testes PASS
-- [ ] Fluxo RSS → IA → aprovação → WordPress preservado.
+## 7. Definition of Done global (Phase 4)
+- [ ] Endpoint `GET/POST /api/ai/prompt-settings` criado e funcional.
+- [ ] Configuração salva na chave `aiPromptSettings` da tabela `Configuration`.
+- [ ] `buildSystemPrompt(settings?)` gera prompt dinâmico.
+- [ ] Prompt sem configuração usa defaults (retrocompatível).
+- [ ] Todos os 4 providers usam `buildSystemPrompt` em vez da constante fixa.
+- [ ] Página `/settings/ai` com 2 abas (Conexão + Prompt Editorial).
+- [ ] Seleção de área do portal funcional com opção "Outro".
+- [ ] Seleção de até 3 estilos de escrita funcional com opção "Outro".
+- [ ] Campos "Outro" validados (max 100 caracteres).
+- [ ] Preview do prompt na UI.
+- [ ] TypeScript PASS, Lint PASS.

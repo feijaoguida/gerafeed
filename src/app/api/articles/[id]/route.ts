@@ -61,6 +61,9 @@ export async function PATCH(
     if (typeof body.status === "string" && ["PENDING", "PUBLISHED", "REJECTED"].includes(body.status.toUpperCase())) {
       dataToUpdate.status = body.status.toUpperCase() as ArticleStatus;
     }
+    if (typeof body.selectedImage === "string" && ["ORIGINAL", "MODIFIED"].includes(body.selectedImage.toUpperCase())) {
+      dataToUpdate.selectedImage = body.selectedImage.toUpperCase();
+    }
     if (typeof body.aiScore === "number") dataToUpdate.aiScore = body.aiScore;
 
     const updated = await prisma.article.update({

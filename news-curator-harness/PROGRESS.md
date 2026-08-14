@@ -1,36 +1,43 @@
 # PROGRESS.md
 
 ## Current Phase
-Phase 2. Configurable System
+Phase 4 — Prompt Customization
 
 ## Current Task
 Nenhuma
 
 ## Status
-DONE
+TODO
 
 ## Phase 1
-Core MVP já implementado pelo projeto existente.
+Core MVP (Concluído)
 
 ## Phase 2
-Configurable System 100% Concluído.
+Configurable System (Concluído)
+
+## Phase 3
+Media & Attribution 100% Concluído.
+
+## Phase 4
+Prompt Customization — TODO
+
+Tasks:
+- 025-ai-prompt-settings-api — TODO
+- 026-migrate-providers-dynamic-prompt — TODO
+- 027-ai-settings-tabs-prompt-ui — TODO
 
 ## Pending
-- Nenhuma
+- Phase 4: Tasks 025, 026, 027
 
 ## Completed
-- Phase 1. Core MVP.
-- Phase 2. Configurable System.
-  - 010-settings-layout
-  - 011-configuration-storage
-  - 012-encryption-helper
-  - 013-wordpress-configuration
-  - 014-ai-provider-abstraction
-  - 015-ai-configuration
-  - 016-ai-provider-testing
-  - 017-migrate-article-processing
-  - 018-navigation-integration
-  - 019-settings-hardening
+- Phase 1
+- Phase 2
+- Phase 3:
+  - 020-rss-source-credit
+  - 021-image-strategy-settings
+  - 022-image-processing-pipeline
+  - 023-article-editor-images
+  - 024-article-generation-attribution
 
 ## In Progress
 - Nenhuma
@@ -39,10 +46,10 @@ Configurable System 100% Concluído.
 - Nenhuma
 
 ## Last Evidence
-Task 019 (019-settings-hardening) concluída.
-- Auditoria de segurança de APIs, logs e fronteiras server-only efetuada com sucesso.
-- Criptografia AES-256-GCM verificada com IVs únicos de 12 bytes e Auth Tag de 16 bytes.
-- Script de teste `scripts/test-settings-hardening.ts` executado validando sigilo de respostas, autenticidade e fallbacks.
+Phase 3 (Media & Attribution) finalizada com sucesso!
+- Task 024 (024-article-generation-attribution) concluída.
+- Atribuição de crédito de fonte original e upload de mídia destacada (`featured_media`) para o WordPress.
 - `npx tsc --noEmit`: PASS
 - `npm run lint`: PASS
 - `npm run build`: PASS
+

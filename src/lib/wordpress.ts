@@ -1,3 +1,5 @@
+import fs from "fs";
+import path from "path";
 import { prisma } from "@/lib/prisma";
 import { getConfig } from "@/lib/config";
 import { decrypt } from "@/lib/crypto";
@@ -68,6 +70,76 @@ function getAuthHeaders(config: Awaited<ReturnType<typeof getWordPressConfig>>):
     Authorization: `Basic ${base64Auth}`,
     "Content-Type": "application/json",
   };
+}
+
+/**
+ * Uploads an image (either local file or remote URL) to WordPress Media Library API (/wp-json/wp/v2/media).
+ * Returns WordPress media ID on success or null on error.
+ */
+export async function uploadMediaToWordPress(
+  config: Awaited<ReturnType<typeof getWordPressConfig>>,
+  imageUrl: string,
+  articleId: string
+): Promise<number | null> {
+  if (!imageUrl || typeof imageUrl !== "string") return null;
+
+  try {
+    let imageBuffer: Buffer;
+    let filename = `article-media-${articleId}.jpg`;
+    let contentType = "image/jpeg";
+
+    if (imageUrl.startsWith("/")) {
+      // Local file in public directory
+      const localPath = path.join(process.cwd(), "public", imageUrl);
+      if (!fs.existsSync(localPath)) {
+        console.warn(`Local media file not found at ${localPath}`);
+        return null;
+      }
+      imageBuffer = await fs.promises.readFile(localPath);
+      filename = path.basename(localPath);
+    } else {
+      // Remote URL
+      const res = await fetch(imageUrl, {
+        headers: {
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+        },
+        signal: AbortSignal.timeout(10000),
+      });
+      if (!res.ok) {
+        console.warn(`Failed to fetch remote image for WP media upload: HTTP ${res.status}`);
+        return null;
+      }
+      const arrayBuffer = await res.arrayBuffer();
+      imageBuffer = Buffer.from(arrayBuffer);
+      const mime = res.headers.get("content-type");
+      if (mime) contentType = mime;
+    }
+
+    const credentials = `${config.username}:${config.applicationPassword}`;
+    const base64Auth = Buffer.from(credentials).toString("base64");
+
+    const wpMediaRes = await fetch(`${config.url}/wp-json/wp/v2/media`, {
+      method: "POST",
+      headers: {
+        Authorization: `Basic ${base64Auth}`,
+        "Content-Type": contentType,
+        "Content-Disposition": `attachment; filename="${filename}"`,
+      },
+      body: new Uint8Array(imageBuffer),
+    });
+
+    if (!wpMediaRes.ok) {
+      const errText = await wpMediaRes.text().catch(() => "");
+      console.warn(`WordPress Media API upload failed (${wpMediaRes.status}): ${errText.substring(0, 200)}`);
+      return null;
+    }
+
+    const mediaData = await wpMediaRes.json();
+    return typeof mediaData?.id === "number" ? mediaData.id : null;
+  } catch (error) {
+    console.warn(`Error uploading media to WordPress for article ${articleId}:`, error);
+    return null;
+  }
 }
 
 /**
@@ -231,7 +303,8 @@ export async function syncWordPressCategories() {
 }
 
 /**
- * Validates required fields, publishes article post to WordPress with Yoast SEO meta fields,
+ * Validates required fields, appends source credit, uploads selected featured media,
+ * publishes article post to WordPress with Yoast SEO meta fields,
  * and updates DB status to PUBLISHED with wordpressPostId.
  */
 export async function publishArticleToWordPress(articleId: string) {
@@ -240,6 +313,7 @@ export async function publishArticleToWordPress(articleId: string) {
     include: {
       category: true,
       suggestedCategory: true,
+      source: true,
     },
   });
 
@@ -263,10 +337,30 @@ export async function publishArticleToWordPress(articleId: string) {
   const config = await getWordPressConfig();
   const headers = getAuthHeaders(config);
 
-  // Resolve tags
+  // 1. Resolve source credit attribution
+  let finalContent = article.content.trim();
+  const creditName = article.source?.creditName || article.source?.name;
+  if (creditName && !finalContent.toLowerCase().includes("fonte:")) {
+    finalContent += `<br><br><p><em>Fonte: ${creditName}</em></p>`;
+  }
+
+  // 2. Resolve selected featured media image
+  let selectedImageUrl: string | null = null;
+  if (article.selectedImage === "MODIFIED" && article.modifiedImageUrl) {
+    selectedImageUrl = article.modifiedImageUrl;
+  } else if (article.originalImageUrl) {
+    selectedImageUrl = article.originalImageUrl;
+  }
+
+  let featuredMediaId: number | null = null;
+  if (selectedImageUrl) {
+    featuredMediaId = await uploadMediaToWordPress(config, selectedImageUrl, articleId);
+  }
+
+  // 3. Resolve tags
   const wpTagIds = await getOrCreateWordPressTagIds(config, headers, article.tags || []);
 
-  // Map Yoast SEO post meta fields
+  // 4. Map Yoast SEO post meta fields
   const meta: Record<string, string> = {};
   if (article.seoTitle && article.seoTitle.trim()) {
     meta._yoast_wpseo_title = article.seoTitle.trim();
@@ -280,11 +374,15 @@ export async function publishArticleToWordPress(articleId: string) {
 
   const wpPostData: Record<string, unknown> = {
     title: article.title,
-    content: article.content,
+    content: finalContent,
     excerpt: article.summary || "",
     status: "publish",
     categories: [categoryToUse.wordpressId],
   };
+
+  if (featuredMediaId) {
+    wpPostData.featured_media = featuredMediaId;
+  }
 
   if (wpTagIds.length > 0) {
     wpPostData.tags = wpTagIds;
@@ -320,6 +418,7 @@ export async function publishArticleToWordPress(articleId: string) {
   return {
     success: true,
     wordpressPostId,
+    featuredMediaId,
     article: updatedArticle,
   };
 }

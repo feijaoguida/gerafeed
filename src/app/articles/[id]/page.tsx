@@ -14,6 +14,7 @@ import {
   Search,
   Globe,
   Tag,
+  Image as ImageIcon,
 } from "lucide-react";
 
 interface Category {
@@ -41,6 +42,9 @@ interface ArticleDetail {
   aiScore: number | null;
   status: "PENDING" | "PUBLISHED" | "REJECTED";
   wordpressPostId: number | null;
+  originalImageUrl?: string | null;
+  modifiedImageUrl?: string | null;
+  selectedImage?: string | null;
   source?: { id: string; name: string; rssUrl?: string } | null;
   suggestedCategory: Category | null;
   category: Category | null;
@@ -62,6 +66,7 @@ export default function ReviewArticlePage({ params }: { params: Promise<{ id: st
   const [seoFocusKeyword, setSeoFocusKeyword] = useState("");
   const [seoTitle, setSeoTitle] = useState("");
   const [seoDescription, setSeoDescription] = useState("");
+  const [selectedImage, setSelectedImage] = useState<"ORIGINAL" | "MODIFIED">("ORIGINAL");
 
   // Loading & Action states
   const [isLoading, setIsLoading] = useState(true);
@@ -96,6 +101,7 @@ export default function ReviewArticlePage({ params }: { params: Promise<{ id: st
           setSeoFocusKeyword(artData.seoFocusKeyword || "");
           setSeoTitle(artData.seoTitle || artData.title || artData.originalTitle || "");
           setSeoDescription(artData.seoDescription || artData.summary || "");
+          setSelectedImage(artData.selectedImage === "MODIFIED" ? "MODIFIED" : "ORIGINAL");
         } else {
           setErrorMessage("Notícia não encontrada.");
         }
@@ -144,6 +150,7 @@ export default function ReviewArticlePage({ params }: { params: Promise<{ id: st
           seoFocusKeyword,
           seoTitle,
           seoDescription,
+          selectedImage,
         }),
       });
 
@@ -234,7 +241,11 @@ export default function ReviewArticlePage({ params }: { params: Promise<{ id: st
     await handleSaveDraft();
 
     try {
-      const res = await fetch(`/api/articles/${id}/approve`, { method: "POST" });
+      const res = await fetch(`/api/articles/${id}/approve`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ selectedImage }),
+      });
       const data = await res.json();
 
       if (!res.ok) throw new Error(data.error || "Erro ao aprovar e publicar no WordPress.");
@@ -494,6 +505,107 @@ export default function ReviewArticlePage({ params }: { params: Promise<{ id: st
                   className="w-full px-3 py-2 rounded-lg bg-zinc-950 border border-zinc-800 text-xs text-zinc-300 placeholder-zinc-600 focus:outline-none focus:border-indigo-500"
                 />
               </div>
+            </div>
+
+            {/* Featured Media Selection Panel */}
+            <div className="p-6 rounded-xl bg-zinc-900/60 border border-zinc-800 space-y-4">
+              <h2 className="text-sm font-semibold text-zinc-200 flex items-center justify-between border-b border-zinc-800 pb-3">
+                <span className="flex items-center gap-2">
+                  <ImageIcon className="w-4 h-4 text-indigo-400" />
+                  Mídia Destacada
+                </span>
+                <span className="text-[10px] font-mono text-zinc-400 bg-zinc-950 px-2 py-0.5 rounded border border-zinc-800">
+                  Ativa: <span className="text-indigo-400 font-bold uppercase">{selectedImage}</span>
+                </span>
+              </h2>
+
+              {article.originalImageUrl || article.modifiedImageUrl ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {/* Option 1: Original Image */}
+                  {article.originalImageUrl && (
+                    <div
+                      onClick={() => setSelectedImage("ORIGINAL")}
+                      className={`p-3 rounded-xl border cursor-pointer transition flex flex-col justify-between space-y-2 ${
+                        selectedImage === "ORIGINAL"
+                          ? "bg-indigo-600/10 border-indigo-500 text-white shadow-md shadow-indigo-500/10"
+                          : "bg-zinc-950/60 border-zinc-800/80 text-zinc-400 hover:border-zinc-700"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-semibold flex items-center gap-1.5">
+                          <input
+                            type="radio"
+                            name="selectedImage"
+                            checked={selectedImage === "ORIGINAL"}
+                            onChange={() => setSelectedImage("ORIGINAL")}
+                            className="accent-indigo-500"
+                          />
+                          Imagem Original
+                        </span>
+                        {selectedImage === "ORIGINAL" && (
+                          <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
+                            SELECIONADA
+                          </span>
+                        )}
+                      </div>
+                      <div className="relative aspect-video w-full overflow-hidden rounded-lg bg-zinc-950 border border-zinc-800">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={article.originalImageUrl}
+                          alt="Imagem Original"
+                          className="object-cover w-full h-full"
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Option 2: Modified Image */}
+                  {article.modifiedImageUrl ? (
+                    <div
+                      onClick={() => setSelectedImage("MODIFIED")}
+                      className={`p-3 rounded-xl border cursor-pointer transition flex flex-col justify-between space-y-2 ${
+                        selectedImage === "MODIFIED"
+                          ? "bg-indigo-600/10 border-indigo-500 text-white shadow-md shadow-indigo-500/10"
+                          : "bg-zinc-950/60 border-zinc-800/80 text-zinc-400 hover:border-zinc-700"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-semibold flex items-center gap-1.5">
+                          <input
+                            type="radio"
+                            name="selectedImage"
+                            checked={selectedImage === "MODIFIED"}
+                            onChange={() => setSelectedImage("MODIFIED")}
+                            className="accent-indigo-500"
+                          />
+                          Imagem Processada
+                        </span>
+                        {selectedImage === "MODIFIED" && (
+                          <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
+                            SELECIONADA
+                          </span>
+                        )}
+                      </div>
+                      <div className="relative aspect-video w-full overflow-hidden rounded-lg bg-zinc-950 border border-zinc-800">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={article.modifiedImageUrl}
+                          alt="Imagem Modificada"
+                          className="object-cover w-full h-full"
+                        />
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="p-3 rounded-xl bg-zinc-950/40 border border-zinc-800/60 flex items-center justify-center text-center">
+                      <p className="text-[11px] text-zinc-500 italic">
+                        Imagem processada não gerada. Clique em &quot;Reescrever com IA&quot;.
+                      </p>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <p className="text-xs text-zinc-500 italic">Sem mídia destacada no RSS.</p>
+              )}
             </div>
 
             {/* Original RSS Reference Panel */}

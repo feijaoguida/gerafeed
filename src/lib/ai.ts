@@ -1,5 +1,7 @@
 import { prisma } from "@/lib/prisma";
+import { getConfig } from "@/lib/config";
 import { getActiveAIProvider } from "./ai/service";
+import { processAndStoreImage } from "./imageProcessor";
 
 export * from "./ai/index";
 
@@ -18,7 +20,7 @@ export interface AiProcessResult {
 
 /**
  * Process a single article by ID using the configured active AIProvider (OpenAI, Gemini, Anthropic, OpenAI-Compatible)
- * and update its fields in Prisma DB.
+ * and update its text and image fields in Prisma DB according to global image strategy.
  */
 export async function processArticleWithAi(articleId: string) {
   const article = await prisma.article.findUnique({
@@ -46,6 +48,18 @@ export async function processArticleWithAi(articleId: string) {
     validCategoryId = aiResult.suggestedCategoryId;
   }
 
+  // Process image if originalImageUrl is present
+  const imageConfig = await getConfig<{ defaultStrategy: "ORIGINAL" | "MODIFIED" }>("imageSettings");
+  const defaultStrategy = imageConfig?.defaultStrategy || "ORIGINAL";
+
+  let modifiedImageUrl: string | null = article.modifiedImageUrl;
+  if (article.originalImageUrl) {
+    const processedUrl = await processAndStoreImage(article.originalImageUrl, articleId);
+    if (processedUrl) {
+      modifiedImageUrl = processedUrl;
+    }
+  }
+
   const updatedArticle = await prisma.article.update({
     where: { id: articleId },
     data: {
@@ -58,6 +72,8 @@ export async function processArticleWithAi(articleId: string) {
       seoFocusKeyword: aiResult.seoFocusKeyword,
       seoTitle: aiResult.seoTitle,
       seoDescription: aiResult.seoDescription,
+      modifiedImageUrl,
+      selectedImage: defaultStrategy,
     },
   });
 

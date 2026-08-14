@@ -14,9 +14,14 @@ export async function PATCH(
       return NextResponse.json({ error: "Fonte não encontrada" }, { status: 404 });
     }
 
-    const dataToUpdate: { name?: string; rssUrl?: string; active?: boolean } = {};
+    const dataToUpdate: { name?: string; creditName?: string | null; rssUrl?: string; active?: boolean } = {};
     if (typeof body.name === "string" && body.name.trim()) {
       dataToUpdate.name = body.name.trim();
+    }
+    if (typeof body.creditName === "string") {
+      dataToUpdate.creditName = body.creditName.trim() || null;
+    } else if (body.creditName === null) {
+      dataToUpdate.creditName = null;
     }
     if (typeof body.rssUrl === "string" && body.rssUrl.trim()) {
       dataToUpdate.rssUrl = body.rssUrl.trim();
