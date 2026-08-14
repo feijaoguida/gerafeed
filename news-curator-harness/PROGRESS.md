@@ -1,10 +1,11 @@
 # PROGRESS.md
 
 ## Current Phase
-Phase 4 — Prompt Customization
+Current Phase
+Phase 5. SaaS, Auth & Billing
 
-## Current Task
-Nenhuma
+Current Task
+030-auth-setup
 
 ## Status
 TODO
@@ -43,6 +44,17 @@ Tasks:
   - 026-migrate-providers-dynamic-prompt
   - 027-ai-settings-tabs-prompt-ui
 
+Phase 5
+SaaS & Multi-tenant (Pendente)
+Pending
+030-auth-setup
+031-multi-tenant-schema
+032-tenant-isolation-refactor
+033-billing-schema-limits
+034-payment-gateway-abstraction
+035-asaas-integration
+036-checkout-and-webhooks
+
 ## In Progress
 - Nenhuma
 
@@ -61,6 +73,5 @@ Phase 4 (Prompt Customization) finalizada com sucesso!
 - `npx tsc --noEmit`: PASS
 - `npm run lint`: PASS
 - `npm run build`: PASS
-
 
 
