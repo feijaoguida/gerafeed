@@ -1,13 +1,15 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { getSessionWorkspaceId } from "@/lib/workspace";
 
 export async function GET() {
   try {
+    const workspaceId = await getSessionWorkspaceId();
     const [pendingCount, publishedCount, rejectedCount, activeSourcesCount] = await Promise.all([
-      prisma.article.count({ where: { status: "PENDING" } }),
-      prisma.article.count({ where: { status: "PUBLISHED" } }),
-      prisma.article.count({ where: { status: "REJECTED" } }),
-      prisma.source.count({ where: { active: true } }),
+      prisma.article.count({ where: { workspaceId, status: "PENDING" } }),
+      prisma.article.count({ where: { workspaceId, status: "PUBLISHED" } }),
+      prisma.article.count({ where: { workspaceId, status: "REJECTED" } }),
+      prisma.source.count({ where: { workspaceId, active: true } }),
     ]);
 
     return NextResponse.json({
@@ -21,3 +23,4 @@ export async function GET() {
     return NextResponse.json({ error: "Erro ao buscar estatísticas do dashboard" }, { status: 500 });
   }
 }
+

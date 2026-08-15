@@ -9,7 +9,7 @@ async function main() {
   // 1. Create test records
   const source = await prisma.source.create({
     data: {
-      name: "Approval Test Source",
+        workspaceId: "default-workspace",name: "Approval Test Source",
       rssUrl: "https://example.com/approval-rss",
       active: true,
     },
@@ -17,7 +17,7 @@ async function main() {
 
   const category = await prisma.wordPressCategory.create({
     data: {
-      wordpressId: 7771,
+        workspaceId: "default-workspace",wordpressId: 7771,
       name: "Tecnologia Aprovação",
       slug: "tecnologia-aprovacao",
     },
@@ -25,7 +25,7 @@ async function main() {
 
   const articleToReject = await prisma.article.create({
     data: {
-      sourceId: source.id,
+        workspaceId: "default-workspace",sourceId: source.id,
       originalUrl: "https://example.com/appr-test-1",
       originalTitle: "Notícia Original para Rejeição",
       status: "PENDING",
@@ -34,7 +34,7 @@ async function main() {
 
   const articleToApprove = await prisma.article.create({
     data: {
-      sourceId: source.id,
+        workspaceId: "default-workspace",sourceId: source.id,
       originalUrl: "https://example.com/appr-test-2",
       originalTitle: "Notícia Original para Aprovação",
       status: "PENDING",
@@ -80,7 +80,7 @@ async function main() {
   // Empty title test
   const invalidArtNoTitle = await prisma.article.create({
     data: {
-      sourceId: source.id,
+        workspaceId: "default-workspace",sourceId: source.id,
       originalUrl: "https://example.com/appr-no-title",
       originalTitle: "No title test",
       status: "PENDING",

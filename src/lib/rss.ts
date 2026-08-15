@@ -1,5 +1,7 @@
 import Parser from "rss-parser";
 import { prisma } from "@/lib/prisma";
+import { BillingService } from "@/lib/billing";
+
 
 export interface ExtractedRssItem {
   originalUrl: string;
@@ -118,12 +120,18 @@ export async function parseFeedUrl(url: string, sourceId: string): Promise<Extra
 
 /**
  * Fetches active RSS sources, deduplicates items by originalUrl,
- * selects up to `limit` new items (default 5), and saves them as PENDING articles.
+ * selects up to `limit` new items (default 5), and saves them as PENDING articles for the specified workspace.
  */
-export async function processRssSources(limit: number = 5) {
-  // 1. Find all active sources
+export async function processRssSources(
+  limit: number = 5,
+  workspaceId: string = "default-workspace"
+) {
+  // 1. Find all active sources for this workspace
   const activeSources = await prisma.source.findMany({
-    where: { active: true },
+    where: {
+      workspaceId,
+      active: true,
+    },
   });
 
   if (activeSources.length === 0) {
@@ -131,7 +139,7 @@ export async function processRssSources(limit: number = 5) {
       success: true,
       processedCount: 0,
       articles: [],
-      message: "Nenhuma fonte RSS ativa encontrada.",
+      message: "Nenhuma fonte RSS ativa encontrada neste workspace.",
     };
   }
 
@@ -160,7 +168,7 @@ export async function processRssSources(limit: number = 5) {
   }
   const uniqueCandidates = Array.from(uniqueCandidatesMap.values());
 
-  // 4. Query existing articles in DB for deduplication
+  // 4. Query existing articles in DB for deduplication within workspace
   const candidateUrls = uniqueCandidates.map((c) => c.originalUrl);
   const existingArticles = await prisma.article.findMany({
     where: {
@@ -186,11 +194,18 @@ export async function processRssSources(limit: number = 5) {
     };
   }
 
-  // 6. Persist selected articles with status PENDING
+  // 6. Persist selected articles with status PENDING up to remaining plan quota
   const createdArticles = [];
   for (const item of selectedItems) {
+    const limitCheck = await BillingService.checkLimit(workspaceId, "ARTICLES");
+    if (!limitCheck.allowed) {
+      console.warn(`[RSS Process] ${limitCheck.message}`);
+      break;
+    }
+
     const article = await prisma.article.create({
       data: {
+        workspaceId,
         sourceId: item.sourceId,
         originalUrl: item.originalUrl,
         originalTitle: item.originalTitle,
@@ -203,6 +218,16 @@ export async function processRssSources(limit: number = 5) {
     createdArticles.push(article);
   }
 
+  if (createdArticles.length === 0 && selectedItems.length > 0) {
+    const limitCheck = await BillingService.checkLimit(workspaceId, "ARTICLES");
+    return {
+      success: false,
+      processedCount: 0,
+      articles: [],
+      message: limitCheck.message || "Limite de artigos atingido para o seu plano.",
+    };
+  }
+
   return {
     success: true,
     processedCount: createdArticles.length,
@@ -210,3 +235,5 @@ export async function processRssSources(limit: number = 5) {
     message: `${createdArticles.length} notícia(s) processada(s) e salva(s) com sucesso.`,
   };
 }
+
+

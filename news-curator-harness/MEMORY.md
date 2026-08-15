@@ -19,13 +19,12 @@
 - Novas Tabelas (Billing): `Plan`, `Subscription`, `Invoice`.
 - Isolamento: `Source`, `Article`, `Configuration`, `WordPressCategory` agora possuem `workspaceId`.
 
-
 ## Fontes RSS
 - Cadastradas na tabela `Source` (`name`, `rssUrl`, `active`, `creditName`).
 - O campo `creditName String?` guarda o nome comercial de exibição utilizado na atribuição de créditos ao veículo original.
 
 ## Stack e Ferramentas Adicionais
-- Next.js App Router, TypeScript, Prisma, Tailwind.
+- Next.js App Router, TypeScript, Prisma, Tailwind CSS v4.
 - Processamento de Imagens: Biblioteca `sharp` no Node.js para transformações de imagem (`.flop()`, modulação de contraste e geração de JPEG/PNG).
 
 ## Segredos e Criptografia
@@ -50,3 +49,9 @@
 ## Gateway de Pagamentos
 - Padrão Strategy: `PaymentProvider` (`AsaasProvider`, `StripeProvider`).
 - Workspaces terão um `stripeCustomerId` ou `asaasCustomerId`.
+
+## Identidade Visual e Temas (Phase 6)
+- Gerenciamento de tema Claro/Escuro implementado via `next-themes` com `ThemeProvider` no RootLayout (`attribute="class"`, `defaultTheme="dark"`).
+- Componente `ThemeToggle` (`src/components/theme-toggle.tsx`) utiliza `useSyncExternalStore` para compatibilidade SSR com React 19 sem hydration mismatches.
+- Variáveis CSS globais padronizadas em `src/app/globals.css` para cores de fundo (`--background`), texto (`--foreground`), cards (`--card`), bordas (`--border`) e cor primária Índigo (`--primary`).
+- Componente `PlanUsageCard` (`src/components/plan-usage-card.tsx`) integrado na Sidebar consome `/api/billing/subscription` exibindo nome do plano, progresso de posts gerados no mês, data de vencimento e link de upgrade.

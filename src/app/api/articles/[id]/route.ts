@@ -1,15 +1,17 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { ArticleStatus } from "@prisma/client";
+import { getSessionWorkspaceId } from "@/lib/workspace";
 
 export async function GET(
   _request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const workspaceId = await getSessionWorkspaceId();
     const { id } = await params;
-    const article = await prisma.article.findUnique({
-      where: { id },
+    const article = await prisma.article.findFirst({
+      where: { id, workspaceId },
       include: {
         source: { select: { id: true, name: true, rssUrl: true } },
         suggestedCategory: { select: { id: true, name: true, slug: true, wordpressId: true } },
@@ -33,10 +35,13 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const workspaceId = await getSessionWorkspaceId();
     const { id } = await params;
     const body = await request.json();
 
-    const existing = await prisma.article.findUnique({ where: { id } });
+    const existing = await prisma.article.findFirst({
+      where: { id, workspaceId },
+    });
     if (!existing) {
       return NextResponse.json({ error: "Notícia não encontrada" }, { status: 404 });
     }
@@ -67,7 +72,7 @@ export async function PATCH(
     if (typeof body.aiScore === "number") dataToUpdate.aiScore = body.aiScore;
 
     const updated = await prisma.article.update({
-      where: { id },
+      where: { id: existing.id },
       data: dataToUpdate,
       include: {
         source: true,
@@ -82,3 +87,4 @@ export async function PATCH(
     return NextResponse.json({ error: "Erro ao atualizar notícia" }, { status: 500 });
   }
 }
+

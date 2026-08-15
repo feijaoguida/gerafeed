@@ -68,7 +68,7 @@ async function main() {
     // Create test database records
     const source = await prisma.source.create({
       data: {
-        name: "Publish Test Source",
+        workspaceId: "default-workspace",name: "Publish Test Source",
         rssUrl: "https://example.com/pub-rss",
         active: true,
       },
@@ -76,7 +76,7 @@ async function main() {
 
     const category = await prisma.wordPressCategory.create({
       data: {
-        wordpressId: 15,
+        workspaceId: "default-workspace",wordpressId: 15,
         name: "Tecnologia",
         slug: "tecnologia",
       },
@@ -84,7 +84,7 @@ async function main() {
 
     const article = await prisma.article.create({
       data: {
-        sourceId: source.id,
+        workspaceId: "default-workspace",sourceId: source.id,
         originalUrl: "https://example.com/pub-test-article",
         originalTitle: "Notícia para Teste de Publicação",
         title: "Inteligência Artificial Transforma Publicação no WordPress",
@@ -120,7 +120,7 @@ async function main() {
     console.log("Testing WP Server Error handling (Failure keeps PENDING status)...");
     const failedArticle = await prisma.article.create({
       data: {
-        sourceId: source.id,
+        workspaceId: "default-workspace",sourceId: source.id,
         originalUrl: "https://example.com/pub-fail-article",
         originalTitle: "Notícia que deve Falhar",
         title: "Título Falha",

@@ -99,21 +99,20 @@ export default function ReviewArticlePage({ params }: { params: Promise<{ id: st
           setCategoryId(artData.categoryId || artData.suggestedCategoryId || "");
           setTagsInput((artData.tags || []).join(", "));
           setSeoFocusKeyword(artData.seoFocusKeyword || "");
-          setSeoTitle(artData.seoTitle || artData.title || artData.originalTitle || "");
-          setSeoDescription(artData.seoDescription || artData.summary || "");
-          setSelectedImage(artData.selectedImage === "MODIFIED" ? "MODIFIED" : "ORIGINAL");
+          setSeoTitle(artData.seoTitle || "");
+          setSeoDescription(artData.seoDescription || "");
+          setSelectedImage((artData.selectedImage as "ORIGINAL" | "MODIFIED") || "ORIGINAL");
         } else {
-          setErrorMessage("Notícia não encontrada.");
+          setErrorMessage("Erro ao carregar os dados da notícia.");
         }
 
         if (categoriesRes.ok) {
-          const catsData: Category[] = await categoriesRes.json();
-          setCategories(catsData);
+          const cats: Category[] = await categoriesRes.json();
+          setCategories(cats);
         }
       } catch (err) {
-        if (!active) return;
-        console.error("Error loading article details:", err);
-        setErrorMessage("Erro ao carregar notícia.");
+        console.error("Error loading review page:", err);
+        setErrorMessage("Erro ao conectar à API.");
       } finally {
         if (active) setIsLoading(false);
       }
@@ -139,7 +138,7 @@ export default function ReviewArticlePage({ params }: { params: Promise<{ id: st
 
     try {
       const res = await fetch(`/api/articles/${id}`, {
-        method: "PATCH",
+        method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           title,
@@ -155,12 +154,12 @@ export default function ReviewArticlePage({ params }: { params: Promise<{ id: st
       });
 
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Erro ao salvar alterações.");
+      if (!res.ok) throw new Error(data.error || "Erro ao salvar rascunho.");
 
-      setArticle(data);
-      setSuccessMessage("Alterações salvas com sucesso!");
+      setArticle((prev) => (prev ? { ...prev, ...data } : null));
+      setSuccessMessage("Rascunho salvo com sucesso!");
     } catch (err) {
-      setErrorMessage(err instanceof Error ? err.message : "Erro ao salvar rascunho.");
+      setErrorMessage(err instanceof Error ? err.message : "Erro ao salvar.");
     } finally {
       setIsSaving(false);
     }
@@ -176,22 +175,23 @@ export default function ReviewArticlePage({ params }: { params: Promise<{ id: st
       const res = await fetch(`/api/articles/${id}/process-ai`, { method: "POST" });
       const data = await res.json();
 
-      if (!res.ok) throw new Error(data.error || "Erro no processamento de IA.");
+      if (!res.ok) throw new Error(data.error || "Erro no processamento da IA.");
 
-      const updated: ArticleDetail = data.article;
-      setArticle(updated);
-      setTitle(updated.title || "");
-      setSummary(updated.summary || "");
-      setContent(updated.content || "");
-      setCategoryId(updated.categoryId || updated.suggestedCategoryId || "");
-      setTagsInput((updated.tags || []).join(", "));
-      setSeoFocusKeyword(updated.seoFocusKeyword || "");
-      setSeoTitle(updated.seoTitle || "");
-      setSeoDescription(updated.seoDescription || "");
+      // Refresh form with AI returned data
+      setTitle(data.title || "");
+      setSummary(data.summary || "");
+      setContent(data.content || "");
+      if (data.categoryId) setCategoryId(data.categoryId);
+      if (data.tags) setTagsInput(data.tags.join(", "));
+      if (data.seoFocusKeyword) setSeoFocusKeyword(data.seoFocusKeyword);
+      if (data.seoTitle) setSeoTitle(data.seoTitle);
+      if (data.seoDescription) setSeoDescription(data.seoDescription);
+      if (data.selectedImage) setSelectedImage(data.selectedImage);
 
-      setSuccessMessage("Notícia reescrita e otimizada pela IA com sucesso!");
+      setArticle((prev) => (prev ? { ...prev, ...data } : null));
+      setSuccessMessage("Conteúdo e mídia reescritos com sucesso pela IA!");
     } catch (err) {
-      setErrorMessage(err instanceof Error ? err.message : "Erro ao reescrever com IA.");
+      setErrorMessage(err instanceof Error ? err.message : "Erro na IA.");
     } finally {
       setIsProcessingAi(false);
     }
@@ -210,7 +210,7 @@ export default function ReviewArticlePage({ params }: { params: Promise<{ id: st
       if (!res.ok) throw new Error(data.error || "Erro ao rejeitar notícia.");
 
       setSuccessMessage("Notícia marcada como REJEITADA.");
-      router.push("/");
+      router.push("/dashboard");
     } catch (err) {
       setErrorMessage(err instanceof Error ? err.message : "Erro ao rejeitar notícia.");
       setIsRejecting(false);
@@ -219,7 +219,6 @@ export default function ReviewArticlePage({ params }: { params: Promise<{ id: st
 
   // Action: Approve & Publish Article
   const handleApprove = async () => {
-    // Validate required fields client-side before calling server
     if (!title.trim()) {
       setErrorMessage("O Título é obrigatório para aprovação.");
       return;
@@ -237,7 +236,6 @@ export default function ReviewArticlePage({ params }: { params: Promise<{ id: st
     setErrorMessage(null);
     setSuccessMessage(null);
 
-    // Save changes first before triggering approve
     await handleSaveDraft();
 
     try {
@@ -251,7 +249,7 @@ export default function ReviewArticlePage({ params }: { params: Promise<{ id: st
       if (!res.ok) throw new Error(data.error || "Erro ao aprovar e publicar no WordPress.");
 
       setSuccessMessage(`Notícia APROVADA e publicada com sucesso! ID WordPress: ${data.wordpressPostId}`);
-      setTimeout(() => router.push("/"), 1500);
+      setTimeout(() => router.push("/dashboard"), 1500);
     } catch (err) {
       setErrorMessage(err instanceof Error ? err.message : "Erro na aprovação/publicação.");
       setIsApproving(false);
@@ -260,46 +258,46 @@ export default function ReviewArticlePage({ params }: { params: Promise<{ id: st
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-zinc-950 text-zinc-100 flex items-center justify-center p-6">
-        <p className="text-zinc-400 text-sm animate-pulse">Carregando editor de revisão...</p>
+      <div className="min-h-screen bg-slate-50 dark:bg-zinc-950 text-slate-900 dark:text-zinc-100 flex items-center justify-center p-6">
+        <p className="text-zinc-500 text-sm animate-pulse">Carregando editor de revisão...</p>
       </div>
     );
   }
 
   if (!article) {
     return (
-      <div className="min-h-screen bg-zinc-950 text-zinc-100 p-8 space-y-4">
-        <Link href="/" className="inline-flex items-center gap-2 text-zinc-400 hover:text-white text-sm">
+      <div className="min-h-screen bg-slate-50 dark:bg-zinc-950 text-slate-900 dark:text-zinc-100 p-8 space-y-4">
+        <Link href="/dashboard" className="inline-flex items-center gap-2 text-zinc-500 hover:text-zinc-900 dark:hover:text-white text-sm">
           <ArrowLeft className="w-4 h-4" /> Voltar ao Dashboard
         </Link>
-        <p className="text-rose-400">Notícia não encontrada.</p>
+        <p className="text-rose-500">Notícia não encontrada.</p>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-zinc-950 text-zinc-100 font-sans pb-16">
+    <div className="min-h-screen bg-slate-50 dark:bg-zinc-950 text-slate-900 dark:text-zinc-100 font-sans pb-16 transition-colors duration-200">
       {/* Header Sticky */}
-      <header className="border-b border-zinc-800 bg-zinc-900/80 backdrop-blur sticky top-0 z-20">
+      <header className="border-b border-zinc-200 dark:border-zinc-800 bg-white/90 dark:bg-zinc-900/80 backdrop-blur sticky top-0 z-20 shadow-sm dark:shadow-none">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <Link
-              href="/"
-              className="p-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 transition"
+              href="/dashboard"
+              className="p-2 rounded-lg bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 transition"
               title="Voltar ao Dashboard"
             >
               <ArrowLeft className="w-5 h-5" />
             </Link>
             <div>
               <div className="flex items-center gap-2">
-                <h1 className="text-lg font-bold text-white tracking-tight">Revisão Editorial</h1>
+                <h1 className="text-lg font-bold text-zinc-900 dark:text-white tracking-tight">Revisão Editorial</h1>
                 <span
                   className={`px-2.5 py-0.5 rounded-full text-xs font-semibold border ${
                     article.status === "PENDING"
-                      ? "bg-amber-500/10 text-amber-400 border-amber-500/20"
+                      ? "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20"
                       : article.status === "PUBLISHED"
-                      ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
-                      : "bg-rose-500/10 text-rose-400 border-rose-500/20"
+                      ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20"
+                      : "bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20"
                   }`}
                 >
                   {article.status === "PENDING"
@@ -309,7 +307,7 @@ export default function ReviewArticlePage({ params }: { params: Promise<{ id: st
                     : "Rejeitada"}
                 </span>
               </div>
-              <p className="text-xs text-zinc-400">Fonte: {article.source?.name || "Fonte RSS"}</p>
+              <p className="text-xs text-zinc-500 dark:text-zinc-400">Fonte: {article.source?.name || "Fonte RSS"}</p>
             </div>
           </div>
 
@@ -318,16 +316,16 @@ export default function ReviewArticlePage({ params }: { params: Promise<{ id: st
             <button
               onClick={handleProcessAi}
               disabled={isProcessingAi}
-              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium bg-indigo-600/20 text-indigo-300 border border-indigo-500/30 hover:bg-indigo-600/30 transition disabled:opacity-50"
+              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium bg-indigo-50 dark:bg-indigo-600/20 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-500/30 hover:bg-indigo-100 dark:hover:bg-indigo-600/30 transition disabled:opacity-50"
             >
-              <Sparkles className={`w-3.5 h-3.5 ${isProcessingAi ? "animate-spin" : ""}`} />
+              <Sparkles className={`w-3.5 h-3.5 ${isProcessingAi ? "animate-spin text-indigo-500" : ""}`} />
               {isProcessingAi ? "Reescrevendo..." : "Reescrever com IA"}
             </button>
 
             <button
               onClick={handleSaveDraft}
               disabled={isSaving}
-              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium bg-zinc-800 hover:bg-zinc-700 text-zinc-200 border border-zinc-700 transition disabled:opacity-50"
+              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-200 border border-zinc-200 dark:border-zinc-700 transition disabled:opacity-50"
             >
               <Save className="w-3.5 h-3.5" />
               {isSaving ? "Salvando..." : "Salvar Rascunho"}
@@ -336,7 +334,7 @@ export default function ReviewArticlePage({ params }: { params: Promise<{ id: st
             <button
               onClick={handleReject}
               disabled={isRejecting}
-              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 border border-rose-500/30 transition disabled:opacity-50"
+              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 dark:text-rose-300 border border-rose-500/30 transition disabled:opacity-50"
             >
               <XCircle className="w-3.5 h-3.5" />
               {isRejecting ? "Rejeitando..." : "Rejeitar"}
@@ -357,24 +355,24 @@ export default function ReviewArticlePage({ params }: { params: Promise<{ id: st
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
         {/* Alerts */}
         {errorMessage && (
-          <div className="p-4 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-300 text-sm flex items-center justify-between">
+          <div className="p-4 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-600 dark:text-rose-300 text-sm flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <AlertCircle className="w-5 h-5 text-rose-400 shrink-0" />
+              <AlertCircle className="w-5 h-5 text-rose-500 dark:text-rose-400 shrink-0" />
               <span>{errorMessage}</span>
             </div>
-            <button onClick={() => setErrorMessage(null)} className="text-xs text-rose-400 hover:underline">
+            <button onClick={() => setErrorMessage(null)} className="text-xs text-rose-500 hover:underline">
               Fechar
             </button>
           </div>
         )}
 
         {successMessage && (
-          <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 text-sm flex items-center justify-between">
+          <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-700 dark:text-emerald-300 text-sm flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
+              <CheckCircle2 className="w-5 h-5 text-emerald-500 dark:text-emerald-400 shrink-0" />
               <span>{successMessage}</span>
             </div>
-            <button onClick={() => setSuccessMessage(null)} className="text-xs text-emerald-400 hover:underline">
+            <button onClick={() => setSuccessMessage(null)} className="text-xs text-emerald-600 hover:underline">
               Fechar
             </button>
           </div>
@@ -384,30 +382,30 @@ export default function ReviewArticlePage({ params }: { params: Promise<{ id: st
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Main Editorial Form (2/3) */}
           <div className="lg:col-span-2 space-y-6">
-            <div className="p-6 rounded-xl bg-zinc-900/60 border border-zinc-800 space-y-5">
-              <h2 className="text-sm font-semibold text-zinc-300 border-b border-zinc-800 pb-3">
+            <div className="p-6 rounded-xl bg-white dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 space-y-5 shadow-sm dark:shadow-none">
+              <h2 className="text-sm font-semibold text-zinc-900 dark:text-zinc-300 border-b border-zinc-200 dark:border-zinc-800 pb-3">
                 Conteúdo Editorial
               </h2>
 
               {/* Title Input */}
               <div className="space-y-1.5">
-                <label className="block text-xs font-medium text-zinc-400">Título Editorial</label>
+                <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400">Título Editorial</label>
                 <input
                   type="text"
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
                   placeholder="Título atraente para publicação..."
-                  className="w-full px-4 py-2.5 rounded-lg bg-zinc-950 border border-zinc-800 text-sm font-semibold text-white placeholder-zinc-600 focus:outline-none focus:border-indigo-500"
+                  className="w-full px-4 py-2.5 rounded-lg bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-sm font-semibold text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-zinc-600 focus:outline-none focus:border-indigo-500"
                 />
               </div>
 
               {/* Category Select */}
               <div className="space-y-1.5">
-                <label className="block text-xs font-medium text-zinc-400">Categoria no WordPress</label>
+                <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400">Categoria no WordPress</label>
                 <select
                   value={categoryId}
                   onChange={(e) => setCategoryId(e.target.value)}
-                  className="w-full px-4 py-2.5 rounded-lg bg-zinc-950 border border-zinc-800 text-xs text-white focus:outline-none focus:border-indigo-500"
+                  className="w-full px-4 py-2.5 rounded-lg bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-xs text-zinc-900 dark:text-white focus:outline-none focus:border-indigo-500"
                 >
                   <option value="">-- Selecione uma Categoria --</option>
                   {categories.map((cat) => (
@@ -417,7 +415,7 @@ export default function ReviewArticlePage({ params }: { params: Promise<{ id: st
                   ))}
                 </select>
                 {article.suggestedCategory && (
-                  <p className="text-[11px] text-indigo-400">
+                  <p className="text-[11px] text-indigo-600 dark:text-indigo-400">
                     Sugestão da IA: <strong>{article.suggestedCategory.name}</strong>
                   </p>
                 )}
@@ -425,32 +423,32 @@ export default function ReviewArticlePage({ params }: { params: Promise<{ id: st
 
               {/* Summary Input */}
               <div className="space-y-1.5">
-                <label className="block text-xs font-medium text-zinc-400">Resumo / Excerpt</label>
+                <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400">Resumo / Excerpt</label>
                 <textarea
                   rows={3}
                   value={summary}
                   onChange={(e) => setSummary(e.target.value)}
                   placeholder="Resumo curto da notícia..."
-                  className="w-full px-4 py-2.5 rounded-lg bg-zinc-950 border border-zinc-800 text-xs text-zinc-200 placeholder-zinc-600 focus:outline-none focus:border-indigo-500"
+                  className="w-full px-4 py-2.5 rounded-lg bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-xs text-zinc-900 dark:text-zinc-200 placeholder-zinc-400 dark:placeholder-zinc-600 focus:outline-none focus:border-indigo-500"
                 />
               </div>
 
               {/* Content Input */}
               <div className="space-y-1.5">
-                <label className="block text-xs font-medium text-zinc-400">Corpo do Artigo (HTML)</label>
+                <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400">Corpo do Artigo (HTML)</label>
                 <textarea
                   rows={12}
                   value={content}
                   onChange={(e) => setContent(e.target.value)}
                   placeholder="<p>Conteúdo do artigo em HTML...</p>"
-                  className="w-full px-4 py-2.5 rounded-lg bg-zinc-950 border border-zinc-800 font-mono text-xs text-zinc-200 placeholder-zinc-600 focus:outline-none focus:border-indigo-500"
+                  className="w-full px-4 py-2.5 rounded-lg bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 font-mono text-xs text-zinc-900 dark:text-zinc-200 placeholder-zinc-400 dark:placeholder-zinc-600 focus:outline-none focus:border-indigo-500"
                 />
               </div>
 
               {/* Tags Input */}
               <div className="space-y-1.5">
-                <label className="block text-xs font-medium text-zinc-400 flex items-center gap-1">
-                  <Tag className="w-3.5 h-3.5 text-indigo-400" />
+                <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 flex items-center gap-1">
+                  <Tag className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
                   Tags (separadas por vírgula)
                 </label>
                 <input
@@ -458,7 +456,7 @@ export default function ReviewArticlePage({ params }: { params: Promise<{ id: st
                   value={tagsInput}
                   onChange={(e) => setTagsInput(e.target.value)}
                   placeholder="tecnologia, inovacao, ai"
-                  className="w-full px-4 py-2.5 rounded-lg bg-zinc-950 border border-zinc-800 text-xs text-white placeholder-zinc-600 focus:outline-none focus:border-indigo-500"
+                  className="w-full px-4 py-2.5 rounded-lg bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-xs text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-zinc-600 focus:outline-none focus:border-indigo-500"
                 />
               </div>
             </div>
@@ -467,55 +465,55 @@ export default function ReviewArticlePage({ params }: { params: Promise<{ id: st
           {/* SEO & Reference Column (1/3) */}
           <div className="space-y-6">
             {/* SEO Settings Panel */}
-            <div className="p-6 rounded-xl bg-zinc-900/60 border border-zinc-800 space-y-5">
-              <h2 className="text-sm font-semibold text-zinc-300 border-b border-zinc-800 pb-3 flex items-center gap-1.5">
-                <Search className="w-4 h-4 text-indigo-400" />
+            <div className="p-6 rounded-xl bg-white dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 space-y-5 shadow-sm dark:shadow-none">
+              <h2 className="text-sm font-semibold text-zinc-900 dark:text-zinc-300 border-b border-zinc-200 dark:border-zinc-800 pb-3 flex items-center gap-1.5">
+                <Search className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
                 Configurações de SEO (Yoast)
               </h2>
 
               <div className="space-y-1.5">
-                <label className="block text-xs font-medium text-zinc-400">Palavra-Chave Foco (Focus Keyword)</label>
+                <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400">Palavra-Chave Foco (Focus Keyword)</label>
                 <input
                   type="text"
                   value={seoFocusKeyword}
                   onChange={(e) => setSeoFocusKeyword(e.target.value)}
                   placeholder="Palavra-chave principal..."
-                  className="w-full px-3 py-2 rounded-lg bg-zinc-950 border border-zinc-800 text-xs text-white placeholder-zinc-600 focus:outline-none focus:border-indigo-500"
+                  className="w-full px-3 py-2 rounded-lg bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-xs text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-zinc-600 focus:outline-none focus:border-indigo-500"
                 />
               </div>
 
               <div className="space-y-1.5">
-                <label className="block text-xs font-medium text-zinc-400">Título SEO (Meta Title)</label>
+                <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400">Título SEO (Meta Title)</label>
                 <input
                   type="text"
                   value={seoTitle}
                   onChange={(e) => setSeoTitle(e.target.value)}
                   placeholder="Título para ferramentas de busca..."
-                  className="w-full px-3 py-2 rounded-lg bg-zinc-950 border border-zinc-800 text-xs text-white placeholder-zinc-600 focus:outline-none focus:border-indigo-500"
+                  className="w-full px-3 py-2 rounded-lg bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-xs text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-zinc-600 focus:outline-none focus:border-indigo-500"
                 />
               </div>
 
               <div className="space-y-1.5">
-                <label className="block text-xs font-medium text-zinc-400">Meta Descrição</label>
+                <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400">Meta Descrição</label>
                 <textarea
                   rows={4}
                   value={seoDescription}
                   onChange={(e) => setSeoDescription(e.target.value)}
                   placeholder="Descrição exibida no Google (120-155 caracteres)..."
-                  className="w-full px-3 py-2 rounded-lg bg-zinc-950 border border-zinc-800 text-xs text-zinc-300 placeholder-zinc-600 focus:outline-none focus:border-indigo-500"
+                  className="w-full px-3 py-2 rounded-lg bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-xs text-zinc-900 dark:text-zinc-300 placeholder-zinc-400 dark:placeholder-zinc-600 focus:outline-none focus:border-indigo-500"
                 />
               </div>
             </div>
 
             {/* Featured Media Selection Panel */}
-            <div className="p-6 rounded-xl bg-zinc-900/60 border border-zinc-800 space-y-4">
-              <h2 className="text-sm font-semibold text-zinc-200 flex items-center justify-between border-b border-zinc-800 pb-3">
+            <div className="p-6 rounded-xl bg-white dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 space-y-4 shadow-sm dark:shadow-none">
+              <h2 className="text-sm font-semibold text-zinc-900 dark:text-zinc-200 flex items-center justify-between border-b border-zinc-200 dark:border-zinc-800 pb-3">
                 <span className="flex items-center gap-2">
-                  <ImageIcon className="w-4 h-4 text-indigo-400" />
+                  <ImageIcon className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
                   Mídia Destacada
                 </span>
-                <span className="text-[10px] font-mono text-zinc-400 bg-zinc-950 px-2 py-0.5 rounded border border-zinc-800">
-                  Ativa: <span className="text-indigo-400 font-bold uppercase">{selectedImage}</span>
+                <span className="text-[10px] font-mono text-zinc-500 dark:text-zinc-400 bg-zinc-100 dark:bg-zinc-950 px-2 py-0.5 rounded border border-zinc-200 dark:border-zinc-800">
+                  Ativa: <span className="text-indigo-600 dark:text-indigo-400 font-bold uppercase">{selectedImage}</span>
                 </span>
               </h2>
 
@@ -527,8 +525,8 @@ export default function ReviewArticlePage({ params }: { params: Promise<{ id: st
                       onClick={() => setSelectedImage("ORIGINAL")}
                       className={`p-3 rounded-xl border cursor-pointer transition flex flex-col justify-between space-y-2 ${
                         selectedImage === "ORIGINAL"
-                          ? "bg-indigo-600/10 border-indigo-500 text-white shadow-md shadow-indigo-500/10"
-                          : "bg-zinc-950/60 border-zinc-800/80 text-zinc-400 hover:border-zinc-700"
+                          ? "bg-indigo-50 dark:bg-indigo-600/10 border-indigo-500 text-zinc-900 dark:text-white shadow-md shadow-indigo-500/10"
+                          : "bg-zinc-50 dark:bg-zinc-950/60 border-zinc-200 dark:border-zinc-800/80 text-zinc-600 dark:text-zinc-400 hover:border-zinc-300 dark:hover:border-zinc-700"
                       }`}
                     >
                       <div className="flex items-center justify-between">
@@ -543,12 +541,12 @@ export default function ReviewArticlePage({ params }: { params: Promise<{ id: st
                           Imagem Original
                         </span>
                         {selectedImage === "ORIGINAL" && (
-                          <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
+                          <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-indigo-100 dark:bg-indigo-500/20 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-500/30">
                             SELECIONADA
                           </span>
                         )}
                       </div>
-                      <div className="relative aspect-video w-full overflow-hidden rounded-lg bg-zinc-950 border border-zinc-800">
+                      <div className="relative aspect-video w-full overflow-hidden rounded-lg bg-zinc-100 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800">
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img
                           src={article.originalImageUrl}
@@ -565,8 +563,8 @@ export default function ReviewArticlePage({ params }: { params: Promise<{ id: st
                       onClick={() => setSelectedImage("MODIFIED")}
                       className={`p-3 rounded-xl border cursor-pointer transition flex flex-col justify-between space-y-2 ${
                         selectedImage === "MODIFIED"
-                          ? "bg-indigo-600/10 border-indigo-500 text-white shadow-md shadow-indigo-500/10"
-                          : "bg-zinc-950/60 border-zinc-800/80 text-zinc-400 hover:border-zinc-700"
+                          ? "bg-indigo-50 dark:bg-indigo-600/10 border-indigo-500 text-zinc-900 dark:text-white shadow-md shadow-indigo-500/10"
+                          : "bg-zinc-50 dark:bg-zinc-950/60 border-zinc-200 dark:border-zinc-800/80 text-zinc-600 dark:text-zinc-400 hover:border-zinc-300 dark:hover:border-zinc-700"
                       }`}
                     >
                       <div className="flex items-center justify-between">
@@ -581,12 +579,12 @@ export default function ReviewArticlePage({ params }: { params: Promise<{ id: st
                           Imagem Processada
                         </span>
                         {selectedImage === "MODIFIED" && (
-                          <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
+                          <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-indigo-100 dark:bg-indigo-500/20 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-500/30">
                             SELECIONADA
                           </span>
                         )}
                       </div>
-                      <div className="relative aspect-video w-full overflow-hidden rounded-lg bg-zinc-950 border border-zinc-800">
+                      <div className="relative aspect-video w-full overflow-hidden rounded-lg bg-zinc-100 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800">
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img
                           src={article.modifiedImageUrl}
@@ -596,7 +594,7 @@ export default function ReviewArticlePage({ params }: { params: Promise<{ id: st
                       </div>
                     </div>
                   ) : (
-                    <div className="p-3 rounded-xl bg-zinc-950/40 border border-zinc-800/60 flex items-center justify-center text-center">
+                    <div className="p-3 rounded-xl bg-zinc-50 dark:bg-zinc-950/40 border border-zinc-200 dark:border-zinc-800/60 flex items-center justify-center text-center">
                       <p className="text-[11px] text-zinc-500 italic">
                         Imagem processada não gerada. Clique em &quot;Reescrever com IA&quot;.
                       </p>
@@ -609,19 +607,19 @@ export default function ReviewArticlePage({ params }: { params: Promise<{ id: st
             </div>
 
             {/* Original RSS Reference Panel */}
-            <div className="p-6 rounded-xl bg-zinc-900/60 border border-zinc-800 space-y-3">
-              <h2 className="text-sm font-semibold text-zinc-300 border-b border-zinc-800 pb-3 flex items-center gap-1.5">
-                <Globe className="w-4 h-4 text-indigo-400" />
+            <div className="p-6 rounded-xl bg-white dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 space-y-3 shadow-sm dark:shadow-none">
+              <h2 className="text-sm font-semibold text-zinc-900 dark:text-zinc-300 border-b border-zinc-200 dark:border-zinc-800 pb-3 flex items-center gap-1.5">
+                <Globe className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
                 Matéria Original (RSS)
               </h2>
 
               <div className="space-y-1">
-                <p className="text-xs font-semibold text-white">{article.originalTitle}</p>
+                <p className="text-xs font-semibold text-zinc-900 dark:text-white">{article.originalTitle}</p>
                 <p className="text-[11px] text-zinc-500">Fonte: {article.source?.name || "Fonte RSS"}</p>
               </div>
 
               {article.originalDescription && (
-                <p className="text-xs text-zinc-400 line-clamp-4 bg-zinc-950/60 p-3 rounded border border-zinc-800/60 leading-relaxed">
+                <p className="text-xs text-zinc-600 dark:text-zinc-400 line-clamp-4 bg-zinc-50 dark:bg-zinc-950/60 p-3 rounded border border-zinc-200 dark:border-zinc-800/60 leading-relaxed">
                   {article.originalDescription}
                 </p>
               )}
@@ -630,7 +628,7 @@ export default function ReviewArticlePage({ params }: { params: Promise<{ id: st
                 href={article.originalUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-1.5 text-xs text-indigo-400 hover:underline pt-1"
+                className="inline-flex items-center gap-1.5 text-xs text-indigo-600 dark:text-indigo-400 hover:underline pt-1"
               >
                 Ver notícia original na íntegra <ExternalLink className="w-3.5 h-3.5" />
               </a>

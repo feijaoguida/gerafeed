@@ -1,10 +1,12 @@
 import { NextResponse } from "next/server";
 import { getConfig, setConfig } from "@/lib/config";
 import { PromptSettings, DEFAULT_PROMPT_SETTINGS } from "@/lib/ai";
+import { getSessionWorkspaceId } from "@/lib/workspace";
 
 export async function GET() {
   try {
-    const config = await getConfig<PromptSettings>("aiPromptSettings");
+    const workspaceId = await getSessionWorkspaceId();
+    const config = await getConfig<PromptSettings>("aiPromptSettings", workspaceId);
 
     if (!config) {
       return NextResponse.json({
@@ -35,6 +37,7 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
+    const workspaceId = await getSessionWorkspaceId();
     const body = await request.json();
     const { portalArea, customPortalArea, writingStyles, customWritingStyle } = body;
 
@@ -97,7 +100,7 @@ export async function POST(request: Request) {
       customWritingStyle: typeof customWritingStyle === "string" ? customWritingStyle.trim() : "",
     };
 
-    await setConfig("aiPromptSettings", cleanedSettings);
+    await setConfig("aiPromptSettings", cleanedSettings, workspaceId);
 
     return NextResponse.json({
       success: true,
@@ -112,3 +115,4 @@ export async function POST(request: Request) {
     );
   }
 }
+

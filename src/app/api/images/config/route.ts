@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getConfig, setConfig } from "@/lib/config";
+import { getSessionWorkspaceId } from "@/lib/workspace";
 
 export interface ImageSettingsStored {
   defaultStrategy: "ORIGINAL" | "MODIFIED";
@@ -7,7 +8,8 @@ export interface ImageSettingsStored {
 
 export async function GET() {
   try {
-    const config = await getConfig<ImageSettingsStored>("imageSettings");
+    const workspaceId = await getSessionWorkspaceId();
+    const config = await getConfig<ImageSettingsStored>("imageSettings", workspaceId);
 
     return NextResponse.json({
       defaultStrategy: config?.defaultStrategy || "ORIGINAL",
@@ -21,6 +23,7 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
+    const workspaceId = await getSessionWorkspaceId();
     const body = await request.json();
     const { defaultStrategy } = body;
 
@@ -32,7 +35,7 @@ export async function POST(request: Request) {
       defaultStrategy,
     };
 
-    await setConfig("imageSettings", newConfigData);
+    await setConfig("imageSettings", newConfigData, workspaceId);
 
     return NextResponse.json({
       success: true,
@@ -44,3 +47,4 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Erro ao salvar configurações de imagens" }, { status: 500 });
   }
 }
+

@@ -50,7 +50,7 @@ async function main() {
   try {
     const source = await prisma.source.create({
       data: {
-        name: "Yoast Test Source",
+        workspaceId: "default-workspace",name: "Yoast Test Source",
         rssUrl: "https://example.com/yoast-rss",
         active: true,
       },
@@ -58,7 +58,7 @@ async function main() {
 
     const category = await prisma.wordPressCategory.create({
       data: {
-        wordpressId: 22,
+        workspaceId: "default-workspace",wordpressId: 22,
         name: "SEO Tech",
         slug: "seo-tech",
       },
@@ -66,7 +66,7 @@ async function main() {
 
     const article = await prisma.article.create({
       data: {
-        sourceId: source.id,
+        workspaceId: "default-workspace",sourceId: source.id,
         originalUrl: "https://example.com/yoast-test-1",
         originalTitle: "Notícia Original Yoast",
         title: "Título Editorial Otimizado com Yoast",

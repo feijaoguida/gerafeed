@@ -1,15 +1,19 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { getSessionWorkspaceId } from "@/lib/workspace";
 
 export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const workspaceId = await getSessionWorkspaceId();
     const { id } = await params;
     const body = await request.json();
 
-    const existing = await prisma.source.findUnique({ where: { id } });
+    const existing = await prisma.source.findFirst({
+      where: { id, workspaceId },
+    });
     if (!existing) {
       return NextResponse.json({ error: "Fonte não encontrada" }, { status: 404 });
     }
@@ -31,7 +35,7 @@ export async function PATCH(
     }
 
     const updated = await prisma.source.update({
-      where: { id },
+      where: { id: existing.id },
       data: dataToUpdate,
     });
 
@@ -47,17 +51,21 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const workspaceId = await getSessionWorkspaceId();
     const { id } = await params;
 
-    const existing = await prisma.source.findUnique({ where: { id } });
+    const existing = await prisma.source.findFirst({
+      where: { id, workspaceId },
+    });
     if (!existing) {
       return NextResponse.json({ error: "Fonte não encontrada" }, { status: 404 });
     }
 
-    await prisma.source.delete({ where: { id } });
+    await prisma.source.delete({ where: { id: existing.id } });
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("DELETE /api/sources/[id] error:", error);
     return NextResponse.json({ error: "Erro ao excluir fonte RSS" }, { status: 500 });
   }
 }
+

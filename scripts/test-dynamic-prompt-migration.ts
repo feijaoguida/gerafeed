@@ -201,7 +201,7 @@ async function main() {
     // Create test source and article in database
     const testSource = await prisma.source.create({
       data: {
-        name: "Test Source Dynamic",
+        workspaceId: "default-workspace",name: "Test Source Dynamic",
         rssUrl: "https://test.com/rss",
         active: true,
       },
@@ -209,7 +209,7 @@ async function main() {
 
     const testArticle = await prisma.article.create({
       data: {
-        sourceId: testSource.id,
+        workspaceId: "default-workspace",sourceId: testSource.id,
         originalTitle: "Notícia Para Teste Integrado de Prompt",
         originalUrl: `https://test.com/art-${Date.now()}`,
         status: "PENDING",

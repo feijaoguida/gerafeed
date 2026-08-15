@@ -11,7 +11,7 @@ async function main() {
   // 1. Create a test Source & Article in DB
   const testSource = await prisma.source.create({
     data: {
-      name: "Fonte Teste Abstração IA",
+        workspaceId: "default-workspace",name: "Fonte Teste Abstração IA",
       rssUrl: "https://test.com/rss.xml",
       active: true,
     },
@@ -19,7 +19,7 @@ async function main() {
 
   const testArticle = await prisma.article.create({
     data: {
-      sourceId: testSource.id,
+        workspaceId: "default-workspace",sourceId: testSource.id,
       originalUrl: "https://test.com/noticia-abstracao-ia",
       originalTitle: "Título Bruto do Feed RSS para Teste de Migração IA",
       originalDescription: "Descrição bruta do feed RSS sobre avanço de inteligência artificial.",

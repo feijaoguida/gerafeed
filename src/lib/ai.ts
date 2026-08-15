@@ -23,23 +23,35 @@ export interface AiProcessResult {
  * Process a single article by ID using the configured active AIProvider (OpenAI, Gemini, Anthropic, OpenAI-Compatible)
  * and update its text and image fields in Prisma DB according to global image strategy.
  */
-export async function processArticleWithAi(articleId: string) {
+export async function processArticleWithAi(
+  articleId: string,
+  workspaceId?: string
+) {
   const article = await prisma.article.findUnique({
-    where: { id: articleId },
+    where: {
+      id: articleId,
+      ...(workspaceId ? { workspaceId } : {}),
+    },
   });
 
   if (!article) {
     throw new Error(`Artigo com ID ${articleId} não encontrado.`);
   }
 
+  const effectiveWorkspaceId = workspaceId || article.workspaceId;
+
   const categories = await prisma.wordPressCategory.findMany({
+    where: { workspaceId: effectiveWorkspaceId },
     select: { id: true, name: true, slug: true },
   });
 
-  const promptConfig = await getConfig<PromptSettings>("aiPromptSettings");
+  const promptConfig = await getConfig<PromptSettings>(
+    "aiPromptSettings",
+    effectiveWorkspaceId
+  );
   const promptSettings = promptConfig || undefined;
 
-  const provider = await getActiveAIProvider();
+  const provider = await getActiveAIProvider(undefined, effectiveWorkspaceId);
   const aiResult = await provider.generateArticle({
     originalTitle: article.originalTitle,
     originalDescription: article.originalDescription,
@@ -54,7 +66,11 @@ export async function processArticleWithAi(articleId: string) {
   }
 
   // Process image if originalImageUrl is present
-  const imageConfig = await getConfig<{ defaultStrategy: "ORIGINAL" | "MODIFIED" }>("imageSettings");
+  const imageConfig = await getConfig<{ defaultStrategy: "ORIGINAL" | "MODIFIED" }>(
+    "imageSettings",
+    effectiveWorkspaceId
+  );
+
   const defaultStrategy = imageConfig?.defaultStrategy || "ORIGINAL";
 
   let modifiedImageUrl: string | null = article.modifiedImageUrl;

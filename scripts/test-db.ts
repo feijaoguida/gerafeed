@@ -11,7 +11,7 @@ async function main() {
   // 1. Create a Source
   const source = await prisma.source.create({
     data: {
-      name: "Test Source",
+        workspaceId: "default-workspace",name: "Test Source",
       rssUrl: "https://example.com/rss.xml",
       active: true,
     },
@@ -21,7 +21,7 @@ async function main() {
   // 2. Create an Article
   const article = await prisma.article.create({
     data: {
-      sourceId: source.id,
+        workspaceId: "default-workspace",sourceId: source.id,
       originalUrl: "https://example.com/test-article-1",
       originalTitle: "Test Article Title",
       originalDescription: "Description of test article",
@@ -35,7 +35,7 @@ async function main() {
   try {
     await prisma.article.create({
       data: {
-        sourceId: source.id,
+        workspaceId: "default-workspace",sourceId: source.id,
         originalUrl: "https://example.com/test-article-1",
         originalTitle: "Duplicate Test Article Title",
       },

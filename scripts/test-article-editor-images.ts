@@ -8,7 +8,7 @@ async function main() {
   // 1. Create a dummy Source and Article in DB for testing
   const source = await prisma.source.create({
     data: {
-      name: "Editor Image Test Source",
+        workspaceId: "default-workspace",name: "Editor Image Test Source",
       rssUrl: "https://example.com/editor-rss",
     },
   });
@@ -16,7 +16,7 @@ async function main() {
   const testArticleId = `test-editor-img-${Date.now()}`;
   const article = await prisma.article.create({
     data: {
-      id: testArticleId,
+        workspaceId: "default-workspace",id: testArticleId,
       sourceId: source.id,
       originalUrl: `https://example.com/article-${testArticleId}`,
       originalTitle: "Test Article Editor Images",

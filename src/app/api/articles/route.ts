@@ -1,13 +1,18 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { ArticleStatus } from "@prisma/client";
+import { getSessionWorkspaceId } from "@/lib/workspace";
 
 export async function GET(request: Request) {
   try {
+    const workspaceId = await getSessionWorkspaceId();
     const { searchParams } = new URL(request.url);
     const statusParam = searchParams.get("status");
 
-    const whereClause: { status?: ArticleStatus } = {};
+    const whereClause: { workspaceId: string; status?: ArticleStatus } = {
+      workspaceId,
+    };
+
     if (statusParam && ["PENDING", "PUBLISHED", "REJECTED"].includes(statusParam.toUpperCase())) {
       whereClause.status = statusParam.toUpperCase() as ArticleStatus;
     }
@@ -34,3 +39,4 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Erro ao buscar notícias" }, { status: 500 });
   }
 }
+

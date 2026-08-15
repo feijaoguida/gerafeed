@@ -173,10 +173,50 @@ A configuração dirá qual provedor está ativo.
 5. Criptografia
 As credenciais (API Keys, senhas do WP) agora devem ser criptografadas levando em consideração o `workspaceId` para evitar acessos cruzados.
 6. Definition of Done global (Phase 5)
-[ ] NextAuth integrado.
-[ ] Schema Prisma atualizado para suportar NextAuth, Workspaces, Plans e Subscriptions.
-[ ] Todas as tabelas de negócio (Source, Article, Configuration) vinculadas a um Workspace.
-[ ] Middlewares e Services refatorados para garantir Tenant Isolation (nunca vazar dados).
-[ ] Abstração de Gateway de Pagamento (`PaymentProvider`).
-[ ] Integração com Asaas implementada.
-[ ] Validador de limites de assinatura funcional.
+- [x] NextAuth integrado.
+- [x] Schema Prisma atualizado para suportar NextAuth, Workspaces, Plans e Subscriptions.
+- [x] Todas as tabelas de negócio (Source, Article, Configuration) vinculadas a um Workspace.
+- [x] Middlewares e Services refatorados para garantir Tenant Isolation (nunca vazar dados).
+- [x] Abstração de Gateway de Pagamento (`PaymentProvider`).
+- [x] Integração com Asaas implementada.
+- [x] Validador de limites de assinatura funcional.
+
+---
+
+# News Curator. Phase 6 (Identidade Visual e Temas)
+
+## 1. Objetivo
+Padronizar a interface do sistema (GeraFeed) criando um Design System coerente baseado na Landing Page, implementando suporte completo a Temas Claro/Escuro (Light/Dark Mode) e adicionando um card informativo de plano no Dashboard.
+
+## 2. Design System e Padronização
+- Extrair variáveis de cores (Índigo/Azul Escuro, Cores de Destaque), tipografia e espaçamentos da Landing Page (`src/app/(public)/page.tsx`) e do Dashboard.
+- Criar ou atualizar o arquivo global de estilos (`src/app/globals.css` ou equivalente) com as variáveis CSS de design.
+- Garantir que a identidade visual comunique um aspecto de SaaS B2B "premium" em todas as telas.
+
+## 3. Tema Claro e Escuro (Light/Dark Mode)
+- Implementar um `ThemeProvider` (usando `next-themes` ou similar suportado no stack) no layout raiz da aplicação (`src/app/layout.tsx` ou equivalente).
+- Assegurar que as seguintes telas respondam à troca de tema:
+  - Landing Page (`/`)
+  - Login (`/login`)
+  - Cadastro (`/register`)
+  - Dashboard Home (`/dashboard`)
+  - Gerenciamento de Feeds/Fontes (`/dashboard/sources`)
+  - Curadoria/Artigos (`/dashboard/articles`)
+  - Configurações (`/dashboard/settings` ou equivalentes)
+- Atualizar classes utilitárias e estilos globais para suportar variantes de dark mode (ex: cores de background, bordas, textos e sombras invertidas para temas escuros).
+
+## 4. Novo Componente: Card de Informações do Plano
+- Criar um novo componente de UI a ser incluído no menu lateral (sidebar) do layout do Dashboard (`src/app/(app)/layout.tsx`).
+- O card deverá exibir:
+  - O nome do plano atual (Starter, Creator, Pro, etc.).
+  - Progresso do uso de artigos gerados no mês (ex: 45/100).
+  - Data de renovação/vencimento ou status da assinatura.
+  - Uma barra de progresso visual para rápida leitura.
+- Os dados do card devem derivar do backend/`BillingService` ou usar placeholders estruturais e se conectar aos hooks/APIs apropriados de billing se já existentes.
+
+## 5. Definition of Done global (Phase 6)
+- [x] Design System (variáveis CSS globais) criado.
+- [x] ThemeProvider integrado e funcional em todo o sistema.
+- [x] Modo Claro e Modo Escuro validados em todas as telas públicas e logadas.
+- [x] Card de Informações do Plano adicionado ao menu lateral do Dashboard e renderizado corretamente.
+- [x] TypeScript PASS, Lint PASS.

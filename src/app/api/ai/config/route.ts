@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getConfig, setConfig } from "@/lib/config";
 import { encrypt } from "@/lib/crypto";
 import { AIProviderType } from "@/lib/ai";
+import { getSessionWorkspaceId } from "@/lib/workspace";
 
 export interface AIConfigStored {
   provider: AIProviderType;
@@ -12,7 +13,8 @@ export interface AIConfigStored {
 
 export async function GET() {
   try {
-    const config = await getConfig<AIConfigStored>("aiProvider");
+    const workspaceId = await getSessionWorkspaceId();
+    const config = await getConfig<AIConfigStored>("aiProvider", workspaceId);
 
     if (!config) {
       // Fallback to env variable if no DB config
@@ -46,6 +48,7 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
+    const workspaceId = await getSessionWorkspaceId();
     const body = await request.json();
     const { provider, apiKey, model, baseUrl } = body;
 
@@ -54,7 +57,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Provedor de IA inválido." }, { status: 400 });
     }
 
-    const existing = await getConfig<AIConfigStored>("aiProvider");
+    const existing = await getConfig<AIConfigStored>("aiProvider", workspaceId);
     let encryptedKey = existing?.apiKey || "";
 
     // If new API key is provided, encrypt it
@@ -76,7 +79,7 @@ export async function POST(request: Request) {
       baseUrl: typeof baseUrl === "string" ? baseUrl.trim() : "",
     };
 
-    await setConfig("aiProvider", newConfigData);
+    await setConfig("aiProvider", newConfigData, workspaceId);
 
     return NextResponse.json({
       success: true,
@@ -95,3 +98,4 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Erro ao salvar configurações de IA" }, { status: 500 });
   }
 }
+

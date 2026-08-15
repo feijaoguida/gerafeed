@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { signOut } from "next-auth/react";
 import { usePathname, useSearchParams } from "next/navigation";
 import {
   LayoutDashboard,
@@ -17,6 +18,8 @@ import {
   Menu,
   X,
 } from "lucide-react";
+import { ThemeToggle, ThemeToggleRow } from "@/components/theme-toggle";
+import { PlanUsageCard } from "@/components/plan-usage-card";
 
 export function Sidebar() {
   const pathname = usePathname();
@@ -27,10 +30,12 @@ export function Sidebar() {
 
   const isActive = (path: string, statusFilter?: string) => {
     if (statusFilter !== undefined) {
-      return pathname === "/" && currentStatus === statusFilter;
+      return pathname === "/dashboard" && currentStatus === statusFilter;
     }
-    if (path === "/") {
-      return pathname === "/" && (!currentStatus || currentStatus === "PENDING");
+    if (path === "/dashboard") {
+      return (
+        pathname === "/dashboard" && (!currentStatus || currentStatus === "PENDING")
+      );
     }
     return pathname.startsWith(path);
   };
@@ -40,7 +45,7 @@ export function Sidebar() {
       {/* Mobile Toggle Button */}
       <button
         onClick={() => setIsMobileOpen(!isMobileOpen)}
-        className="lg:hidden fixed top-4 left-4 z-40 p-2.5 rounded-lg bg-zinc-900 border border-zinc-800 text-zinc-300 hover:text-white shadow-lg"
+        className="lg:hidden fixed top-4 left-4 z-40 p-2.5 rounded-lg bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-700 dark:text-zinc-300 hover:text-zinc-950 dark:hover:text-white shadow-lg"
         aria-label="Alternar menu"
       >
         {isMobileOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
@@ -56,33 +61,36 @@ export function Sidebar() {
 
       {/* Sidebar Container */}
       <aside
-        className={`fixed lg:static top-0 left-0 bottom-0 z-30 w-64 bg-zinc-900 border-r border-zinc-800/80 flex flex-col justify-between transition-transform duration-300 ease-in-out ${
+        className={`fixed lg:static top-0 left-0 bottom-0 z-30 w-64 bg-white dark:bg-zinc-900 border-r border-zinc-200 dark:border-zinc-800/80 flex flex-col justify-between transition-all duration-300 ease-in-out ${
           isMobileOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
         }`}
       >
-        <div className="p-4 space-y-6">
+        <div className="p-4 space-y-6 overflow-y-auto">
           {/* Brand Header */}
-          <div className="flex items-center gap-3 px-2 py-1">
-            <div className="p-2 bg-indigo-600/20 text-indigo-400 rounded-lg border border-indigo-500/30">
-              <Newspaper className="w-5 h-5" />
+          <div className="flex items-center justify-between px-2 py-1">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-indigo-600/10 dark:bg-indigo-600/20 text-indigo-600 dark:text-indigo-400 rounded-lg border border-indigo-500/20 dark:border-indigo-500/30">
+                <Newspaper className="w-5 h-5" />
+              </div>
+              <div>
+                <h2 className="text-base font-bold text-zinc-900 dark:text-white tracking-tight">GeraFeed</h2>
+                <p className="text-[11px] text-zinc-500 dark:text-zinc-400">Painel Editorial & IA</p>
+              </div>
             </div>
-            <div>
-              <h2 className="text-base font-bold text-white tracking-tight">News Curator</h2>
-              <p className="text-[11px] text-zinc-400">Painel Editorial & IA</p>
-            </div>
+            <ThemeToggle />
           </div>
 
           {/* Navigation Links */}
-          <nav className="space-y-6">
+          <nav className="space-y-5">
             {/* Dashboard */}
             <div>
               <Link
-                href="/"
+                href="/dashboard"
                 onClick={() => setIsMobileOpen(false)}
                 className={`flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-semibold transition ${
-                  isActive("/", undefined) && pathname === "/" && !currentStatus
+                  isActive("/dashboard", undefined) && !currentStatus
                     ? "bg-indigo-600 text-white shadow-md shadow-indigo-600/20"
-                    : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/60"
+                    : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800/60"
                 }`}
               >
                 <LayoutDashboard className="w-4 h-4" />
@@ -92,52 +100,53 @@ export function Sidebar() {
 
             {/* Notícias Fila */}
             <div className="space-y-1">
-              <div className="px-3 text-[10px] font-bold text-zinc-500 uppercase tracking-wider">
+              <div className="px-3 text-[10px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-wider">
                 Notícias
               </div>
+
               <Link
-                href="/?status=PENDING"
+                href="/dashboard?status=PENDING"
                 onClick={() => setIsMobileOpen(false)}
                 className={`flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-medium transition ${
-                  isActive("/", "PENDING")
-                    ? "bg-indigo-600/20 text-indigo-300 border border-indigo-500/30"
-                    : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/60"
+                  isActive("/dashboard", "PENDING")
+                    ? "bg-indigo-50 dark:bg-indigo-600/20 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-500/30 font-semibold"
+                    : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800/60"
                 }`}
               >
-                <Clock className="w-4 h-4 text-amber-400" />
+                <Clock className="w-4 h-4 text-amber-500 dark:text-amber-400" />
                 Pendentes
               </Link>
 
               <Link
-                href="/?status=PUBLISHED"
+                href="/dashboard?status=PUBLISHED"
                 onClick={() => setIsMobileOpen(false)}
                 className={`flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-medium transition ${
-                  isActive("/", "PUBLISHED")
-                    ? "bg-indigo-600/20 text-indigo-300 border border-indigo-500/30"
-                    : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/60"
+                  isActive("/dashboard", "PUBLISHED")
+                    ? "bg-indigo-50 dark:bg-indigo-600/20 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-500/30 font-semibold"
+                    : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800/60"
                 }`}
               >
-                <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                <CheckCircle2 className="w-4 h-4 text-emerald-500 dark:text-emerald-400" />
                 Publicadas
               </Link>
 
               <Link
-                href="/?status=REJECTED"
+                href="/dashboard?status=REJECTED"
                 onClick={() => setIsMobileOpen(false)}
                 className={`flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-medium transition ${
-                  isActive("/", "REJECTED")
-                    ? "bg-indigo-600/20 text-indigo-300 border border-indigo-500/30"
-                    : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/60"
+                  isActive("/dashboard", "REJECTED")
+                    ? "bg-indigo-50 dark:bg-indigo-600/20 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-500/30 font-semibold"
+                    : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800/60"
                 }`}
               >
-                <XCircle className="w-4 h-4 text-rose-400" />
+                <XCircle className="w-4 h-4 text-rose-500 dark:text-rose-400" />
                 Rejeitadas
               </Link>
             </div>
 
             {/* Configurações */}
             <div className="space-y-1">
-              <div className="px-3 text-[10px] font-bold text-zinc-500 uppercase tracking-wider flex items-center gap-1.5">
+              <div className="px-3 text-[10px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-wider flex items-center gap-1.5">
                 <Settings className="w-3 h-3" />
                 Configurações
               </div>
@@ -147,11 +156,11 @@ export function Sidebar() {
                 onClick={() => setIsMobileOpen(false)}
                 className={`flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-medium transition ${
                   isActive("/settings/sources")
-                    ? "bg-indigo-600/20 text-indigo-300 border border-indigo-500/30"
-                    : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/60"
+                    ? "bg-indigo-50 dark:bg-indigo-600/20 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-500/30 font-semibold"
+                    : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800/60"
                 }`}
               >
-                <Rss className="w-4 h-4 text-indigo-400" />
+                <Rss className="w-4 h-4 text-indigo-500 dark:text-indigo-400" />
                 Fontes RSS
               </Link>
 
@@ -160,11 +169,11 @@ export function Sidebar() {
                 onClick={() => setIsMobileOpen(false)}
                 className={`flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-medium transition ${
                   isActive("/settings/wordpress")
-                    ? "bg-indigo-600/20 text-indigo-300 border border-indigo-500/30"
-                    : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/60"
+                    ? "bg-indigo-50 dark:bg-indigo-600/20 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-500/30 font-semibold"
+                    : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800/60"
                 }`}
               >
-                <Globe className="w-4 h-4 text-sky-400" />
+                <Globe className="w-4 h-4 text-sky-500 dark:text-sky-400" />
                 WordPress
               </Link>
 
@@ -173,11 +182,11 @@ export function Sidebar() {
                 onClick={() => setIsMobileOpen(false)}
                 className={`flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-medium transition ${
                   isActive("/settings/ai")
-                    ? "bg-indigo-600/20 text-indigo-300 border border-indigo-500/30"
-                    : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/60"
+                    ? "bg-indigo-50 dark:bg-indigo-600/20 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-500/30 font-semibold"
+                    : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800/60"
                 }`}
               >
-                <Sparkles className="w-4 h-4 text-emerald-400" />
+                <Sparkles className="w-4 h-4 text-emerald-500 dark:text-emerald-400" />
                 Inteligência Artificial
               </Link>
 
@@ -186,20 +195,34 @@ export function Sidebar() {
                 onClick={() => setIsMobileOpen(false)}
                 className={`flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-medium transition ${
                   isActive("/settings/images")
-                    ? "bg-indigo-600/20 text-indigo-300 border border-indigo-500/30"
-                    : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/60"
+                    ? "bg-indigo-50 dark:bg-indigo-600/20 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-500/30 font-semibold"
+                    : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800/60"
                 }`}
               >
-                <ImageIcon className="w-4 h-4 text-purple-400" />
+                <ImageIcon className="w-4 h-4 text-purple-500 dark:text-purple-400" />
                 Estratégia de Imagens
               </Link>
+            </div>
+
+            {/* Opção Visual de Tema no Menu */}
+            <div className="pt-2 border-t border-zinc-100 dark:border-zinc-800/60">
+              <ThemeToggleRow />
             </div>
           </nav>
         </div>
 
-        {/* Footer info */}
-        <div className="p-4 border-t border-zinc-800/80 text-[11px] text-zinc-500">
-          News Curator v0.2.0 • Phase 2
+        {/* Plan Usage Card & Footer info */}
+        <div className="p-4 border-t border-zinc-200 dark:border-zinc-800/80 space-y-4">
+          <PlanUsageCard />
+          <div className="flex items-center justify-between text-[11px] pt-1">
+            <span className="text-zinc-400 dark:text-zinc-500">GeraFeed v0.6.0</span>
+            <button
+              onClick={() => signOut({ callbackUrl: "/login" })}
+              className="text-zinc-500 dark:text-zinc-400 hover:text-rose-600 dark:hover:text-rose-400 transition"
+            >
+              Sair da conta
+            </button>
+          </div>
         </div>
       </aside>
     </>

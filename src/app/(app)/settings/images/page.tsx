@@ -76,29 +76,29 @@ export default function SettingsImagesPage() {
   }
 
   return (
-    <div className="p-6 sm:p-8 max-w-4xl mx-auto space-y-8">
+    <div className="p-6 sm:p-8 max-w-4xl mx-auto space-y-8 transition-colors duration-200">
       <div>
         <div className="flex items-center gap-2">
-          <ImageIcon className="w-5 h-5 text-indigo-400" />
-          <h1 className="text-xl font-bold text-white tracking-tight">Estratégia de Imagens</h1>
+          <ImageIcon className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
+          <h1 className="text-xl font-bold text-zinc-900 dark:text-white tracking-tight">Estratégia de Imagens</h1>
         </div>
-        <p className="text-xs text-zinc-400 mt-1">
+        <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
           Defina o comportamento padrão para as imagens das matérias coletadas via RSS (imagem original vs. imagem processada).
         </p>
       </div>
 
       {/* Current Active Strategy Badge */}
-      <div className="p-4 rounded-xl bg-zinc-900/60 border border-zinc-800 flex items-center justify-between">
+      <div className="p-4 rounded-xl bg-white dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 flex items-center justify-between shadow-sm dark:shadow-none">
         <div className="flex items-center gap-3">
-          <ShieldCheck className="w-5 h-5 text-indigo-400" />
+          <ShieldCheck className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
           <div>
-            <p className="text-xs font-semibold text-white">
+            <p className="text-xs font-semibold text-zinc-900 dark:text-white">
               Estratégia Padrão Ativa:{" "}
-              <span className="uppercase text-indigo-400 font-bold">
+              <span className="uppercase text-indigo-600 dark:text-indigo-400 font-bold">
                 {defaultStrategy === "ORIGINAL" ? "Usar Imagem Original" : "Processar / Modificar Imagem"}
               </span>
             </p>
-            <p className="text-[11px] text-zinc-400">
+            <p className="text-[11px] text-zinc-500 dark:text-zinc-400">
               Esta preferência será aplicada como valor inicial no editor de notícias.
             </p>
           </div>
@@ -107,32 +107,32 @@ export default function SettingsImagesPage() {
 
       {/* Alerts */}
       {errorMessage && (
-        <div className="p-4 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-300 text-xs flex items-center justify-between">
+        <div className="p-4 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-600 dark:text-rose-300 text-xs flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
+            <AlertCircle className="w-4 h-4 text-rose-500 dark:text-rose-400 shrink-0" />
             <span>{errorMessage}</span>
           </div>
-          <button onClick={() => setErrorMessage(null)} className="text-rose-400 hover:underline">
+          <button onClick={() => setErrorMessage(null)} className="text-rose-500 hover:underline">
             Fechar
           </button>
         </div>
       )}
 
       {successMessage && (
-        <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 text-xs flex items-center justify-between">
+        <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-700 dark:text-emerald-300 text-xs flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+            <CheckCircle2 className="w-4 h-4 text-emerald-500 dark:text-emerald-400 shrink-0" />
             <span>{successMessage}</span>
           </div>
-          <button onClick={() => setSuccessMessage(null)} className="text-emerald-400 hover:underline">
+          <button onClick={() => setSuccessMessage(null)} className="text-emerald-600 hover:underline">
             Fechar
           </button>
         </div>
       )}
 
       {/* Settings Form */}
-      <form onSubmit={handleSave} className="p-6 rounded-xl bg-zinc-900/60 border border-zinc-800 space-y-6">
-        <h2 className="text-sm font-semibold text-zinc-200 border-b border-zinc-800 pb-3">
+      <form onSubmit={handleSave} className="p-6 rounded-xl bg-white dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 space-y-6 shadow-sm dark:shadow-none">
+        <h2 className="text-sm font-semibold text-zinc-900 dark:text-zinc-200 border-b border-zinc-200 dark:border-zinc-800 pb-3">
           Seleção da Estratégia Padrão
         </h2>
 
@@ -141,8 +141,8 @@ export default function SettingsImagesPage() {
           <label
             className={`p-4 rounded-xl border cursor-pointer transition flex flex-col justify-between space-y-3 ${
               defaultStrategy === "ORIGINAL"
-                ? "bg-indigo-600/10 border-indigo-500/50 text-white"
-                : "bg-zinc-950/60 border-zinc-800 text-zinc-400 hover:border-zinc-700"
+                ? "bg-indigo-50 dark:bg-indigo-600/10 border-indigo-500/50 text-zinc-900 dark:text-white shadow-sm"
+                : "bg-zinc-50 dark:bg-zinc-950/60 border-zinc-200 dark:border-zinc-800 text-zinc-600 dark:text-zinc-400 hover:border-zinc-300 dark:hover:border-zinc-700"
             }`}
           >
             <div className="flex items-start justify-between">
@@ -155,10 +155,10 @@ export default function SettingsImagesPage() {
                   onChange={() => setDefaultStrategy("ORIGINAL")}
                   className="accent-indigo-500"
                 />
-                <span className="text-xs font-bold text-white">Usar Imagem Original</span>
+                <span className="text-xs font-bold text-zinc-900 dark:text-white">Usar Imagem Original</span>
               </div>
             </div>
-            <p className="text-[11px] text-zinc-400 leading-relaxed">
+            <p className="text-[11px] text-zinc-500 dark:text-zinc-400 leading-relaxed">
               Mantém a imagem original extraída do feed RSS da matéria sem alterações ou filtros adicionais.
             </p>
           </label>
@@ -167,8 +167,8 @@ export default function SettingsImagesPage() {
           <label
             className={`p-4 rounded-xl border cursor-pointer transition flex flex-col justify-between space-y-3 ${
               defaultStrategy === "MODIFIED"
-                ? "bg-indigo-600/10 border-indigo-500/50 text-white"
-                : "bg-zinc-950/60 border-zinc-800 text-zinc-400 hover:border-zinc-700"
+                ? "bg-indigo-50 dark:bg-indigo-600/10 border-indigo-500/50 text-zinc-900 dark:text-white shadow-sm"
+                : "bg-zinc-50 dark:bg-zinc-950/60 border-zinc-200 dark:border-zinc-800 text-zinc-600 dark:text-zinc-400 hover:border-zinc-300 dark:hover:border-zinc-700"
             }`}
           >
             <div className="flex items-start justify-between">
@@ -181,11 +181,11 @@ export default function SettingsImagesPage() {
                   onChange={() => setDefaultStrategy("MODIFIED")}
                   className="accent-indigo-500"
                 />
-                <span className="text-xs font-bold text-white">Processar / Alterar Imagem</span>
+                <span className="text-xs font-bold text-zinc-900 dark:text-white">Processar / Alterar Imagem</span>
               </div>
             </div>
-            <p className="text-[11px] text-zinc-400 leading-relaxed">
-              Gera e aplica filtros/marcas d&apos;água na imagem para padronização visual e diferenciação do conteúdo original.
+            <p className="text-[11px] text-zinc-500 dark:text-zinc-400 leading-relaxed">
+              Gera e aplica filtros/modificações na imagem para padronização visual e diferenciação do conteúdo original.
             </p>
           </label>
         </div>

@@ -1,7 +1,7 @@
 import fs from "fs";
 import path from "path";
 import { prisma } from "@/lib/prisma";
-import { getConfig } from "@/lib/config";
+import { getConfig, DEFAULT_WORKSPACE_ID } from "@/lib/config";
 import { decrypt } from "@/lib/crypto";
 
 export interface WpCategory {
@@ -17,13 +17,13 @@ export interface WordPressConnectionConfigStored {
 }
 
 /**
- * Returns active WordPress configuration.
+ * Returns active WordPress configuration for a specific workspace.
  * Checks DB configuration first (decrypting application password server-side).
  * Falls back to environment variables if no DB configuration exists.
  */
-export async function getWordPressConfig() {
+export async function getWordPressConfig(workspaceId: string = DEFAULT_WORKSPACE_ID) {
   // 1. Try DB configuration first
-  const dbConfig = await getConfig<WordPressConnectionConfigStored>("wordpressConnection");
+  const dbConfig = await getConfig<WordPressConnectionConfigStored>("wordpressConnection", workspaceId);
 
   if (dbConfig && dbConfig.url && dbConfig.username) {
     let plainPassword = "";
@@ -61,6 +61,7 @@ export async function getWordPressConfig() {
     applicationPassword,
   };
 }
+
 
 function getAuthHeaders(config: Awaited<ReturnType<typeof getWordPressConfig>>): Record<string, string> {
   const credentials = `${config.username}:${config.applicationPassword}`;
@@ -198,11 +199,14 @@ export async function getOrCreateWordPressTagIds(
 }
 
 /**
- * Tests connection to WordPress REST API using active configuration.
+ * Tests connection to WordPress REST API using active configuration for a specific workspace.
  */
-export async function testWordPressConnection() {
-  const config = await getWordPressConfig();
+export async function testWordPressConnection(
+  workspaceId: string = DEFAULT_WORKSPACE_ID
+) {
+  const config = await getWordPressConfig(workspaceId);
   const headers = getAuthHeaders(config);
+
 
   const res = await fetch(`${config.url}/wp-json/wp/v2/users/me`, {
     method: "GET",
@@ -230,10 +234,12 @@ export async function testWordPressConnection() {
 }
 
 /**
- * Fetches all categories from WordPress REST API.
+ * Fetches all categories directly from WordPress REST API (/wp-json/wp/v2/categories).
  */
-export async function fetchWordPressCategories(): Promise<WpCategory[]> {
-  const config = await getWordPressConfig();
+export async function fetchWordPressCategories(
+  workspaceId: string = DEFAULT_WORKSPACE_ID
+): Promise<WpCategory[]> {
+  const config = await getWordPressConfig(workspaceId);
   const headers = getAuthHeaders(config);
 
   const allCategories: WpCategory[] = [];
@@ -273,20 +279,28 @@ export async function fetchWordPressCategories(): Promise<WpCategory[]> {
 }
 
 /**
- * Syncs WordPress categories into Prisma DB.
+ * Syncs WordPress categories into Prisma DB for a specific workspace.
  */
-export async function syncWordPressCategories() {
-  const categories = await fetchWordPressCategories();
+export async function syncWordPressCategories(
+  workspaceId: string = DEFAULT_WORKSPACE_ID
+) {
+  const categories = await fetchWordPressCategories(workspaceId);
 
   const synced = [];
   for (const cat of categories) {
     const upserted = await prisma.wordPressCategory.upsert({
-      where: { wordpressId: cat.id },
+      where: {
+        workspaceId_wordpressId: {
+          workspaceId,
+          wordpressId: cat.id,
+        },
+      },
       update: {
         name: cat.name,
         slug: cat.slug,
       },
       create: {
+        workspaceId,
         wordpressId: cat.id,
         name: cat.name,
         slug: cat.slug,
@@ -307,9 +321,15 @@ export async function syncWordPressCategories() {
  * publishes article post to WordPress with Yoast SEO meta fields,
  * and updates DB status to PUBLISHED with wordpressPostId.
  */
-export async function publishArticleToWordPress(articleId: string) {
+export async function publishArticleToWordPress(
+  articleId: string,
+  workspaceId?: string
+) {
   const article = await prisma.article.findUnique({
-    where: { id: articleId },
+    where: {
+      id: articleId,
+      ...(workspaceId ? { workspaceId } : {}),
+    },
     include: {
       category: true,
       suggestedCategory: true,
@@ -334,7 +354,7 @@ export async function publishArticleToWordPress(articleId: string) {
     throw new Error("Selecione uma categoria válida do WordPress antes de aprovar.");
   }
 
-  const config = await getWordPressConfig();
+  const config = await getWordPressConfig(article.workspaceId);
   const headers = getAuthHeaders(config);
 
   // 1. Resolve source credit attribution

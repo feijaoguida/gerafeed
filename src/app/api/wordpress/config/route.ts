@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getConfig, setConfig } from "@/lib/config";
 import { encrypt } from "@/lib/crypto";
+import { getSessionWorkspaceId } from "@/lib/workspace";
 
 export interface WordPressConfigStored {
   url: string;
@@ -10,7 +11,8 @@ export interface WordPressConfigStored {
 
 export async function GET() {
   try {
-    const config = await getConfig<WordPressConfigStored>("wordpressConnection");
+    const workspaceId = await getSessionWorkspaceId();
+    const config = await getConfig<WordPressConfigStored>("wordpressConnection", workspaceId);
 
     if (!config) {
       // Fallback to env info if no DB config
@@ -42,6 +44,7 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
+    const workspaceId = await getSessionWorkspaceId();
     const body = await request.json();
     const { url, username, applicationPassword } = body;
 
@@ -53,7 +56,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "O Nome de Usuário do WordPress é obrigatório." }, { status: 400 });
     }
 
-    const existing = await getConfig<WordPressConfigStored>("wordpressConnection");
+    const existing = await getConfig<WordPressConfigStored>("wordpressConnection", workspaceId);
     let encryptedPassword = existing?.applicationPassword || "";
 
     // If new password is provided, encrypt it
@@ -74,7 +77,7 @@ export async function POST(request: Request) {
       applicationPassword: encryptedPassword,
     };
 
-    await setConfig("wordpressConnection", newConfigData);
+    await setConfig("wordpressConnection", newConfigData, workspaceId);
 
     return NextResponse.json({
       success: true,
@@ -92,3 +95,4 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Erro ao salvar configuração do WordPress" }, { status: 500 });
   }
 }
+

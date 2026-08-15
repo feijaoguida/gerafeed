@@ -7,7 +7,7 @@ async function main() {
   // 1. Create test records for stats verification
   const source = await prisma.source.create({
     data: {
-      name: "Dashboard Test Source",
+        workspaceId: "default-workspace",name: "Dashboard Test Source",
       rssUrl: "https://example.com/dash-rss",
       active: true,
     },
@@ -15,7 +15,7 @@ async function main() {
 
   const category = await prisma.wordPressCategory.create({
     data: {
-      wordpressId: 8881,
+        workspaceId: "default-workspace",wordpressId: 8881,
       name: "Dashboard Category",
       slug: "dashboard-category",
     },
@@ -23,7 +23,7 @@ async function main() {
 
   const pendingArt = await prisma.article.create({
     data: {
-      sourceId: source.id,
+        workspaceId: "default-workspace",sourceId: source.id,
       originalUrl: "https://example.com/dash-art-1",
       originalTitle: "Notícia Pendente para Dashboard",
       status: "PENDING",
@@ -34,7 +34,7 @@ async function main() {
 
   const publishedArt = await prisma.article.create({
     data: {
-      sourceId: source.id,
+        workspaceId: "default-workspace",sourceId: source.id,
       originalUrl: "https://example.com/dash-art-2",
       originalTitle: "Notícia Publicada para Dashboard",
       status: "PUBLISHED",

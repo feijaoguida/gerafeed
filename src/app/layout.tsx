@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
-import { Suspense } from "react";
-import { Sidebar } from "@/components/sidebar";
+import { ThemeProvider } from "@/components/theme-provider";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -15,10 +14,13 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "News Curator",
-  description: "Curadoria de notícias via RSS com inteligência artificial",
+  title: "GeraFeed - Curadoria Inteligente & Publicação Automática",
+  description: "Curadoria de notícias via RSS com inteligência artificial e publicação automática",
 };
 
+/**
+ * Root layout — shell global: fontes, tema claro/escuro e ThemeProvider.
+ */
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -27,14 +29,21 @@ export default function RootLayout({
   return (
     <html
       lang="pt-BR"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased dark`}
+      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
       suppressHydrationWarning
     >
-      <body className="min-h-full flex bg-zinc-950 text-zinc-100" suppressHydrationWarning>
-        <Suspense fallback={<div className="w-64 bg-zinc-900 border-r border-zinc-800" />}>
-          <Sidebar />
-        </Suspense>
-        <div className="flex-1 min-w-0 flex flex-col">{children}</div>
+      <body
+        className="min-h-full bg-background text-foreground antialiased selection:bg-indigo-500 selection:text-white transition-colors duration-200"
+        suppressHydrationWarning
+      >
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="dark"
+          enableSystem
+          disableTransitionOnChange
+        >
+          {children}
+        </ThemeProvider>
       </body>
     </html>
   );

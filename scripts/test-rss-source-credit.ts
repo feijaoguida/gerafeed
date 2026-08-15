@@ -10,7 +10,7 @@ async function main() {
   console.log("Testing Prisma model Source with creditName field...");
   const directSource = await prisma.source.create({
     data: {
-      name: "TechCrunch Direct",
+        workspaceId: "default-workspace",name: "TechCrunch Direct",
       creditName: "TechCrunch Brasil",
       rssUrl: "https://techcrunch.com/feed/direct-test",
       active: true,

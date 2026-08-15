@@ -162,19 +162,19 @@ function DashboardContent() {
   return (
     <div className="p-6 sm:p-8 max-w-7xl mx-auto space-y-8">
       {/* Top Header Bar */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-zinc-800/80">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-zinc-200 dark:border-zinc-800/80">
         <div>
-          <h1 className="text-xl font-bold text-white tracking-tight">Dashboard Editorial</h1>
-          <p className="text-xs text-zinc-400 mt-0.5">Fila de curadoria e processamento de inteligência artificial</p>
+          <h1 className="text-xl font-bold text-zinc-900 dark:text-white tracking-tight">Dashboard Editorial</h1>
+          <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">Fila de curadoria e processamento de inteligência artificial</p>
         </div>
 
         <div className="flex items-center gap-3">
           <button
             onClick={handleSyncWordPress}
             disabled={isSyncingWp}
-            className="inline-flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-xs font-medium bg-zinc-900 hover:bg-zinc-800 text-zinc-200 border border-zinc-800 transition disabled:opacity-50"
+            className="inline-flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-xs font-medium bg-white dark:bg-zinc-900 hover:bg-zinc-50 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-200 border border-zinc-200 dark:border-zinc-800 shadow-sm dark:shadow-none transition disabled:opacity-50"
           >
-            <FolderSync className={`w-4 h-4 ${isSyncingWp ? "animate-spin" : ""}`} />
+            <FolderSync className={`w-4 h-4 ${isSyncingWp ? "animate-spin text-indigo-500" : ""}`} />
             {isSyncingWp ? "Sincronizando..." : "Sincronizar Categorias WP"}
           </button>
 
@@ -191,24 +191,24 @@ function DashboardContent() {
 
       {/* Feedback Alerts */}
       {errorMessage && (
-        <div className="p-4 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-300 text-xs flex items-center justify-between gap-3">
+        <div className="p-4 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-600 dark:text-rose-300 text-xs flex items-center justify-between gap-3">
           <div className="flex items-center gap-2">
-            <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
+            <AlertCircle className="w-4 h-4 text-rose-500 dark:text-rose-400 shrink-0" />
             <span>{errorMessage}</span>
           </div>
-          <button onClick={() => setErrorMessage(null)} className="text-xs text-rose-400 hover:underline">
+          <button onClick={() => setErrorMessage(null)} className="text-xs text-rose-500 hover:underline">
             Fechar
           </button>
         </div>
       )}
 
       {successMessage && (
-        <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 text-xs flex items-center justify-between gap-3">
+        <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-700 dark:text-emerald-300 text-xs flex items-center justify-between gap-3">
           <div className="flex items-center gap-2">
-            <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+            <CheckCircle2 className="w-4 h-4 text-emerald-500 dark:text-emerald-400 shrink-0" />
             <span>{successMessage}</span>
           </div>
-          <button onClick={() => setSuccessMessage(null)} className="text-xs text-emerald-400 hover:underline">
+          <button onClick={() => setSuccessMessage(null)} className="text-xs text-emerald-600 hover:underline">
             Fechar
           </button>
         </div>
@@ -216,57 +216,57 @@ function DashboardContent() {
 
       {/* Stats Grid */}
       <section className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-        <Link href="/?status=PENDING" className="block">
-          <div className="p-5 rounded-xl bg-zinc-900/60 border border-zinc-800/80 hover:border-amber-500/30 transition space-y-1">
-            <div className="flex items-center justify-between text-zinc-400 text-xs font-medium">
+        <Link href="/dashboard?status=PENDING" className="block group">
+          <div className="p-5 rounded-xl bg-white dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800/80 hover:border-amber-500/50 shadow-sm dark:shadow-none transition space-y-1">
+            <div className="flex items-center justify-between text-zinc-500 dark:text-zinc-400 text-xs font-medium">
               <span>Pendentes de Revisão</span>
-              <Clock className="w-4 h-4 text-amber-400" />
+              <Clock className="w-4 h-4 text-amber-500 dark:text-amber-400" />
             </div>
-            <p className="text-2xl sm:text-3xl font-bold text-white tracking-tight">{stats.pendingCount}</p>
+            <p className="text-2xl sm:text-3xl font-bold text-zinc-900 dark:text-white tracking-tight">{stats.pendingCount}</p>
           </div>
         </Link>
 
-        <Link href="/?status=PUBLISHED" className="block">
-          <div className="p-5 rounded-xl bg-zinc-900/60 border border-zinc-800/80 hover:border-emerald-500/30 transition space-y-1">
-            <div className="flex items-center justify-between text-zinc-400 text-xs font-medium">
+        <Link href="/dashboard?status=PUBLISHED" className="block group">
+          <div className="p-5 rounded-xl bg-white dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800/80 hover:border-emerald-500/50 shadow-sm dark:shadow-none transition space-y-1">
+            <div className="flex items-center justify-between text-zinc-500 dark:text-zinc-400 text-xs font-medium">
               <span>Publicadas no WordPress</span>
-              <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+              <CheckCircle2 className="w-4 h-4 text-emerald-500 dark:text-emerald-400" />
             </div>
-            <p className="text-2xl sm:text-3xl font-bold text-white tracking-tight">{stats.publishedCount}</p>
+            <p className="text-2xl sm:text-3xl font-bold text-zinc-900 dark:text-white tracking-tight">{stats.publishedCount}</p>
           </div>
         </Link>
 
-        <Link href="/?status=REJECTED" className="block">
-          <div className="p-5 rounded-xl bg-zinc-900/60 border border-zinc-800/80 hover:border-rose-500/30 transition space-y-1">
-            <div className="flex items-center justify-between text-zinc-400 text-xs font-medium">
+        <Link href="/dashboard?status=REJECTED" className="block group">
+          <div className="p-5 rounded-xl bg-white dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800/80 hover:border-rose-500/50 shadow-sm dark:shadow-none transition space-y-1">
+            <div className="flex items-center justify-between text-zinc-500 dark:text-zinc-400 text-xs font-medium">
               <span>Rejeitadas</span>
-              <XCircle className="w-4 h-4 text-rose-400" />
+              <XCircle className="w-4 h-4 text-rose-500 dark:text-rose-400" />
             </div>
-            <p className="text-2xl sm:text-3xl font-bold text-white tracking-tight">{stats.rejectedCount}</p>
+            <p className="text-2xl sm:text-3xl font-bold text-zinc-900 dark:text-white tracking-tight">{stats.rejectedCount}</p>
           </div>
         </Link>
 
-        <Link href="/settings/sources" className="block">
-          <div className="p-5 rounded-xl bg-zinc-900/60 border border-zinc-800/80 hover:border-indigo-500/30 transition space-y-1">
-            <div className="flex items-center justify-between text-zinc-400 text-xs font-medium">
+        <Link href="/settings/sources" className="block group">
+          <div className="p-5 rounded-xl bg-white dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800/80 hover:border-indigo-500/50 shadow-sm dark:shadow-none transition space-y-1">
+            <div className="flex items-center justify-between text-zinc-500 dark:text-zinc-400 text-xs font-medium">
               <span>Fontes RSS Ativas</span>
-              <Rss className="w-4 h-4 text-indigo-400" />
+              <Rss className="w-4 h-4 text-indigo-500 dark:text-indigo-400" />
             </div>
-            <p className="text-2xl sm:text-3xl font-bold text-white tracking-tight">{stats.activeSourcesCount}</p>
+            <p className="text-2xl sm:text-3xl font-bold text-zinc-900 dark:text-white tracking-tight">{stats.activeSourcesCount}</p>
           </div>
         </Link>
       </section>
 
       {/* Main Articles List Section */}
       <div className="space-y-6">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-zinc-800 pb-4">
-          <h2 className="text-base font-semibold text-white flex items-center gap-2">
-            <Newspaper className="w-5 h-5 text-indigo-400" />
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-zinc-200 dark:border-zinc-800 pb-4">
+          <h2 className="text-base font-semibold text-zinc-900 dark:text-white flex items-center gap-2">
+            <Newspaper className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
             Fila de Notícias ({articles.length})
           </h2>
 
           {/* Status Filter Link Tabs */}
-          <div className="flex items-center gap-1 bg-zinc-900 p-1 rounded-lg border border-zinc-800">
+          <div className="flex items-center gap-1 bg-zinc-100 dark:bg-zinc-900 p-1 rounded-lg border border-zinc-200 dark:border-zinc-800">
             {[
               { tab: "PENDING", label: "Pendentes" },
               { tab: "PUBLISHED", label: "Publicadas" },
@@ -275,11 +275,11 @@ function DashboardContent() {
             ].map(({ tab, label }) => (
               <Link
                 key={tab}
-                href={tab === "PENDING" ? "/" : `/?status=${tab}`}
+                href={tab === "PENDING" ? "/dashboard" : `/dashboard?status=${tab}`}
                 className={`px-3 py-1.5 rounded-md text-xs font-medium transition ${
                   statusFilter === tab
-                    ? "bg-indigo-600 text-white shadow"
-                    : "text-zinc-400 hover:text-white hover:bg-zinc-800"
+                    ? "bg-indigo-600 text-white shadow-sm font-semibold"
+                    : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-200/60 dark:hover:bg-zinc-800"
                 }`}
               >
                 {label}
@@ -290,17 +290,17 @@ function DashboardContent() {
 
         {/* Articles List / Empty State */}
         {isLoading ? (
-          <div className="p-12 text-center text-zinc-500 text-xs flex flex-col items-center gap-2">
-            <RefreshCw className="w-5 h-5 animate-spin text-indigo-400" />
+          <div className="p-12 text-center text-zinc-400 dark:text-zinc-500 text-xs flex flex-col items-center gap-2">
+            <RefreshCw className="w-5 h-5 animate-spin text-indigo-600 dark:text-indigo-400" />
             <span>Carregando notícias...</span>
           </div>
         ) : articles.length === 0 ? (
-          <div className="p-12 text-center rounded-xl bg-zinc-900/40 border border-zinc-800 space-y-3">
-            <p className="text-zinc-400 text-xs">Nenhuma notícia encontrada para este filtro.</p>
+          <div className="p-12 text-center rounded-xl bg-white dark:bg-zinc-900/40 border border-zinc-200 dark:border-zinc-800 space-y-3 shadow-sm dark:shadow-none">
+            <p className="text-zinc-500 dark:text-zinc-400 text-xs">Nenhuma notícia encontrada para este filtro.</p>
             <button
               onClick={handleProcessRss}
               disabled={isProcessingRss}
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-medium bg-indigo-600/20 text-indigo-300 border border-indigo-500/30 hover:bg-indigo-600/30 transition"
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-medium bg-indigo-50 dark:bg-indigo-600/20 text-indigo-600 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-500/30 hover:bg-indigo-100 dark:hover:bg-indigo-600/30 transition"
             >
               <Sparkles className="w-4 h-4" />
               Processar 5 Notícias Agora
@@ -311,15 +311,15 @@ function DashboardContent() {
             {articles.map((article) => (
               <div
                 key={article.id}
-                className="p-5 rounded-xl bg-zinc-900/60 border border-zinc-800/80 hover:border-zinc-700/80 transition space-y-3"
+                className="p-5 rounded-xl bg-white dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800/80 hover:border-zinc-300 dark:hover:border-zinc-700/80 transition space-y-3 shadow-sm dark:shadow-none"
               >
                 <div className="flex items-start justify-between gap-4">
                   <div className="space-y-1">
-                    <span className="text-xs font-medium text-indigo-400 flex items-center gap-1.5">
+                    <span className="text-xs font-medium text-indigo-600 dark:text-indigo-400 flex items-center gap-1.5">
                       <Rss className="w-3.5 h-3.5" />
                       {article.source?.name || "Fonte RSS"}
                     </span>
-                    <h3 className="text-base font-semibold text-white leading-snug">
+                    <h3 className="text-base font-semibold text-zinc-900 dark:text-white leading-snug">
                       {article.title || article.originalTitle}
                     </h3>
                   </div>
@@ -328,10 +328,10 @@ function DashboardContent() {
                   <span
                     className={`px-2.5 py-1 rounded-full text-xs font-medium border shrink-0 ${
                       article.status === "PENDING"
-                        ? "bg-amber-500/10 text-amber-400 border-amber-500/20"
+                        ? "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20"
                         : article.status === "PUBLISHED"
-                        ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
-                        : "bg-rose-500/10 text-rose-400 border-rose-500/20"
+                        ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20"
+                        : "bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20"
                     }`}
                   >
                     {article.status === "PENDING"
@@ -343,16 +343,16 @@ function DashboardContent() {
                 </div>
 
                 {article.summary && (
-                  <p className="text-xs text-zinc-400 line-clamp-2 leading-relaxed">
+                  <p className="text-xs text-zinc-600 dark:text-zinc-400 line-clamp-2 leading-relaxed">
                     {article.summary}
                   </p>
                 )}
 
-                <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-zinc-800/60 text-xs text-zinc-500">
+                <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-zinc-100 dark:border-zinc-800/60 text-xs text-zinc-500">
                   <div className="flex items-center gap-3">
                     {/* AI Score Badge */}
                     {article.aiScore !== null && (
-                      <span className="inline-flex items-center gap-1 font-semibold text-indigo-300 bg-indigo-500/10 px-2 py-0.5 rounded border border-indigo-500/20">
+                      <span className="inline-flex items-center gap-1 font-semibold text-indigo-700 dark:text-indigo-300 bg-indigo-50 dark:bg-indigo-500/10 px-2 py-0.5 rounded border border-indigo-200 dark:border-indigo-500/20">
                         <Sparkles className="w-3 h-3" />
                         Score: {article.aiScore}
                       </span>
@@ -360,8 +360,8 @@ function DashboardContent() {
 
                     {/* Suggested Category Badge */}
                     {article.suggestedCategory && (
-                      <span className="text-zinc-400">
-                        Cat: <strong className="text-zinc-300 font-normal">{article.suggestedCategory.name}</strong>
+                      <span className="text-zinc-500 dark:text-zinc-400">
+                        Cat: <strong className="text-zinc-700 dark:text-zinc-300 font-normal">{article.suggestedCategory.name}</strong>
                       </span>
                     )}
                   </div>
@@ -371,7 +371,7 @@ function DashboardContent() {
                       href={article.originalUrl}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1 text-zinc-400 hover:text-zinc-200 transition"
+                      className="inline-flex items-center gap-1 text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-200 transition"
                     >
                       Original <ExternalLink className="w-3 h-3" />
                     </a>
@@ -379,7 +379,7 @@ function DashboardContent() {
                     {/* Navigation link to edit/review page */}
                     <Link
                       href={`/articles/${article.id}`}
-                      className="inline-flex items-center gap-1 px-3 py-1.5 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-200 font-medium transition"
+                      className="inline-flex items-center gap-1 px-3 py-1.5 rounded bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-800 dark:text-zinc-200 font-medium transition"
                     >
                       <Edit3 className="w-3.5 h-3.5" />
                       Revisar
@@ -393,14 +393,14 @@ function DashboardContent() {
       </div>
 
       {/* RSS Sources Link Footer Banner */}
-      <div className="p-5 rounded-xl bg-zinc-900/40 border border-zinc-800/80 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="p-5 rounded-xl bg-white dark:bg-zinc-900/40 border border-zinc-200 dark:border-zinc-800/80 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-sm dark:shadow-none">
         <div>
-          <h3 className="text-xs font-semibold text-white">Gerenciar Fontes RSS</h3>
-          <p className="text-[11px] text-zinc-400">Cadastre ou ative fontes de notícias nas configurações.</p>
+          <h3 className="text-xs font-semibold text-zinc-900 dark:text-white">Gerenciar Fontes RSS</h3>
+          <p className="text-[11px] text-zinc-500 dark:text-zinc-400">Cadastre ou ative fontes de notícias nas configurações.</p>
         </div>
         <Link
           href="/settings/sources"
-          className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium bg-zinc-800 hover:bg-zinc-700 text-zinc-200 transition self-start sm:self-auto"
+          className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-800 dark:text-zinc-200 transition self-start sm:self-auto"
         >
           Ir para Fontes RSS <ArrowRight className="w-3.5 h-3.5" />
         </Link>

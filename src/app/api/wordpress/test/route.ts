@@ -1,9 +1,11 @@
 import { NextResponse } from "next/server";
 import { testWordPressConnection } from "@/lib/wordpress";
+import { getSessionWorkspaceId } from "@/lib/workspace";
 
 export async function GET() {
   try {
-    const result = await testWordPressConnection();
+    const workspaceId = await getSessionWorkspaceId();
+    const result = await testWordPressConnection(workspaceId);
     return NextResponse.json(result);
   } catch (error) {
     const message = error instanceof Error ? error.message : "Erro desconhecido ao conectar com WordPress";
@@ -14,3 +16,4 @@ export async function GET() {
 export async function POST() {
   return GET();
 }
+

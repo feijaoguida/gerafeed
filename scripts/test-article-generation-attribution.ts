@@ -8,22 +8,32 @@ async function main() {
   // 1. Create a dummy Source with creditName and dummy Category & Article in DB
   const source = await prisma.source.create({
     data: {
-      name: "Tecmundo Feed",
+        workspaceId: "default-workspace",name: "Tecmundo Feed",
       creditName: "TecMundo Brasil",
       rssUrl: "https://tecmundo.com.br/rss",
     },
   });
 
   const category = await prisma.wordPressCategory.upsert({
-    where: { wordpressId: 9999 },
+    where: {
+      workspaceId_wordpressId: {
+        workspaceId: "default-workspace",
+        wordpressId: 9999,
+      },
+    },
     update: { name: "Tecnologia", slug: "tecnologia" },
-    create: { wordpressId: 9999, name: "Tecnologia", slug: "tecnologia" },
+    create: {
+      workspaceId: "default-workspace",
+      wordpressId: 9999,
+      name: "Tecnologia",
+      slug: "tecnologia",
+    },
   });
 
   const testArticleId = `test-attr-${Date.now()}`;
   const article = await prisma.article.create({
     data: {
-      id: testArticleId,
+        workspaceId: "default-workspace",id: testArticleId,
       sourceId: source.id,
       originalUrl: `https://tecmundo.com.br/article-${testArticleId}`,
       originalTitle: "Notícia de Teste com Atribuição de Crédito",

@@ -16,7 +16,7 @@ async function main() {
   // 1. Create a valid test RSS source (using NYTimes Tech RSS feed)
   const validSource = await prisma.source.create({
     data: {
-      name: "Test RSS Source - NYT Tech",
+        workspaceId: "default-workspace",name: "Test RSS Source - NYT Tech",
       rssUrl: "https://rss.nytimes.com/services/xml/rss/nyt/Technology.xml",
       active: true,
     },
@@ -26,7 +26,7 @@ async function main() {
   // 2. Create an invalid test RSS source to test error isolation
   const invalidSource = await prisma.source.create({
     data: {
-      name: "Test RSS Source - Invalid URL",
+        workspaceId: "default-workspace",name: "Test RSS Source - Invalid URL",
       rssUrl: "https://invalid-domain-rss-99999.xyz/feed.xml",
       active: true,
     },

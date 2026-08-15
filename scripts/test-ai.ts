@@ -34,7 +34,7 @@ async function main() {
     // Create a test Source & Article
     const source = await prisma.source.create({
       data: {
-        name: "Test AI Source",
+        workspaceId: "default-workspace",name: "Test AI Source",
         rssUrl: "https://example.com/rss",
         active: true,
       },
@@ -42,7 +42,7 @@ async function main() {
 
     const category = await prisma.wordPressCategory.create({
       data: {
-        wordpressId: 9991,
+        workspaceId: "default-workspace",wordpressId: 9991,
         name: "Tecnologia Teste",
         slug: "tecnologia-teste",
       },
@@ -50,7 +50,7 @@ async function main() {
 
     const article = await prisma.article.create({
       data: {
-        sourceId: source.id,
+        workspaceId: "default-workspace",sourceId: source.id,
         originalUrl: "https://example.com/ai-test-1",
         originalTitle: "Robôs com Inteligência Artificial começam a trabalhar em fábricas no Brasil",
         originalDescription: "Empresas brasileiras estão adotando robôs autônomos impulsionados por inteligência artificial para otimizar linhas de produção.",
@@ -93,7 +93,7 @@ async function main() {
     // Create test records
     const source = await prisma.source.create({
       data: {
-        name: "Test AI Source Dummy",
+        workspaceId: "default-workspace",name: "Test AI Source Dummy",
         rssUrl: "https://example.com/rss-dummy",
         active: true,
       },
@@ -101,7 +101,7 @@ async function main() {
 
     const article = await prisma.article.create({
       data: {
-        sourceId: source.id,
+        workspaceId: "default-workspace",sourceId: source.id,
         originalUrl: "https://example.com/ai-test-dummy",
         originalTitle: "Notícia Teste para validação de Schema",
         originalDescription: "Descrição original para teste de campos.",

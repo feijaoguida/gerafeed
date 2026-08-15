@@ -1,4 +1,4 @@
-import { getConfig } from "@/lib/config";
+import { getConfig, DEFAULT_WORKSPACE_ID } from "@/lib/config";
 import { decrypt } from "@/lib/crypto";
 import { createAIProvider } from "./factory";
 import { AIProvider, AIProviderConfig, AIProviderType } from "./types";
@@ -11,12 +11,15 @@ export interface AIProviderConfigStored {
 }
 
 /**
- * Returns an instance of the active AIProvider.
+ * Returns an instance of the active AIProvider for a specific workspace.
  * Reads configuration from database (decrypting apiKey server-side).
  * Falls back to OPENAI_API_KEY environment variable if no DB configuration exists.
  */
-export async function getActiveAIProvider(overrideConfig?: Partial<AIProviderConfigStored>): Promise<AIProvider> {
-  const dbConfig = await getConfig<AIProviderConfigStored>("aiProvider");
+export async function getActiveAIProvider(
+  overrideConfig?: Partial<AIProviderConfigStored>,
+  workspaceId: string = DEFAULT_WORKSPACE_ID
+): Promise<AIProvider> {
+  const dbConfig = await getConfig<AIProviderConfigStored>("aiProvider", workspaceId);
 
   const effectiveProvider = overrideConfig?.provider || dbConfig?.provider || "openai";
   const effectiveModel = overrideConfig?.model || dbConfig?.model || undefined;
@@ -56,9 +59,13 @@ export async function getActiveAIProvider(overrideConfig?: Partial<AIProviderCon
 }
 
 /**
- * Tests connection to the active or candidate AI Provider.
+ * Tests connection to the active or candidate AI Provider for a specific workspace.
  */
-export async function testActiveAIProviderConnection(overrideConfig?: Partial<AIProviderConfigStored>) {
-  const providerInstance = await getActiveAIProvider(overrideConfig);
+export async function testActiveAIProviderConnection(
+  overrideConfig?: Partial<AIProviderConfigStored>,
+  workspaceId: string = DEFAULT_WORKSPACE_ID
+) {
+  const providerInstance = await getActiveAIProvider(overrideConfig, workspaceId);
   return await providerInstance.testConnection();
 }
+
