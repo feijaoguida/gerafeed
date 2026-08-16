@@ -55,3 +55,17 @@
 - Componente `ThemeToggle` (`src/components/theme-toggle.tsx`) utiliza `useSyncExternalStore` para compatibilidade SSR com React 19 sem hydration mismatches.
 - Variáveis CSS globais padronizadas em `src/app/globals.css` para cores de fundo (`--background`), texto (`--foreground`), cards (`--card`), bordas (`--border`) e cor primária Índigo (`--primary`).
 - Componente `PlanUsageCard` (`src/components/plan-usage-card.tsx`) integrado na Sidebar consome `/api/billing/subscription` exibindo nome do plano, progresso de posts gerados no mês, data de vencimento e link de upgrade.
+
+## Processamento de Imagens (Serverless)
+- `processAndStoreImage` retorna Data URI base64 (`data:image/jpeg;base64,...`) em vez de salvar arquivo no filesystem.
+- Compatível com ambientes serverless (Vercel) onde o filesystem é read-only em runtime.
+- O campo `Article.modifiedImageUrl` armazena o Data URI completo.
+
+## Billing e Contagem de Artigos
+- Campo `Article.processedAt DateTime?` registra o momento exato da reescrita pela IA.
+- `BillingService.checkLimit("ARTICLES")` conta apenas artigos com `processedAt` não-nulo no mês corrente, não todos os artigos ingeridos via RSS.
+
+## RSS — Limite por Feed
+- `processRssSources(limitPerFeed, workspaceId)` aplica o limite individualmente por source ativa.
+- Com N feeds ativos e limit=5, o sistema traz até N*5 artigos (5 de cada feed).
+- O billing check foi removido da ingestão RSS; a validação de cota ocorre no momento da reescrita IA.

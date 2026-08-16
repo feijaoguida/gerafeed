@@ -1,18 +1,18 @@
-import fs from "fs";
-import path from "path";
 import sharp from "sharp";
 
 /**
  * Downloads an image from imageUrl, applies horizontal flip (.flop())
- * and subtle contrast/color modulation, saving the resulting image
- * to `public/media/modified-${articleId}.jpg`.
+ * and subtle contrast/color modulation, and returns the processed image
+ * as a Data URI string (`data:image/jpeg;base64,...`).
  *
- * Returns the public relative URL string `/media/modified-${articleId}.jpg`
- * or `null` if processing or downloading fails.
+ * This approach works on serverless environments (Vercel) where the
+ * filesystem is read-only at runtime.
+ *
+ * Returns the Data URI string or `null` if processing or downloading fails.
  */
 export async function processAndStoreImage(
   imageUrl: string,
-  articleId: string
+  _articleId: string
 ): Promise<string | null> {
   if (!imageUrl || typeof imageUrl !== "string" || !imageUrl.trim()) {
     return null;
@@ -45,20 +45,11 @@ export async function processAndStoreImage(
       .jpeg({ quality: 85 })
       .toBuffer();
 
-    // Ensure public/media directory exists
-    const mediaDir = path.join(process.cwd(), "public", "media");
-    if (!fs.existsSync(mediaDir)) {
-      fs.mkdirSync(mediaDir, { recursive: true });
-    }
-
-    const fileName = `modified-${articleId}.jpg`;
-    const filePath = path.join(mediaDir, fileName);
-
-    await fs.promises.writeFile(filePath, processedBuffer);
-
-    return `/media/${fileName}`;
+    // Return as Data URI (works on both local and serverless environments)
+    const base64 = processedBuffer.toString("base64");
+    return `data:image/jpeg;base64,${base64}`;
   } catch (error) {
-    console.error(`Error processing image for article ${articleId}:`, error);
+    console.error(`Error processing image for article ${_articleId}:`, error);
     return null;
   }
 }

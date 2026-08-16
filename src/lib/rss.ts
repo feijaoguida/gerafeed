@@ -1,6 +1,5 @@
 import Parser from "rss-parser";
 import { prisma } from "@/lib/prisma";
-import { BillingService } from "@/lib/billing";
 
 
 export interface ExtractedRssItem {
@@ -119,11 +118,12 @@ export async function parseFeedUrl(url: string, sourceId: string): Promise<Extra
 }
 
 /**
- * Fetches active RSS sources, deduplicates items by originalUrl,
- * selects up to `limit` new items (default 5), and saves them as PENDING articles for the specified workspace.
+ * Fetches active RSS sources, and for each source individually selects up to
+ * `limitPerFeed` new items (default 5), deduplicating by originalUrl against the DB.
+ * This ensures each feed contributes up to `limitPerFeed` articles.
  */
 export async function processRssSources(
-  limit: number = 5,
+  limitPerFeed: number = 5,
   workspaceId: string = "default-workspace"
 ) {
   // 1. Find all active sources for this workspace
@@ -143,88 +143,62 @@ export async function processRssSources(
     };
   }
 
-  // 2. Fetch items from each active source (handling errors individually)
-  const candidateItems: ExtractedRssItem[] = [];
+  // 2. Process each source independently, applying limit per feed
+  const createdArticles = [];
+
   for (const source of activeSources) {
     const items = await parseFeedUrl(source.rssUrl, source.id);
-    candidateItems.push(...items);
-  }
 
-  if (candidateItems.length === 0) {
-    return {
-      success: true,
-      processedCount: 0,
-      articles: [],
-      message: "Nenhum item encontrado nas fontes RSS ativas.",
-    };
-  }
+    if (items.length === 0) continue;
 
-  // 3. Deduplicate candidates among themselves by originalUrl
-  const uniqueCandidatesMap = new Map<string, ExtractedRssItem>();
-  for (const item of candidateItems) {
-    if (!uniqueCandidatesMap.has(item.originalUrl)) {
-      uniqueCandidatesMap.set(item.originalUrl, item);
+    // Deduplicate within the feed itself
+    const uniqueMap = new Map<string, ExtractedRssItem>();
+    for (const item of items) {
+      if (!uniqueMap.has(item.originalUrl)) {
+        uniqueMap.set(item.originalUrl, item);
+      }
+    }
+    const uniqueItems = Array.from(uniqueMap.values());
+
+    // Check which URLs already exist in DB
+    const candidateUrls = uniqueItems.map((c) => c.originalUrl);
+    const existingArticles = await prisma.article.findMany({
+      where: {
+        originalUrl: { in: candidateUrls },
+      },
+      select: { originalUrl: true },
+    });
+
+    const existingUrlsSet = new Set(existingArticles.map((a) => a.originalUrl));
+    const newItems = uniqueItems.filter((c) => !existingUrlsSet.has(c.originalUrl));
+
+    // Apply limit per feed
+    const selectedItems = newItems.slice(0, limitPerFeed);
+
+    // Persist selected articles with status PENDING
+    for (const item of selectedItems) {
+      const article = await prisma.article.create({
+        data: {
+          workspaceId,
+          sourceId: item.sourceId,
+          originalUrl: item.originalUrl,
+          originalTitle: item.originalTitle,
+          originalDescription: item.originalDescription,
+          originalImageUrl: item.originalImageUrl,
+          originalPublishedAt: item.originalPublishedAt,
+          status: "PENDING",
+        },
+      });
+      createdArticles.push(article);
     }
   }
-  const uniqueCandidates = Array.from(uniqueCandidatesMap.values());
 
-  // 4. Query existing articles in DB for deduplication within workspace
-  const candidateUrls = uniqueCandidates.map((c) => c.originalUrl);
-  const existingArticles = await prisma.article.findMany({
-    where: {
-      originalUrl: { in: candidateUrls },
-    },
-    select: { originalUrl: true },
-  });
-
-  const existingUrlsSet = new Set(existingArticles.map((a) => a.originalUrl));
-
-  // Filter out URLs that already exist in DB
-  const newCandidates = uniqueCandidates.filter((c) => !existingUrlsSet.has(c.originalUrl));
-
-  // 5. Select at most `limit` (max 5) new items
-  const selectedItems = newCandidates.slice(0, limit);
-
-  if (selectedItems.length === 0) {
+  if (createdArticles.length === 0) {
     return {
       success: true,
       processedCount: 0,
       articles: [],
       message: "Todas as notícias coletadas já foram salvas anteriormente (deduplicadas).",
-    };
-  }
-
-  // 6. Persist selected articles with status PENDING up to remaining plan quota
-  const createdArticles = [];
-  for (const item of selectedItems) {
-    const limitCheck = await BillingService.checkLimit(workspaceId, "ARTICLES");
-    if (!limitCheck.allowed) {
-      console.warn(`[RSS Process] ${limitCheck.message}`);
-      break;
-    }
-
-    const article = await prisma.article.create({
-      data: {
-        workspaceId,
-        sourceId: item.sourceId,
-        originalUrl: item.originalUrl,
-        originalTitle: item.originalTitle,
-        originalDescription: item.originalDescription,
-        originalImageUrl: item.originalImageUrl,
-        originalPublishedAt: item.originalPublishedAt,
-        status: "PENDING",
-      },
-    });
-    createdArticles.push(article);
-  }
-
-  if (createdArticles.length === 0 && selectedItems.length > 0) {
-    const limitCheck = await BillingService.checkLimit(workspaceId, "ARTICLES");
-    return {
-      success: false,
-      processedCount: 0,
-      articles: [],
-      message: limitCheck.message || "Limite de artigos atingido para o seu plano.",
     };
   }
 

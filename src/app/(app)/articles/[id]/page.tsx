@@ -177,18 +177,21 @@ export default function ReviewArticlePage({ params }: { params: Promise<{ id: st
 
       if (!res.ok) throw new Error(data.error || "Erro no processamento da IA.");
 
-      // Refresh form with AI returned data
-      setTitle(data.title || "");
-      setSummary(data.summary || "");
-      setContent(data.content || "");
-      if (data.categoryId) setCategoryId(data.categoryId);
-      if (data.tags) setTagsInput(data.tags.join(", "));
-      if (data.seoFocusKeyword) setSeoFocusKeyword(data.seoFocusKeyword);
-      if (data.seoTitle) setSeoTitle(data.seoTitle);
-      if (data.seoDescription) setSeoDescription(data.seoDescription);
-      if (data.selectedImage) setSelectedImage(data.selectedImage);
+      // API returns { success, article, aiResult } — read from data.article
+      const updated = data.article;
+      if (updated) {
+        setTitle(updated.title || "");
+        setSummary(updated.summary || "");
+        setContent(updated.content || "");
+        if (updated.suggestedCategoryId) setCategoryId(updated.suggestedCategoryId);
+        if (updated.tags) setTagsInput(updated.tags.join(", "));
+        if (updated.seoFocusKeyword) setSeoFocusKeyword(updated.seoFocusKeyword);
+        if (updated.seoTitle) setSeoTitle(updated.seoTitle);
+        if (updated.seoDescription) setSeoDescription(updated.seoDescription);
+        if (updated.selectedImage) setSelectedImage(updated.selectedImage);
 
-      setArticle((prev) => (prev ? { ...prev, ...data } : null));
+        setArticle((prev) => (prev ? { ...prev, ...updated } : null));
+      }
       setSuccessMessage("Conteúdo e mídia reescritos com sucesso pela IA!");
     } catch (err) {
       setErrorMessage(err instanceof Error ? err.message : "Erro na IA.");

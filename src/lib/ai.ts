@@ -95,6 +95,7 @@ export async function processArticleWithAi(
       seoDescription: aiResult.seoDescription,
       modifiedImageUrl,
       selectedImage: defaultStrategy,
+      processedAt: new Date(),
     },
   });
 

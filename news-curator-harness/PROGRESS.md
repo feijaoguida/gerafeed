@@ -1,7 +1,7 @@
 # PROGRESS.md
 
 ## Current Phase
-Phase 6. Identidade Visual e Temas
+Phase 7. Bugfixes & Behavioral Corrections
 
 ## Current Task
 Nenhuma
@@ -26,6 +26,9 @@ SaaS, Auth, Multi-tenant & Billing — 100% Concluído.
 
 ## Phase 6
 Identidade Visual e Temas — 100% Concluído.
+
+## Phase 7
+Bugfixes & Behavioral Corrections — 100% Concluído.
 
 ## Completed
 - Phase 1: Core MVP
@@ -52,6 +55,11 @@ Identidade Visual e Temas — 100% Concluído.
   - 040-design-system-theme-provider
   - 041-apply-themes-to-screens
   - 042-plan-info-card-sidebar
+- Phase 7: Bugfixes & Behavioral Corrections
+  - 050-fix-ai-rewrite-ui-refresh
+  - 051-fix-image-processing-serverless
+  - 052-fix-billing-count-ai-processed
+  - 053-fix-rss-items-per-feed
 
 ## In Progress
 - Nenhuma
@@ -63,12 +71,13 @@ Identidade Visual e Temas — 100% Concluído.
 - Nenhuma
 
 ## Last Evidence
-Phase 6 concluída com 100% de sucesso:
-- `src/app/globals.css`: tokens CSS centralizados para modo Claro (`:root`) e modo Escuro (`.dark`).
-- `src/components/theme-provider.tsx`: wrapper client do `next-themes` integrado ao `src/app/layout.tsx`.
-- `src/components/theme-toggle.tsx`: alternador de tema com `useSyncExternalStore` (zero hydration mismatch).
-- Telas adaptadas para Light/Dark: Landing Page, Login, Registro, Dashboard, Editor de Artigos, Fontes RSS, WordPress, IA, Estratégia de Imagens.
-- `src/components/plan-usage-card.tsx`: card integrado na Sidebar exibindo plano, cotas consumidas, vencimento e link de upgrade.
+Phase 7 concluída com 100% de sucesso:
+- `src/app/(app)/articles/[id]/page.tsx`: handler `handleProcessAi` corrigido para ler `data.article.*`.
+- `src/lib/imageProcessor.ts`: removido `fs`/`path`, retorna Data URI base64 (compatível Vercel).
+- `prisma/schema.prisma`: campo `processedAt DateTime?` adicionado ao model `Article`.
+- `src/lib/ai.ts`: seta `processedAt: new Date()` ao concluir reescrita IA.
+- `src/lib/billing.ts`: `checkLimit("ARTICLES")` filtra por `processedAt >= startOfMonth`.
+- `src/lib/rss.ts`: `processRssSources` aplica limit por feed (removido `BillingService` da ingestão).
 - `npx tsc --noEmit`: PASS.
 - `npm run lint`: PASS.
-- `npm run build`: PASS (todas as 28 rotas otimizadas).
+- `npm run build`: PASS (28 rotas otimizadas).

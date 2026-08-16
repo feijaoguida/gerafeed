@@ -220,3 +220,32 @@ Padronizar a interface do sistema (GeraFeed) criando um Design System coerente b
 - [x] Modo Claro e Modo Escuro validados em todas as telas públicas e logadas.
 - [x] Card de Informações do Plano adicionado ao menu lateral do Dashboard e renderizado corretamente.
 - [x] TypeScript PASS, Lint PASS.
+
+---
+
+# News Curator. Phase 7 (Bugfixes & Behavioral Corrections)
+
+## 1. Objetivo
+Corrigir 4 problemas comportamentais identificados em produção após a Phase 6, garantindo funcionamento correto do fluxo de curadoria.
+
+## 2. Bugs Identificados e Correções
+
+### Bug 1: UI não atualiza após "Reescrever com IA"
+O handler `handleProcessAi` lia `data.title`, `data.summary` etc. diretamente da raiz da resposta, mas a API retorna `{ success, article, aiResult }`. Campos corretos estão em `data.article.*`.
+
+### Bug 2: Imagem destacada não gera na Vercel
+O `imageProcessor.ts` salvava no filesystem local (`public/media/`), que é read-only na Vercel (serverless). Substituído por retorno de Data URI base64 (`data:image/jpeg;base64,...`) armazenado no campo `modifiedImageUrl` do banco.
+
+### Bug 3: Contagem de posts usa ingestão RSS em vez de reescrita IA
+O `BillingService.checkLimit` contava todos os artigos criados no mês (`createdAt`). Adicionado campo `processedAt DateTime?` ao model Article, setado no momento da reescrita IA, e a contagem agora filtra por `processedAt >= startOfMonth`.
+
+### Bug 4: RSS traz 5 notícias no total em vez de 5 por feed
+O `processRssSources` aplicava `slice(0, limit)` globalmente sobre o pool de todos os feeds. Refatorado para aplicar o limit por source individualmente.
+
+## 3. Definition of Done global (Phase 7)
+- [x] `handleProcessAi` lê de `data.article.*` e atualiza UI sem reload.
+- [x] `processAndStoreImage` retorna Data URI base64, sem dependência de filesystem.
+- [x] Campo `processedAt` adicionado ao Article e setado na reescrita IA.
+- [x] `BillingService.checkLimit("ARTICLES")` filtra por `processedAt`.
+- [x] `processRssSources` aplica limit por feed.
+- [x] TypeScript PASS, Lint PASS, Build PASS.

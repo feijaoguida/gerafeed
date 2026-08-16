@@ -106,14 +106,15 @@ export class BillingService {
     const plan = sub.plan;
 
     if (resource === "ARTICLES") {
-      // Count articles created in current month
+      // Count articles processed by AI in current month (processedAt != null)
       const now = new Date();
       const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
 
       const current = await prisma.article.count({
         where: {
           workspaceId,
-          createdAt: {
+          processedAt: {
+            not: null,
             gte: startOfMonth,
           },
         },
