@@ -1,48 +1,118 @@
 # AGENTS.md. News Curator
 
-## Antes de qualquer alteração
-1. Leia `SPEC.md`, `MEMORY.md` e `PROGRESS.md`.
-2. Leia `docs/decisions.md` quando a task envolver arquitetura.
-3. Identifique a única task `IN_PROGRESS`; se não existir, use a primeira `TODO`.
-4. Leia a task completa antes de codificar.
-5. Inspecione o código existente antes de criar abstrações.
+## Fonte de verdade
 
-## Regras
-- Uma task por vez.
-- Não implemente escopo de tasks futuras.
-- Preserve o MVP existente.
-- Não use NestJS, Redis, RabbitMQ, BullMQ, Docker, Cron ou microserviços no MVP.
-- TypeScript estrito.
-- Secrets nunca chegam ao client nem aparecem em logs.
-- API Keys e Application Passwords persistidas pelo usuário devem ser criptografadas.
-- Toda criptografia/descriptografia passa por um helper central.
-- Não invente criptografia própria. Prefira AES-256-GCM.
-- Não declare DONE sem Definition of Done, validação e Evidence.
-- Trabalho fora do escopo deve ser registrado em `Discovered Work`.
-- Decisões permanentes vão para `docs/decisions.md`.
-- Atualize `PROGRESS.md` após cada task.
-- Atualize `MEMORY.md` somente com conhecimento permanente.
+O repositório é a fonte de verdade. Antes de alterar código:
 
-## Criptografia
-`ENCRYPTION_KEY` é o segredo principal e fica somente no ambiente da aplicação.
+1. Leia `AGENTS.md`.
+2. Leia `SPEC.md`.
+3. Leia `MEMORY.md`.
+4. Leia `PROGRESS.md`.
+5. Leia a task atual.
+6. Leia `docs/decisions.md` quando houver mudança arquitetural.
+7. Inspecione a implementação atual antes de criar ou alterar abstrações.
 
-Um SALT/contexto pode participar da derivação, mas SALT não é uma segunda chave secreta e não substitui a `ENCRYPTION_KEY`.
+## Harness
 
-Se futuramente houver necessidade de um segundo segredo real, use um `PEPPER` separado e secreto em environment variable.
+Uma task por vez.
 
-Use AES-256-GCM ou mecanismo autenticado equivalente, com nonce/IV novo para cada valor. Não use nonce/IV fixo.
+Fluxo obrigatório:
 
-## AI Provider
-O negócio não pode ficar acoplado a um fornecedor.
-Use `AIProvider` + factory/registry.
+```text
+Contexto
+→ Task
+→ Implementação
+→ Definition of Done
+→ Validation
+→ Evidence
+→ PROGRESS
+→ MEMORY/decisions quando necessário
+```
 
-Providers:
-- OpenAI
-- Gemini
-- Anthropic
-- OpenAI Compatible
+Não declarar uma task como DONE apenas porque o código compila.
 
-OpenAI Compatible deve permitir DeepSeek, OpenRouter, Kimi e outros endpoints compatíveis.
+## Multi-tenant
+
+Todas as entidades de domínio pertencem a um Workspace quando aplicável.
+
+Toda query deve validar `workspaceId`.
+
+Nunca confiar em um ID enviado pelo client sem confirmar que o recurso pertence ao Workspace autorizado.
+
+No Backoffice, o SuperAdmin pode selecionar outro Workspace, mas essa seleção precisa ser explícita e validada no servidor.
+
+## WordPress
+
+Na nova arquitetura, WordPress configurado pelo usuário é uma entidade `WordPressSite`.
+
+Não tratar a antiga chave `wordpressConnection` como único site depois da migração.
+
+Application Password continua criptografada.
+
+## Feeds
+
+`Source` é global ao Workspace.
+
+A relação com WordPress é N:N através da entidade de associação.
+
+Nunca copiar o mesmo Feed para tabelas diferentes apenas para criar associação.
+
+## Prompt
+
+A resolução de prompt deve ficar centralizada em um serviço/função.
+
+Precedência definida pela SPEC:
+
+```text
+Feed ↔ WordPress override
+→ Feed default
+→ WordPress default
+→ Workspace default
+```
+
+Não duplicar essa regra no frontend.
+
+## Backoffice
+
+A área `/backoffice` é independente da UI funcional, mas usa o mesmo domínio.
+
+Somente `User.isSuperAdmin === true` pode acessar.
+
+Não confiar apenas em middleware/client-side para proteger dados. APIs e Server Actions também devem verificar SuperAdmin.
+
+## Secrets
+
+Nunca retornar API keys, Application Passwords ou outros secrets descriptografados, mesmo para SuperAdmin.
+
+Para trocar um secret, aceitar uma nova credencial e criptografar server-side.
+
+## Planos e Features
+
+Reutilizar BillingService e modelos existentes sempre que possível.
+
+Não duplicar cálculo de limites no Backoffice.
 
 ## Definition of Done
-Uma task só vira DONE quando todos os critérios forem atendidos, TypeScript/lint/testes aplicáveis passarem e Evidence objetiva for registrada.
+
+Todos os critérios da task devem ser atendidos.
+
+Obrigatório quando aplicável:
+- TypeScript PASS
+- Lint PASS
+- testes PASS
+- Build PASS
+- validação de autorização
+- evidências registradas
+
+## Discovered Work
+
+Se surgir algo fora da task:
+
+```text
+## Discovered Work
+Descrição:
+Motivo:
+Impacto:
+```
+
+Não implementar automaticamente.

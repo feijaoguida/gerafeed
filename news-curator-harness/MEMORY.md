@@ -1,71 +1,105 @@
-# MEMORY.md. Memória Permanente
+# MEMORY.md. Memória Permanente do Projeto
 
 ## Produto
-- News Curator coleta notícias via RSS, prepara conteúdo com IA, permite revisão humana e publica no WordPress.
-- Nenhuma notícia publica sem aprovação explícita.
-- **Fase 3 (Concluída)**: Artigos incluem créditos da fonte no final do post (`Fonte: Nome`) e mídia destacada selecionada (original ou processada via `sharp`).
-- News Curator é um SaaS multi-tenant.
-- Usuários gerenciam Workspaces.
-- Planos de assinatura (Free, Creator, Scale) limitam o uso e definem recursos.
+- News Curator é um SaaS multi-tenant para curadoria de notícias.
+- Usuários trabalham dentro de Workspaces.
+- Workspaces possuem planos, limites, fontes RSS, configurações, artigos e sites WordPress.
+- Publicação exige aprovação explícita.
+- Processamento RSS é manual e limitado pelo billing conforme as regras existentes.
 
-## Banco de dados
-- PostgreSQL + Prisma.
-- Tabela `Configuration` para settings (ex: `wordpressConnection`, `aiProvider`, `imageSettings`).
-- A chave `imageSettings` armazena a estratégia padrão de imagens (`defaultStrategy: 'ORIGINAL' | 'MODIFIED'`).
-- `Article.modifiedImageUrl` armazena o caminho relativo da imagem processada via `sharp` (`/media/modified-${articleId}.jpg`).
-- `Article.selectedImage` armazena a escolha de imagem ativa para a matéria (`ORIGINAL` | `MODIFIED`).
-- Novas Tabelas (Auth): `User`, `Account`, `Session`, `VerificationToken` (Padrão NextAuth).
-- Novas Tabelas (Tenant): `Workspace`, `WorkspaceUser` (relação N:N com role).
-- Novas Tabelas (Billing): `Plan`, `Subscription`, `Invoice`.
-- Isolamento: `Source`, `Article`, `Configuration`, `WordPressCategory` agora possuem `workspaceId`.
+## Stack
+- Next.js App Router.
+- TypeScript.
+- Prisma.
+- PostgreSQL.
+- Tailwind CSS v4.
+- Vercel.
+- NextAuth/Auth.js.
 
-## Fontes RSS
-- Cadastradas na tabela `Source` (`name`, `rssUrl`, `active`, `creditName`).
-- O campo `creditName String?` guarda o nome comercial de exibição utilizado na atribuição de créditos ao veículo original.
+## Multi-tenant
+- `Workspace` é o tenant.
+- `WorkspaceUser` conecta usuários ao tenant.
+- Dados de domínio usam `workspaceId`.
+- O isolamento tenant-per-row é obrigatório.
 
-## Stack e Ferramentas Adicionais
-- Next.js App Router, TypeScript, Prisma, Tailwind CSS v4.
-- Processamento de Imagens: Biblioteca `sharp` no Node.js para transformações de imagem (`.flop()`, modulação de contraste e geração de JPEG/PNG).
+## WordPress. Nova arquitetura
+A partir da Phase 8:
 
-## Segredos e Criptografia
-- Segredos encriptados em AES-256-GCM (Phase 2).
+- `WordPressSite` representa um destino WordPress.
+- Um Workspace pode possuir vários WordPressSites.
+- `Source` continua sendo global dentro do Workspace.
+- Feed e WordPress possuem relação N:N.
+- A relação deve possuir override de prompt por destino.
+- `Article` deve conhecer o `wordpressSiteId` quando o artigo tiver destino definido.
 
-## AI Provider
-- Interface `AIProvider` agnóstica de fornecedor.
-- **Phase 4 (Concluída)**: `buildSystemPrompt(settings?)` implementado para construção dinâmica do prompt com base nas preferências do usuário (área do portal e estilos de escrita). Todos os 4 provedores de IA (OpenAI, Gemini, Anthropic, OpenAI-Compatible) e o pipeline `processArticleWithAi` consomem as configurações de prompt salvas no banco.
-- Nova chave `aiPromptSettings` na tabela `Configuration` armazena as preferências do prompt editorial (`portalArea`, `customPortalArea`, `writingStyles`, `customWritingStyle`).
-- Endpoint `GET/POST /api/ai/prompt-settings` criado para gerenciar e validar as configurações.
-- Página `/settings/ai` possui 2 abas: "Conexão" (credenciais do provedor) e "Prompt Editorial" (área do portal, estilos de escrita com limite de 3 seleções, opções livres e preview em tempo real).
+A antiga configuração `wordpressConnection` é tratada como legado/migração e não como representação permanente de múltiplos sites.
 
-## WordPress
-- Publicação usa REST API nativa (`/wp-json/wp/v2/`).
-- Envio de mídia para o WP (`/wp-json/wp/v2/media`) realiza o upload da imagem selecionada pelo editor (original ou modificada) e atribui o ID resultante à propriedade `featured_media` do post.
-- Crédito da fonte (`Fonte: ${creditName}`) é automaticamente anexado ao final do conteúdo HTML.
+## Prompt
+Há configuração global de prompt no Workspace.
 
-## Autenticação
-- NextAuth.js (v5 / Auth.js).
-- Middleware do Next.js protege todas as rotas `/dashboard` e `/settings`.
+A Phase 8 acrescenta:
 
-## Gateway de Pagamentos
-- Padrão Strategy: `PaymentProvider` (`AsaasProvider`, `StripeProvider`).
-- Workspaces terão um `stripeCustomerId` ou `asaasCustomerId`.
+- prompt default do WordPress;
+- prompt default do Feed;
+- override Feed ↔ WordPress.
 
-## Identidade Visual e Temas (Phase 6)
-- Gerenciamento de tema Claro/Escuro implementado via `next-themes` com `ThemeProvider` no RootLayout (`attribute="class"`, `defaultTheme="dark"`).
-- Componente `ThemeToggle` (`src/components/theme-toggle.tsx`) utiliza `useSyncExternalStore` para compatibilidade SSR com React 19 sem hydration mismatches.
-- Variáveis CSS globais padronizadas em `src/app/globals.css` para cores de fundo (`--background`), texto (`--foreground`), cards (`--card`), bordas (`--border`) e cor primária Índigo (`--primary`).
-- Componente `PlanUsageCard` (`src/components/plan-usage-card.tsx`) integrado na Sidebar consome `/api/billing/subscription` exibindo nome do plano, progresso de posts gerados no mês, data de vencimento e link de upgrade.
+Precedência:
 
-## Processamento de Imagens (Serverless)
-- `processAndStoreImage` retorna Data URI base64 (`data:image/jpeg;base64,...`) em vez de salvar arquivo no filesystem.
-- Compatível com ambientes serverless (Vercel) onde o filesystem é read-only em runtime.
-- O campo `Article.modifiedImageUrl` armazena o Data URI completo.
+`Feed ↔ WordPress override → Feed default → WordPress default → Workspace default`.
 
-## Billing e Contagem de Artigos
-- Campo `Article.processedAt DateTime?` registra o momento exato da reescrita pela IA.
-- `BillingService.checkLimit("ARTICLES")` conta apenas artigos com `processedAt` não-nulo no mês corrente, não todos os artigos ingeridos via RSS.
+A regra deve ser centralizada.
 
-## RSS — Limite por Feed
-- `processRssSources(limitPerFeed, workspaceId)` aplica o limite individualmente por source ativa.
-- Com N feeds ativos e limit=5, o sistema traz até N*5 artigos (5 de cada feed).
-- O billing check foi removido da ingestão RSS; a validação de cota ocorre no momento da reescrita IA.
+## Feeds
+`Source` contém, entre outros:
+- name
+- rssUrl
+- active
+- creditName
+- defaultPromptType, se adotado na implementação.
+
+A associação a WordPress ocorre por entidade N:N.
+
+O cadastro de Feed pode ser global e também pode ser iniciado dentro da tela de um WordPress, criando e associando em uma operação.
+
+Na listagem de artigos, filtros obrigatórios da Phase 8:
+- data;
+- Feed;
+- WordPressSite.
+
+O card deve exibir a data editorial do feed, preferencialmente `originalPublishedAt`.
+
+## Billing
+Já existem Plan, Subscription, Invoice e BillingService.
+
+A Phase 9 deve reutilizar o BillingService para calcular limites/uso sempre que possível.
+
+## Backoffice
+- Backoffice é uma área administrativa da mesma aplicação.
+- Usuários comuns não podem acessá-lo.
+- `User.isSuperAdmin` é a autorização global.
+- `WorkspaceUser.role` não substitui SuperAdmin.
+- O Backoffice administra Workspaces exibidos como Empresas.
+- Não criar `Company` duplicada sem necessidade.
+
+## Planos
+A Phase 9 adiciona administração de Features/limites.
+
+Modelo sugerido:
+- `Feature`
+- `PlanFeature`
+
+`PlanFeature` deve permitir enabled e limit quando aplicável.
+
+## SuperAdmin
+Seed idempotente com:
+
+`SUPERADMIN_EMAIL`
+`SUPERADMIN_PASSWORD`
+
+Senha nunca deve ser impressa em logs.
+
+## Segurança
+- Secrets continuam criptografados com AES-256-GCM.
+- Nunca exibir secrets descriptografados no Backoffice.
+- APIs do Backoffice validam `isSuperAdmin` server-side.
+- Toda alteração de Workspace/Empresa deve validar o alvo no servidor.

@@ -1,251 +1,976 @@
-# News Curator. Phase 3
+# News Curator. Phase 8 e Phase 9
 
-## 1. Objetivo
-Evoluir o sistema para gerenciar mídias (imagens) de forma inteligente e garantir a devida atribuição (créditos) às fontes originais.
-
-Nesta fase:
-- Campo "Fonte" no cadastro de RSS.
-- Configuração global de estratégia de imagens (Original vs. Processada/IA).
-- Processamento de imagens (inversão, filtros sutis ou IA) para diferenciação.
-- Comparação visual (Original x Alterada) na tela de aprovação.
-- Inserção automática dos créditos no final do artigo gerado.
-
-## 2. AI Provider e Processamento
-O fluxo existente de `AIProvider` permanece. A novidade é a etapa de processamento de imagem que ocorre após a coleta e antes (ou durante) a aprovação.
-
-## 3. Configuração central
-Adicionar nova chave na tabela `Configuration`:
-- `imageSettings` (JSON)
-  Exemplo de valor: `{ "strategy": "MODIFIED", "modificationType": "FLIP_HORIZONTAL" }`
-
-## 4. WordPress
-A publicação no WordPress agora deve enviar a imagem escolhida (Original ou Alterada) como `featured_media`. O upload da imagem para o media library do WP deve ocorrer na aprovação, ou a URL externa deve ser usada (se o WP estiver configurado para aceitar).
-
-## 5. Criptografia
-Sem mudanças estruturais nesta fase.
-
-## 6. Telas e UI
-### Cadastro de RSS
-Adicionar campo opcional "Fonte". Descrição: "Usado para informar no final das Matérias".
-
-### Configurações de Imagem
-Nova aba ou seção em Configurações para escolher a estratégia padrão de imagens.
-
-### Editor de Aprovação
-O painel de edição do artigo deve exibir:
-- Imagem Original (com label).
-- Imagem Alterada (com label).
-Permitir que o usuário selecione qual versão será publicada (radio button ou seleção visual).
-
-## 7. Geração e Atribuição
-No momento de montar o conteúdo final para o WordPress, o sistema deve concatenar automaticamente:
-`<br><br><p><em>Fonte: {Nome da Fonte}</em></p>` (ou formato equivalente) no final do `content`.
-
-## 8. Definition of Done global (Phase 3)
-- [x] Schema do Prisma atualizado (Source.creditName, Article.modifiedImageUrl).
-- [x] Cadastro de RSS refatorado para incluir campo Fonte.
-- [x] Configuração de Estratégia de Imagem criada no banco e na UI.
-- [x] Pipeline de processamento de imagem implementado (Sharp para inversão/filtros ou integração IA).
-- [x] Tela de aprovação exibindo as duas versões da imagem lado a lado.
-- [x] Seleção de imagem final pelo usuário.
-- [x] Artigo publicado contendo a atribuição (Fonte) no final do texto.
-- [x] Imagem correta enviada ao WordPress.
-- [x] TypeScript PASS, Lint PASS.
+> **Nota de versionamento:** o arquivo recebido já registra a Phase 7 como concluída, referente a Bugfixes & Behavioral Corrections. Para não apagar histórico, as duas novas fases solicitadas são numeradas internamente como **Phase 8** e **Phase 9**. A Phase 8 corresponde à funcionalidade solicitada como “Fase 7” pelo produto, e a Phase 9 corresponde à funcionalidade solicitada como “Fase 8”.
 
 ---
 
-# News Curator — Phase 4: Prompt Customization
+# Phase 8. Multi-WordPress, Feeds e Prompt por Destino
 
 ## 1. Objetivo
-Permitir que o usuário personalize o prompt editorial da IA diretamente pela interface, sem necessidade de alterar código. O `SYSTEM_PROMPT_EDITORIAL`, atualmente uma constante fixa em `src/lib/ai/types.ts`, passará a ser construído dinamicamente com base nas preferências do usuário.
 
-Nesta fase:
-- Personalização da **área do portal** (ex: Tecnologia, Política, Humor, etc.).
-- Seleção de até **3 estilos de escrita** (ex: Informativo, Atraente, Sério, etc.).
-- Opção de informar valores personalizados (texto livre, máximo 100 caracteres) para área e estilo.
-- Preview do prompt gerado na interface.
-- O prompt sem configuração deve usar defaults retrocompatíveis (portal de tecnologia e negócios, estilo atraente).
+Evoluir o News Curator para permitir que um mesmo Workspace possua múltiplas configurações/sites WordPress, cada um representando um destino editorial diferente.
 
-## 2. Configuração central
-Nova chave na tabela `Configuration`:
-- `aiPromptSettings` (JSON)
-  Exemplo de valor:
-  ```json
-  {
-    "portalArea": "Tecnologia",
-    "customPortalArea": "",
-    "writingStyles": ["Informativo", "Atraente"],
-    "customWritingStyle": ""
-  }
-  ```
+Exemplos:
 
-Sem alterações no schema do Prisma — usa a tabela `Configuration` existente.
+- Site de Humor
+- Site de Política
+- Site de Tecnologia
+- Site de Notícias Gerais
 
-## 3. Opções pré-definidas
+Os feeds continuam cadastrados no Workspace, porém devem poder ser associados a um ou vários sites WordPress.
 
-### Áreas do Portal
-- Tecnologia
-- Negócios
-- Política
-- Ciência
-- Saúde
-- Entretenimento
-- Esportes
-- Educação
-- Humor
-- Meio Ambiente
-- Outro (texto livre, max 100 caracteres)
-
-### Estilos de Escrita (selecionar até 3)
-- Informativo
-- Atraente
-- Sério
-- Alegre
-- Humorístico
-- Analítico
-- Provocativo
-- Casual
-- Técnico
-- Persuasivo
-- Outro (texto livre, max 100 caracteres)
-
-## 4. Prompt dinâmico
-A constante `SYSTEM_PROMPT_EDITORIAL` deve ser transformada em uma função `buildSystemPrompt(settings?)` que:
-- Sem argumentos: retorna o prompt padrão atual (retrocompatível).
-- Com argumentos: injeta a área e os estilos escolhidos no texto do prompt.
-
-Os 4 providers (OpenAI, Gemini, Anthropic, OpenAI-Compatible) devem usar a função em vez da constante.
-
-A função `processArticleWithAi` em `src/lib/ai.ts` deve carregar `aiPromptSettings` do banco via `getConfig` e repassar ao provider.
-
-## 5. Telas e UI
-### Página de configurações de IA (`/settings/ai`)
-A página existente deve ser refatorada em **2 abas**:
-
-**Aba 1 — Conexão** (conteúdo atual, sem alteração funcional)
-- Seleção do provedor, API Key, Model, Base URL.
-
-**Aba 2 — Prompt Editorial** (nova)
-- Seleção da área do portal (radio buttons + campo "Outro").
-- Seleção de estilos de escrita (checkboxes, máximo 3 + campo "Outro").
-- Preview read-only do trecho do prompt gerado.
-- Botão "Salvar Configurações do Prompt".
-
-## 6. API
-Novo endpoint `GET/POST /api/ai/prompt-settings`:
-- **GET**: Retorna as configurações salvas.
-- **POST**: Valida (max 3 estilos, max 100 chars nos campos livres) e salva sob a chave `aiPromptSettings`.
-
-## 7. Definition of Done global (Phase 4)
-- [x] Endpoint `GET/POST /api/ai/prompt-settings` criado e funcional.
-- [x] Configuração salva na chave `aiPromptSettings` da tabela `Configuration`.
-- [x] `buildSystemPrompt(settings?)` gera prompt dinâmico.
-- [x] Prompt sem configuração usa defaults (retrocompatível).
-- [x] Todos os 4 providers usam `buildSystemPrompt` em vez da constante fixa.
-- [x] Página `/settings/ai` com 2 abas (Conexão + Prompt Editorial).
-- [x] Seleção de área do portal funcional com opção "Outro".
-- [x] Seleção de até 3 estilos de escrita funcional com opção "Outro".
-- [x] Campos "Outro" validados (max 100 caracteres).
-- [x] Preview do prompt na UI.
-- [x] TypeScript PASS, Lint PASS.
-
-News Curator. Phase 5 (SaaS & Multi-tenant)
-1. Objetivo
-Transformar o News Curator em um SaaS comercial (B2B/Creators) com suporte a múltiplos inquilinos (multi-tenant), planos de assinatura e integração com gateways de pagamento.
-Nesta fase:
-Autenticação de usuários usando NextAuth.js (Auth.js).
-Separação de dados por Workspace (Tenant).
-Gestão de Planos (Starter, Creator, Scale).
-Abstração de Gateway de Pagamento.
-Integração com Asaas (principal) e preparação estrutural para Stripe.
-Controle de limites por plano (ex: 10 artigos/mês no grátis).
-2. Multi-tenant e Autenticação
-O sistema deixará de ser single-user. Todo usuário pertence a pelo menos um `Workspace` (Inquilino). Fontes (Sources), Artigos (Articles) e Configurações (Configurations) pertencerão a um `Workspace`, garantindo isolamento total de dados.
-Autenticação: NextAuth (Providers: Credentials, Email/Magic Link ou OAuth - Google).
-3. Planos e Limites
-Sistema Freemium/Tiers.
-Planos definem cotas: `maxSources`, `maxArticlesPerMonth`, `maxWordpressSites`, `allowAIGeneration`, `requireBYOK`.
-Uma camada de serviço de Billing interceptará ações (ex: aprovar artigo, criar fonte) para validar limites.
-4. Pagamentos (Gateway Abstraction)
-O negócio não pode ficar preso ao Asaas.
-Criaremos a interface `PaymentProvider` com implementações: `AsaasProvider` e `StripeProvider`.
-A configuração dirá qual provedor está ativo.
-5. Criptografia
-As credenciais (API Keys, senhas do WP) agora devem ser criptografadas levando em consideração o `workspaceId` para evitar acessos cruzados.
-6. Definition of Done global (Phase 5)
-- [x] NextAuth integrado.
-- [x] Schema Prisma atualizado para suportar NextAuth, Workspaces, Plans e Subscriptions.
-- [x] Todas as tabelas de negócio (Source, Article, Configuration) vinculadas a um Workspace.
-- [x] Middlewares e Services refatorados para garantir Tenant Isolation (nunca vazar dados).
-- [x] Abstração de Gateway de Pagamento (`PaymentProvider`).
-- [x] Integração com Asaas implementada.
-- [x] Validador de limites de assinatura funcional.
+Cada feed deve possuir uma configuração de prompt padrão. A associação Feed ↔ WordPress deve permitir um override de prompt para aquele destino.
 
 ---
 
-# News Curator. Phase 6 (Identidade Visual e Temas)
+## 2. Motivação
 
-## 1. Objetivo
-Padronizar a interface do sistema (GeraFeed) criando um Design System coerente baseado na Landing Page, implementando suporte completo a Temas Claro/Escuro (Light/Dark Mode) e adicionando um card informativo de plano no Dashboard.
+Hoje a configuração WordPress e os feeds estão conceitualmente próximos de uma instalação única.
 
-## 2. Design System e Padronização
-- Extrair variáveis de cores (Índigo/Azul Escuro, Cores de Destaque), tipografia e espaçamentos da Landing Page (`src/app/(public)/page.tsx`) e do Dashboard.
-- Criar ou atualizar o arquivo global de estilos (`src/app/globals.css` ou equivalente) com as variáveis CSS de design.
-- Garantir que a identidade visual comunique um aspecto de SaaS B2B "premium" em todas as telas.
+Isso não é suficiente para um SaaS onde uma empresa poderá operar vários portais.
 
-## 3. Tema Claro e Escuro (Light/Dark Mode)
-- Implementar um `ThemeProvider` (usando `next-themes` ou similar suportado no stack) no layout raiz da aplicação (`src/app/layout.tsx` ou equivalente).
-- Assegurar que as seguintes telas respondam à troca de tema:
-  - Landing Page (`/`)
-  - Login (`/login`)
-  - Cadastro (`/register`)
-  - Dashboard Home (`/dashboard`)
-  - Gerenciamento de Feeds/Fontes (`/dashboard/sources`)
-  - Curadoria/Artigos (`/dashboard/articles`)
-  - Configurações (`/dashboard/settings` ou equivalentes)
-- Atualizar classes utilitárias e estilos globais para suportar variantes de dark mode (ex: cores de background, bordas, textos e sombras invertidas para temas escuros).
+A nova arquitetura deve separar claramente:
 
-## 4. Novo Componente: Card de Informações do Plano
-- Criar um novo componente de UI a ser incluído no menu lateral (sidebar) do layout do Dashboard (`src/app/(app)/layout.tsx`).
-- O card deverá exibir:
-  - O nome do plano atual (Starter, Creator, Pro, etc.).
-  - Progresso do uso de artigos gerados no mês (ex: 45/100).
-  - Data de renovação/vencimento ou status da assinatura.
-  - Uma barra de progresso visual para rápida leitura.
-- Os dados do card devem derivar do backend/`BillingService` ou usar placeholders estruturais e se conectar aos hooks/APIs apropriados de billing se já existentes.
-
-## 5. Definition of Done global (Phase 6)
-- [x] Design System (variáveis CSS globais) criado.
-- [x] ThemeProvider integrado e funcional em todo o sistema.
-- [x] Modo Claro e Modo Escuro validados em todas as telas públicas e logadas.
-- [x] Card de Informações do Plano adicionado ao menu lateral do Dashboard e renderizado corretamente.
-- [x] TypeScript PASS, Lint PASS.
+```text
+Workspace
+   |
+   +-- Sources / Feeds
+   |
+   +-- WordPressSites
+   |      |
+   |      +-- Feed assignments
+   |      +-- Prompt override
+   |
+   +-- Articles
+   +-- AI configuration
+   +-- Billing
+```
 
 ---
 
-# News Curator. Phase 7 (Bugfixes & Behavioral Corrections)
+## 3. Regra de arquitetura
 
-## 1. Objetivo
-Corrigir 4 problemas comportamentais identificados em produção após a Phase 6, garantindo funcionamento correto do fluxo de curadoria.
+Não criar uma segunda tabela chamada “ConfigurationWordPress” apenas para representar um site.
 
-## 2. Bugs Identificados e Correções
+Criar uma entidade de domínio própria:
 
-### Bug 1: UI não atualiza após "Reescrever com IA"
-O handler `handleProcessAi` lia `data.title`, `data.summary` etc. diretamente da raiz da resposta, mas a API retorna `{ success, article, aiResult }`. Campos corretos estão em `data.article.*`.
+```text
+WordPressSite
+```
 
-### Bug 2: Imagem destacada não gera na Vercel
-O `imageProcessor.ts` salvava no filesystem local (`public/media/`), que é read-only na Vercel (serverless). Substituído por retorno de Data URI base64 (`data:image/jpeg;base64,...`) armazenado no campo `modifiedImageUrl` do banco.
+Ela representa um destino WordPress do Workspace.
 
-### Bug 3: Contagem de posts usa ingestão RSS em vez de reescrita IA
-O `BillingService.checkLimit` contava todos os artigos criados no mês (`createdAt`). Adicionado campo `processedAt DateTime?` ao model Article, setado no momento da reescrita IA, e a contagem agora filtra por `processedAt >= startOfMonth`.
+A tabela `Configuration` continua existindo para configurações gerais/estruturadas, inclusive configurações de IA e outras preferências que não justificam uma entidade própria.
 
-### Bug 4: RSS traz 5 notícias no total em vez de 5 por feed
-O `processRssSources` aplicava `slice(0, limit)` globalmente sobre o pool de todos os feeds. Refatorado para aplicar o limit por source individualmente.
+A antiga configuração `wordpressConnection` deve ser migrada para a nova entidade quando necessário.
 
-## 3. Definition of Done global (Phase 7)
-- [x] `handleProcessAi` lê de `data.article.*` e atualiza UI sem reload.
-- [x] `processAndStoreImage` retorna Data URI base64, sem dependência de filesystem.
-- [x] Campo `processedAt` adicionado ao Article e setado na reescrita IA.
-- [x] `BillingService.checkLimit("ARTICLES")` filtra por `processedAt`.
-- [x] `processRssSources` aplica limit por feed.
-- [x] TypeScript PASS, Lint PASS, Build PASS.
+---
+
+## 4. Modelo WordPressSite
+
+Criar ou evoluir uma entidade equivalente a:
+
+```text
+WordPressSite
+---------------------------
+id
+workspaceId
+name
+url
+username
+encryptedApplicationPassword
+active
+createdAt
+updatedAt
+```
+
+### Campos
+
+`workspaceId`
+- Tenant obrigatório.
+
+`name`
+- Nome amigável do site.
+- Exemplo: `Portal Política`.
+
+`url`
+- URL base do WordPress.
+
+`username`
+- Usuário da REST API.
+
+`encryptedApplicationPassword`
+- Application Password criptografada com o helper da Phase 2.
+
+`active`
+- Permite desativar o destino sem apagar histórico.
+
+---
+
+## 5. Configuração central e WordPress
+
+A antiga chave:
+
+```text
+wordpressConnection
+```
+
+não deve continuar representando o único WordPress quando a nova entidade estiver ativa.
+
+Pode existir uma fase de compatibilidade/migração, mas o novo código deve trabalhar com:
+
+```text
+WordPressSite
+```
+
+A configuração visual de cada site deve carregar suas próprias credenciais, categorias e estado de sincronização.
+
+---
+
+## 6. Modelo Source / Feed
+
+`Source` continua pertencendo ao Workspace.
+
+Campos já existentes devem ser preservados, incluindo:
+
+```text
+id
+workspaceId
+name
+rssUrl
+active
+creditName
+```
+
+Adicionar o conceito de prompt padrão do feed, se ele ainda não estiver representado por uma configuração equivalente.
+
+Sugestão:
+
+```text
+defaultPromptType
+```
+
+O nome exato pode seguir a convenção existente no código.
+
+Esse prompt padrão vale para todas as configurações WordPress que utilizarem aquele feed, salvo quando houver override.
+
+---
+
+## 7. Relação Feed ↔ WordPress
+
+Um feed pode alimentar vários sites.
+
+Um site pode possuir vários feeds.
+
+Portanto, usar relação N:N através de uma entidade de associação.
+
+Sugestão:
+
+```text
+WordPressSiteSource
+---------------------------
+id
+workspaceId
+wordpressSiteId
+sourceId
+active
+promptTypeOverride
+createdAt
+updatedAt
+```
+
+### Regras
+
+- `workspaceId` obrigatório.
+- `wordpressSiteId` deve pertencer ao mesmo Workspace.
+- `sourceId` deve pertencer ao mesmo Workspace.
+- Um mesmo feed não pode ser associado duas vezes ao mesmo WordPress.
+- `promptTypeOverride` é opcional.
+
+---
+
+## 8. Resolução do prompt
+
+A ordem de precedência deve ser:
+
+```text
+Override do vínculo Feed ↔ WordPress
+        ↓
+Prompt padrão do Feed
+        ↓
+Configuração padrão global do Workspace
+```
+
+Exemplo:
+
+```text
+Feed: G1
+Prompt padrão: INFORMATIVE
+
+WordPress: Portal Humor
+Override: HUMORISTIC
+
+Resultado:
+HUMORISTIC
+```
+
+Outro destino:
+
+```text
+WordPress: Portal Política
+Sem override
+
+Resultado:
+INFORMATIVE
+```
+
+Criar uma função/service central para essa resolução. Não espalhar regras de prioridade pelo frontend.
+
+---
+
+## 9. Cadastro de Feed
+
+O cadastro global de Feed/RSS deve continuar permitindo:
+
+- nome;
+- URL RSS;
+- ativo/inativo;
+- Fonte/creditName;
+- tipo de prompt padrão.
+
+O usuário não é obrigado a escolher um WordPress nessa tela.
+
+Um feed pode existir no Workspace antes de ser atribuído a qualquer destino.
+
+---
+
+## 10. Configuração WordPress
+
+A tela de cada WordPress deve permitir:
+
+### Dados básicos
+- nome do site;
+- URL;
+- usuário;
+- Application Password;
+- ativo/inativo.
+
+### Conexão
+- testar conexão;
+- sincronizar categorias.
+
+### Feeds associados
+Mostrar lista de feeds do Workspace:
+
+```text
+[✓] G1
+[✓] UOL
+[ ] Reuters
+[✓] Canaltech
+```
+
+Permitir:
+
+- associar feed existente;
+- remover associação;
+- ativar/desativar associação;
+- escolher prompt override.
+
+### Criar Feed
+Dentro da tela WordPress deve existir uma ação:
+
+```text
++ Novo Feed
+```
+
+Ela permite cadastrar um novo Feed e já associá-lo ao WordPress atual.
+
+---
+
+## 11. Prompt na configuração WordPress
+
+No nível do site WordPress deve existir uma seção de configuração editorial.
+
+Ela pode definir:
+
+```text
+Prompt padrão deste site
+```
+
+Porém a precedência final permanece:
+
+```text
+Feed ↔ WordPress override
+→ Feed default
+→ Site default
+→ Workspace default
+```
+
+> Caso a implementação atual não possua um “prompt padrão do site”, essa capacidade deve ser adicionada nessa fase porque resolve o caso de um portal ter identidade editorial diferente.
+
+A ordem de precedência deve ser documentada no código.
+
+---
+
+## 12. Conflito de requisitos de prompt
+
+A aplicação deve distinguir:
+
+```text
+Prompt global do Workspace
+Prompt padrão do WordPress
+Prompt padrão do Feed
+Override Feed ↔ WordPress
+```
+
+Não duplicar o conteúdo inteiro do prompt em cada registro. Armazenar somente o identificador/tipo/opções necessárias para resolver a configuração.
+
+---
+
+## 13. Processamento de Artigos
+
+Ao processar uma notícia, o artigo deve estar associado ao destino WordPress que receberá o conteúdo.
+
+Portanto, o processamento deve conhecer:
+
+```text
+workspaceId
+sourceId
+wordpressSiteId
+```
+
+O prompt deve ser resolvido através do serviço central de prioridade.
+
+Um artigo não deve usar aleatoriamente a configuração do Workspace quando seu destino já estiver definido.
+
+---
+
+## 14. Article e destino
+
+Adicionar, se ainda não existir:
+
+```text
+wordpressSiteId
+```
+
+ao Article.
+
+Motivo:
+
+- saber para qual site aquela curadoria foi criada;
+- filtrar por configuração WordPress;
+- recuperar o prompt correto;
+- publicar no destino correto;
+- permitir auditoria histórica.
+
+A relação deve respeitar o Workspace.
+
+---
+
+## 15. Listagem de notícias
+
+A tela de artigos/feeds processados deve possuir filtros:
+
+### Data
+
+Permitir pelo menos:
+
+- data inicial;
+- data final.
+
+Usar a data editorial do feed (`originalPublishedAt`) quando o objetivo for filtrar pela data da notícia.
+
+Não confundir com `createdAt`, que representa o momento em que o sistema ingeriu o registro.
+
+### Feed
+
+Dropdown/select com Sources do Workspace.
+
+### Configuração WordPress
+
+Dropdown/select com WordPressSites ativos/inativos conforme a necessidade da tela.
+
+---
+
+## 16. Card de notícia
+
+Todo card deve exibir a data do feed.
+
+Exemplo:
+
+```text
+Nova ferramenta de IA é lançada
+
+Fonte: Canaltech
+Feed: Canaltech
+Data: 16/08/2026 14:30
+Destino: Portal Tecnologia
+
+[Editar]
+```
+
+A data mostrada como “Data” deve preferencialmente ser `originalPublishedAt`.
+
+Se a fonte não fornecer data, mostrar um estado explícito como:
+
+```text
+Data não informada pela fonte
+```
+
+---
+
+## 17. Processamento manual
+
+O botão existente de processamento deve continuar manual.
+
+O processamento deve respeitar os feeds atribuídos ao WordPress selecionado.
+
+Não buscar uma notícia de um feed que não esteja associado ao destino, salvo uma ação explicitamente global que siga as regras existentes.
+
+---
+
+## 18. Isolamento multi-tenant
+
+Todas as entidades novas devem possuir `workspaceId` quando são entidades de domínio do tenant.
+
+A relação `WordPressSiteSource` também deve ser tenant-aware.
+
+Nunca aceitar apenas IDs fornecidos pelo client sem validar pertencimento ao Workspace da sessão.
+
+---
+
+## 19. Compatibilidade / Migração
+
+Se o sistema atual possui uma única configuração `wordpressConnection`, criar task específica de migração.
+
+Estratégia esperada:
+
+```text
+Config antiga
+     ↓
+criar WordPressSite default
+     ↓
+migrar credenciais
+     ↓
+associar feeds existentes
+     ↓
+validar
+     ↓
+manter compatibilidade temporária se necessária
+```
+
+Não apagar dados antigos antes de confirmar a migração.
+
+---
+
+# Phase 9. Backoffice e SuperAdmin
+
+## 20. Objetivo
+
+Criar um Backoffice separado da área funcional do SaaS para operação administrativa da plataforma.
+
+O Backoffice deve ser acessível somente por usuários marcados como `superAdmin`.
+
+A área deve possuir layout, navegação, APIs e autorização próprias.
+
+Ela utiliza os mesmos dados e serviços do sistema, mas não deve depender da UI do Workspace.
+
+---
+
+## 21. Separação
+
+A aplicação terá duas áreas principais:
+
+```text
+Área funcional
+/dashboard
+/settings
+...
+
+Backoffice
+/backoffice
+/backoffice/plans
+/backoffice/companies
+...
+```
+
+O Backoffice não deve aparecer no menu do usuário comum.
+
+---
+
+## 22. SuperAdmin
+
+Adicionar no modelo `User`, caso ainda não exista:
+
+```text
+isSuperAdmin Boolean @default(false)
+```
+
+Esse atributo é global e não depende de Workspace.
+
+Ter `WorkspaceUser.role = ADMIN` não significa `superAdmin`.
+
+Somente:
+
+```text
+User.isSuperAdmin === true
+```
+
+autoriza o acesso ao Backoffice.
+
+---
+
+## 23. Proteção de acesso
+
+Criar autorização server-side para `/backoffice`.
+
+Não confiar apenas em esconder links.
+
+Acesso direto deve retornar:
+
+- redirect para login quando não autenticado;
+- forbidden/redirect quando autenticado sem `isSuperAdmin`.
+
+APIs `/api/backoffice/*` também devem validar `isSuperAdmin`.
+
+Server Actions utilizadas pelo Backoffice devem usar a mesma regra.
+
+---
+
+## 24. Seed SuperAdmin
+
+Criar seed do Prisma para um usuário SuperAdmin.
+
+Nunca hardcodar senha real.
+
+Usar environment variables:
+
+```text
+SUPERADMIN_EMAIL
+SUPERADMIN_PASSWORD
+```
+
+O seed deve:
+
+1. validar as variáveis;
+2. criar ou atualizar o usuário;
+3. definir `isSuperAdmin = true`;
+4. gerar hash da senha usando o mecanismo de autenticação existente;
+5. não imprimir a senha em logs.
+
+A seed deve ser idempotente.
+
+---
+
+## 25. Backoffice. Dashboard
+
+Criar dashboard operacional com indicadores úteis.
+
+Mínimo:
+
+```text
+Empresas
+Planos
+Assinaturas ativas
+Notícias processadas no período
+```
+
+Não criar analytics complexos sem requisito.
+
+---
+
+## 26. Backoffice. Planos
+
+Criar menu:
+
+```text
+Planos
+```
+
+Funcionalidades:
+
+- listar planos;
+- criar plano;
+- editar plano;
+- ativar/inativar;
+- ordenar/exibir destaque quando aplicável;
+- selecionar Features;
+- definir quantidades/limites.
+
+---
+
+## 27. Modelo de Feature
+
+Como os planos precisam selecionar Features e quantidades, a modelagem deve separar:
+
+```text
+Feature
+PlanFeature
+```
+
+Exemplo:
+
+```text
+Feature
+----------------
+id
+key
+name
+description
+valueType
+active
+```
+
+```text
+PlanFeature
+----------------
+planId
+featureId
+enabled
+limit
+```
+
+`valueType` pode representar:
+
+```text
+BOOLEAN
+QUANTITY
+```
+
+Se o sistema já possuir mecanismo de features equivalente, reutilizá-lo em vez de duplicar.
+
+---
+
+## 28. Plano
+
+O formulário de plano deve permitir:
+
+```text
+Nome
+Slug
+Descrição
+Preço
+Periodicidade
+Ativo
+Destaque
+```
+
+E uma seção:
+
+```text
+Features
+
+[✓] Geração com IA
+    Limite: 100
+
+[✓] Fontes RSS
+    Limite: 10
+
+[✓] Sites WordPress
+    Limite: 3
+
+[ ] Recurso X
+```
+
+Os nomes concretos das features devem reutilizar as keys já existentes quando disponíveis.
+
+---
+
+## 29. Backoffice. Empresas
+
+No produto, “Empresa” representa o `Workspace` atual.
+
+Não criar uma entidade `Company` duplicada sem necessidade.
+
+Menu:
+
+```text
+Empresas
+```
+
+Tela de listagem:
+
+- busca por nome;
+- busca por email/identificador quando aplicável;
+- filtro por status;
+- filtro por plano;
+- paginação;
+- ordenação.
+
+---
+
+## 30. Card/linha da Empresa
+
+A listagem deve mostrar:
+
+```text
+Empresa
+Plano
+Status
+Créditos/uso
+Sites WordPress
+Feeds
+Data de criação
+```
+
+Ações:
+
+```text
+Inativar
+Mais opções
+```
+
+O saldo/uso de créditos deve ser calculado através do BillingService existente quando possível.
+
+Não duplicar a regra de cálculo de limites no Backoffice.
+
+---
+
+## 31. Inativar Empresa
+
+“Inativar” não deve apagar dados.
+
+A operação deve alterar o status da empresa/Workspace para um estado inativo já suportado ou criar um status equivalente.
+
+Antes de inativar:
+
+- exigir confirmação;
+- impedir operação acidental.
+
+O estado inativo deve ser respeitado pela área funcional.
+
+---
+
+## 32. Mais opções. Área interna da Empresa
+
+Ao clicar em `Mais opções`, abrir uma área interna do Backoffice específica do Workspace.
+
+Exemplo:
+
+```text
+/backoffice/companies/[workspaceId]
+```
+
+A página deve possuir abas/seções:
+
+```text
+Visão geral
+Plano e cobrança
+Créditos / uso
+Feeds
+WordPress
+IA
+Prompts
+Configurações
+```
+
+---
+
+## 33. Operação sobre a Empresa
+
+O operador SuperAdmin poderá visualizar e, quando permitido, alterar:
+
+### Geral
+- nome;
+- status;
+- dados básicos;
+- identificadores.
+
+### Plano
+- plano atual;
+- status da assinatura;
+- limites;
+- datas relevantes.
+
+### Créditos
+- saldo;
+- uso;
+- possibilidade de ajuste manual, se o domínio atual permitir.
+
+### Feeds
+- listar;
+- criar;
+- editar;
+- ativar/desativar;
+- atribuir WordPress;
+- editar prompt default.
+
+### WordPress
+- listar sites;
+- criar;
+- editar;
+- testar conexão;
+- sincronizar categorias;
+- atribuir feeds.
+
+### IA
+- visualizar provider;
+- alterar provider;
+- alterar modelo;
+- alterar Base URL;
+- substituir API Key;
+- testar conexão.
+
+Secrets nunca devem ser exibidos em plaintext, nem mesmo para SuperAdmin.
+
+### Prompts
+- editar área do portal;
+- estilos;
+- configurações de prompt;
+- overrides.
+
+---
+
+## 34. Regra de segurança do Backoffice
+
+SuperAdmin possui capacidade operacional elevada, mas não pode receber secrets descriptografados na UI.
+
+Quando um segredo precisar ser substituído:
+
+```text
+[Senha/API Key atual configurada]
+
+Nova credencial:
+[_______________]
+
+[Salvar]
+```
+
+Nunca:
+
+```text
+Senha atual: ******** -> valor descriptografado
+```
+
+---
+
+## 35. Auditoria mínima
+
+Operações destrutivas ou administrativas importantes devem possuir logs de auditoria estruturados quando houver infraestrutura existente para isso.
+
+Mínimo recomendado:
+
+```text
+actorUserId
+workspaceId
+action
+entity
+entityId
+createdAt
+```
+
+Não registrar secrets.
+
+Se auditoria não existir no projeto, criar uma task específica somente se necessária para cumprir os critérios de segurança do Backoffice.
+
+---
+
+## 36. APIs do Backoffice
+
+Sugestão:
+
+```text
+/api/backoffice/dashboard
+/api/backoffice/plans
+/api/backoffice/features
+/api/backoffice/companies
+/api/backoffice/companies/:id
+/api/backoffice/companies/:id/feeds
+/api/backoffice/companies/:id/wordpress
+/api/backoffice/companies/:id/ai
+/api/backoffice/companies/:id/prompts
+```
+
+Todos devem aplicar autorização `superAdmin` server-side.
+
+---
+
+## 37. Isolamento
+
+Mesmo o SuperAdmin deverá acessar Workspaces explicitamente identificados.
+
+As consultas devem validar:
+
+```text
+workspaceId
+```
+
+antes de alterar dados.
+
+A diferença é que a origem do `workspaceId` pode ser uma seleção administrativa feita no Backoffice em vez da sessão comum do tenant.
+
+Não remover o isolamento tenant-per-row.
+
+---
+
+## 38. Definition of Done da Phase 8
+
+- [ ] WordPressSite criado.
+- [ ] Múltiplos WordPress por Workspace.
+- [ ] Credenciais criptografadas.
+- [ ] Migration da configuração WordPress antiga.
+- [ ] Source continua global no Workspace.
+- [ ] Feed ↔ WordPress N:N.
+- [ ] Feed pode ser criado dentro do WordPress.
+- [ ] Prompt default no Feed.
+- [ ] Prompt default no WordPress.
+- [ ] Override Feed ↔ WordPress.
+- [ ] Resolução de prompt centralizada.
+- [ ] Article referencia WordPressSite.
+- [ ] Filtro por data.
+- [ ] Filtro por Feed.
+- [ ] Filtro por WordPress.
+- [ ] Card mostra data do feed.
+- [ ] Multi-tenant preservado.
+- [ ] TypeScript PASS.
+- [ ] Lint PASS.
+- [ ] Testes PASS.
+- [ ] Build PASS.
+
+---
+
+## 39. Definition of Done da Phase 9
+
+- [ ] Backoffice isolado em layout/rotas.
+- [ ] SuperAdmin criado no User.
+- [ ] Proteção de páginas.
+- [ ] Proteção de APIs.
+- [ ] Seed idempotente.
+- [ ] Dashboard.
+- [ ] CRUD de Planos.
+- [ ] CRUD de Features quando necessário.
+- [ ] PlanFeature com enabled/limit.
+- [ ] Listagem de Empresas/Workspaces.
+- [ ] Busca e filtros.
+- [ ] Plano e créditos/uso na listagem.
+- [ ] Inativação.
+- [ ] Área interna da Empresa.
+- [ ] Feeds administráveis.
+- [ ] WordPress administrável.
+- [ ] IA administrável.
+- [ ] Prompts administráveis.
+- [ ] Secrets protegidos.
+- [ ] Isolamento tenant preservado.
+- [ ] TypeScript PASS.
+- [ ] Lint PASS.
+- [ ] Testes PASS.
+- [ ] Build PASS.
+
+---
+
+# 40. Princípio de implementação
+
+O sistema continua sendo um monólito Next.js.
+
+Não introduzir:
+
+- microserviço;
+- fila;
+- Redis;
+- RabbitMQ;
+- Cron;
+- Docker obrigatório;
+
+apenas para implementar estas fases.
+
+O Backoffice é uma segunda área da mesma aplicação, não um segundo sistema.

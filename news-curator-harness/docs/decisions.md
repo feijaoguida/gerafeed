@@ -1,50 +1,100 @@
 # Architectural Decisions
 
-## ADR-010. Estratégia de Modificação de Imagens
+## Histórico
+
+As decisões anteriores (ADR-010 em diante) permanecem válidas, salvo quando explicitamente substituídas por uma decisão posterior.
+
+## ADR-022. WordPressSite como entidade própria
 Status: Accepted
 
-### Contexto
-O usuário precisa de imagens para as notícias, mas a cópia exata de imagens de terceiros pode gerar problemas de duplicidade ou copyright. Foi solicitado o uso da imagem original com modificações (via IA ou simples, como inversão).
+Um Workspace pode possuir múltiplos sites WordPress. Não representar isso somente por JSON em `Configuration`.
 
-### Decisão
-O sistema oferecerá uma estratégia configurável. Para modificações "sutis" e "inversão", implementaremos inicialmente um processamento programático usando a biblioteca `sharp` (Node.js). Ela permite espelhar horizontalmente (flop), alterar brilho/saturação e aplicar filtros de forma rápida, barata e determinística. Integrações com IA gerativa de imagem (DALL-E 3) poderão ser acopladas posteriomente na mesma interface de pipeline, mas o `sharp` resolve o MVP de alteração sutil eficientemente.
+`WordPressSite` será entidade de domínio com credenciais criptografadas.
 
-### Consequência
-O backend precisará baixar a imagem original, processá-la via buffer com `sharp`, salvá-la temporariamente (ou em cloud storage/diretório public) e disponibilizar a URL para aprovação.
+Motivo:
+- múltiplos destinos;
+- estado independente;
+- categorias por destino;
+- associação de feeds;
+- histórico e auditoria.
 
-## ADR-011. Atribuição de Fonte
+## ADR-023. Source global no Workspace
 Status: Accepted
 
-### Contexto
-Todo artigo gerado deve informar a fonte original.
+Feed/RSS continua sendo uma entidade do Workspace e não uma propriedade exclusiva de um WordPressSite.
 
-### Decisão
-Um campo `creditName` será adicionado ao modelo `Source`. Durante a montagem do payload para publicação no WordPress, o backend anexará o texto de crédito no final do HTML gerado.
+Um mesmo Feed pode alimentar vários sites.
 
-### Consequência
-O fluxo do editor não precisa que a IA gere o crédito no corpo do texto. O crédito é anexado de forma programática na etapa de `Aprovar e Publicar`, garantindo que não seja perdido caso a IA se perca no prompt.
-
-Architectural Decisions
-##ADR-020. Multi-tenant via Workspace (Tenant-per-row)
+## ADR-024. Relação N:N Feed ↔ WordPress
 Status: Accepted
 
-## Contexto
-O sistema precisa suportar múltiplos clientes isolados.
+Criar uma entidade de associação, como `WordPressSiteSource`.
 
-## Decisão
-Usaremos o modelo Pool (Tenant-per-row). Todas as tabelas de domínio (`Source`, `Article`, `Configuration`) receberão uma Foreign Key `workspaceId`. O ID do workspace será recuperado da sessão ativa do usuário.
+Ela armazena o vínculo e permite override de prompt específico do destino.
 
-## Consequência
-Toda e qualquer query no Prisma deverá obrigatoriamente incluir `where: { workspaceId }`. Esquecer disso resulta em vazamento de dados.
+Motivo: o mesmo feed pode ser adaptado para diferentes portais.
 
-## ADR-021. Abstração do Gateway de Pagamento
+## ADR-025. Hierarquia de Prompt
 Status: Accepted
 
-## Contexto
-O usuário solicitou Asaas agora, mas preparação para Stripe no futuro.
+A resolução final usa:
 
-## Decisão
-Criaremos uma interface `PaymentGateway` com os métodos essenciais (`createCustomer`, `createSubscription`, `cancelSubscription`, `handleWebhook`). A injeção de dependência/factory definirá qual implementação usar com base em variáveis de ambiente (ex: `PAYMENT_GATEWAY=asaas`).
+```text
+Feed ↔ WordPress override
+→ Feed default
+→ WordPress default
+→ Workspace default
+```
 
-## Consequência
-O código de negócio (checkout, upgrade) lidará apenas com a interface. Trocar para o Stripe futuramente exigirá apenas implementar a classe `StripeGateway`, sem refatorar o frontend ou a lógica de negócio principal.
+A resolução fica em serviço/função central.
+
+## ADR-026. Article pertence a um destino editorial
+Status: Accepted
+
+Quando um artigo tem destino definido, `Article.wordpressSiteId` registra o WordPress para o qual foi preparado.
+
+Motivos:
+- filtro;
+- prompt correto;
+- publicação;
+- auditoria.
+
+## ADR-027. Backoffice como segunda área da mesma aplicação
+Status: Accepted
+
+Backoffice utiliza o mesmo Next.js e banco, mas possui layout, rotas e autorização próprios.
+
+Não criar segundo aplicativo para o MVP.
+
+## ADR-028. SuperAdmin global
+Status: Accepted
+
+`User.isSuperAdmin` autoriza Backoffice.
+
+`WorkspaceUser.role` não concede acesso ao Backoffice.
+
+## ADR-029. Empresa é Workspace
+Status: Accepted
+
+No Backoffice, o conceito apresentado ao operador é “Empresa”, mas o registro de domínio continua sendo `Workspace`.
+
+Não criar `Company` duplicada sem necessidade.
+
+## ADR-030. Feature e PlanFeature
+Status: Accepted
+
+Planos são configurados através de Features associadas por `PlanFeature`, permitindo `enabled` e `limit` quando aplicável.
+
+O cálculo real de uso/limite deve permanecer no BillingService.
+
+## ADR-031. Seed SuperAdmin por environment
+Status: Accepted
+
+Seed utiliza `SUPERADMIN_EMAIL` e `SUPERADMIN_PASSWORD`.
+
+Não hardcodar credenciais.
+
+## ADR-032. Secrets nunca são expostos ao SuperAdmin
+Status: Accepted
+
+Mesmo SuperAdmin não recebe Application Password/API Keys descriptografadas. O Backoffice permite substituir secrets, não visualizá-los.
