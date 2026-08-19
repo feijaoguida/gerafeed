@@ -138,7 +138,7 @@ export default function ReviewArticlePage({ params }: { params: Promise<{ id: st
 
     try {
       const res = await fetch(`/api/articles/${id}`, {
-        method: "PUT",
+        method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           title,
@@ -310,7 +310,23 @@ export default function ReviewArticlePage({ params }: { params: Promise<{ id: st
                     : "Rejeitada"}
                 </span>
               </div>
-              <p className="text-xs text-zinc-500 dark:text-zinc-400">Fonte: {article.source?.name || "Fonte RSS"}</p>
+              <p className="text-xs text-zinc-500 dark:text-zinc-400 flex items-center gap-2 mt-0.5">
+                <span>Fonte: {article.source?.name || "Fonte RSS"}</span>
+                <span>•</span>
+                <span>
+                  Publicação:{" "}
+                  {article.originalPublishedAt
+                    ? new Date(article.originalPublishedAt).toLocaleDateString("pt-BR", {
+                        timeZone: "America/Sao_Paulo",
+                        day: "2-digit",
+                        month: "2-digit",
+                        year: "numeric",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })
+                    : "Data não informada pela fonte"}
+                </span>
+              </p>
             </div>
           </div>
 
@@ -618,7 +634,23 @@ export default function ReviewArticlePage({ params }: { params: Promise<{ id: st
 
               <div className="space-y-1">
                 <p className="text-xs font-semibold text-zinc-900 dark:text-white">{article.originalTitle}</p>
-                <p className="text-[11px] text-zinc-500">Fonte: {article.source?.name || "Fonte RSS"}</p>
+                <p className="text-[11px] text-zinc-500 flex items-center gap-2">
+                  <span>Fonte: {article.source?.name || "Fonte RSS"}</span>
+                  <span>•</span>
+                  <span>
+                    Publicação:{" "}
+                    {article.originalPublishedAt
+                      ? new Date(article.originalPublishedAt).toLocaleDateString("pt-BR", {
+                          timeZone: "America/Sao_Paulo",
+                          day: "2-digit",
+                          month: "2-digit",
+                          year: "numeric",
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })
+                      : "Data não informada pela fonte"}
+                  </span>
+                </p>
               </div>
 
               {article.originalDescription && (

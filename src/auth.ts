@@ -68,15 +68,38 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 
         if (!email || !password) return null;
 
+        // 1. SuperAdmin Credentials Check
+        const superAdminEmail = process.env.SUPERADMIN_EMAIL?.trim().toLowerCase();
+        const superAdminPassword = process.env.SUPERADMIN_PASSWORD;
+
+        if (superAdminEmail && superAdminPassword && email.toLowerCase() === superAdminEmail && password === superAdminPassword) {
+          const superUser = await prisma.user.upsert({
+            where: { email: superAdminEmail },
+            update: {
+              name: "Super Admin",
+              isSuperAdmin: true,
+            },
+            create: {
+              name: "Super Admin",
+              email: superAdminEmail,
+              isSuperAdmin: true,
+            },
+          });
+
+          const workspaceId = await ensureUserWorkspace(superUser.id);
+
+          return {
+            id: superUser.id,
+            name: superUser.name || "Super Admin",
+            email: superUser.email,
+            workspaceId,
+            isSuperAdmin: true,
+          };
+        }
+
+        // 2. Standard Admin Credentials Check (Legacy MVP admin)
         const adminEmail = process.env.ADMIN_EMAIL;
         const adminPassword = process.env.ADMIN_PASSWORD;
-
-        if (!adminEmail || !adminPassword) {
-          console.error(
-            "[auth] ADMIN_EMAIL ou ADMIN_PASSWORD não configurados no ambiente."
-          );
-          return null;
-        }
 
         if (adminEmail && adminPassword && email === adminEmail && password === adminPassword) {
           // Find or create user in DB
@@ -96,10 +119,11 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             name: dbUser.name || "Admin",
             email: dbUser.email,
             workspaceId,
+            isSuperAdmin: Boolean(dbUser.isSuperAdmin),
           };
         }
 
-        // Check if standard registered user exists in DB
+        // 3. Check if standard registered user exists in DB
         const regularUser = await prisma.user.findUnique({
           where: { email },
         });
@@ -111,6 +135,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             name: regularUser.name || "Usuário",
             email: regularUser.email,
             workspaceId,
+            isSuperAdmin: Boolean(regularUser.isSuperAdmin),
           };
         }
 
@@ -119,17 +144,22 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     }),
   ],
 
-
   callbacks: {
     async jwt({ token, user }) {
       if (user) {
         token.id = user.id;
         token.workspaceId = user.workspaceId;
+        token.isSuperAdmin = Boolean(user.isSuperAdmin);
       }
 
-      // If token missing workspaceId, resolve from DB
-      if (token.id && !token.workspaceId) {
+      // If token missing workspaceId or isSuperAdmin, resolve from DB
+      if (token.id && (!token.workspaceId || token.isSuperAdmin === undefined)) {
         token.workspaceId = await ensureUserWorkspace(token.id as string);
+        const dbUser = await prisma.user.findUnique({
+          where: { id: token.id as string },
+          select: { isSuperAdmin: true },
+        });
+        token.isSuperAdmin = Boolean(dbUser?.isSuperAdmin);
       }
 
       return token;
@@ -143,6 +173,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           session.user.workspaceId = token.workspaceId as string;
           session.workspaceId = token.workspaceId as string;
         }
+        session.user.isSuperAdmin = Boolean(token.isSuperAdmin);
+        session.isSuperAdmin = Boolean(token.isSuperAdmin);
       }
       return session;
     },

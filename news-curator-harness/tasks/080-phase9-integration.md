@@ -21,10 +21,32 @@ Validar Backoffice completo.
 15. Verificar que secrets não aparecem.
 
 ## Definition of Done
-- [ ] todos os cenários PASS.
-- [ ] nenhuma regressão da área funcional.
-- [ ] tenant isolation PASS.
-- [ ] TypeScript PASS.
-- [ ] Lint PASS.
-- [ ] Build PASS.
-- [ ] Testes PASS.
+- [x] todos os cenários PASS.
+- [x] nenhuma regressão da área funcional.
+- [x] tenant isolation PASS.
+- [x] TypeScript PASS.
+- [x] Lint PASS.
+- [x] Build PASS.
+- [x] Testes PASS.
+
+## Evidence
+- `scripts/test-phase9-integration.ts` executou com sucesso todos os 15 cenários de integração da Fase 9:
+  1. Autenticação de SuperAdmin com acesso total.
+  2. Rejeição com 403 Forbidden para usuários comuns.
+  3. Acesso e visualização do dashboard do Backoffice.
+  4. Bloqueio em layout e rotas de API.
+  5. Criação e edição de planos (Plano Enterprise P9).
+  6. Gestão de features e cotas de limites.
+  7. Pesquisa e paginação de empresas.
+  8. Inativação e reativação segura de empresas.
+  9. Visualização de detalhes completos da empresa.
+  10. Criação e edição de feeds com prompt default.
+  11. Conexão e vinculação de sites WordPress.
+  12. Configuração de IA com criptografia AES-256-GCM.
+  13. Diretrizes editoriais e resolução hierárquica de prompt overrides.
+  14. Visualização de consumo e créditos via `BillingService`.
+  15. Auditoria de segredos (Application Password e AI API Key nunca expostos ao client).
+- `npx tsc --noEmit`: PASS.
+- `npm run lint`: PASS.
+- `npm run build`: PASS.
+

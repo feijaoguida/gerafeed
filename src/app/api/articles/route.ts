@@ -1,20 +1,63 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { ArticleStatus } from "@prisma/client";
+import { ArticleStatus, Prisma } from "@prisma/client";
 import { getSessionWorkspaceId } from "@/lib/workspace";
 
 export async function GET(request: Request) {
   try {
     const workspaceId = await getSessionWorkspaceId();
     const { searchParams } = new URL(request.url);
-    const statusParam = searchParams.get("status");
 
-    const whereClause: { workspaceId: string; status?: ArticleStatus } = {
+    const statusParam = searchParams.get("status");
+    const sourceIdParam = searchParams.get("sourceId") || searchParams.get("feed");
+    const wordpressSiteIdParam = searchParams.get("wordpressSiteId") || searchParams.get("wordpress");
+    const startDateParam = searchParams.get("startDate");
+    const endDateParam = searchParams.get("endDate");
+
+    const whereClause: Prisma.ArticleWhereInput = {
       workspaceId,
     };
 
+    // Filter by Status
     if (statusParam && ["PENDING", "PUBLISHED", "REJECTED"].includes(statusParam.toUpperCase())) {
       whereClause.status = statusParam.toUpperCase() as ArticleStatus;
+    }
+
+    // Filter by Feed / Source
+    if (sourceIdParam && sourceIdParam.trim() && sourceIdParam !== "ALL") {
+      whereClause.sourceId = sourceIdParam.trim();
+    }
+
+    // Filter by WordPress Site
+    if (wordpressSiteIdParam && wordpressSiteIdParam.trim() && wordpressSiteIdParam !== "ALL") {
+      whereClause.wordpressSiteId = wordpressSiteIdParam.trim();
+    }
+
+    // Filter by Editorial Date (originalPublishedAt)
+    if (startDateParam || endDateParam) {
+      const dateFilter: Prisma.DateTimeNullableFilter = {};
+
+      if (startDateParam && startDateParam.trim()) {
+        const start = new Date(startDateParam.trim());
+        if (!isNaN(start.getTime())) {
+          dateFilter.gte = start;
+        }
+      }
+
+      if (endDateParam && endDateParam.trim()) {
+        const end = new Date(endDateParam.trim());
+        if (!isNaN(end.getTime())) {
+          // If date only (e.g. YYYY-MM-DD), set to end of day 23:59:59.999
+          if (endDateParam.trim().length === 10) {
+            end.setUTCHours(23, 59, 59, 999);
+          }
+          dateFilter.lte = end;
+        }
+      }
+
+      if (dateFilter.gte || dateFilter.lte) {
+        whereClause.originalPublishedAt = dateFilter;
+      }
     }
 
     const articles = await prisma.article.findMany({
@@ -22,7 +65,10 @@ export async function GET(request: Request) {
       orderBy: { createdAt: "desc" },
       include: {
         source: {
-          select: { id: true, name: true, rssUrl: true },
+          select: { id: true, name: true, rssUrl: true, creditName: true },
+        },
+        wordpressSite: {
+          select: { id: true, name: true, url: true },
         },
         suggestedCategory: {
           select: { id: true, name: true, slug: true },
@@ -39,4 +85,3 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Erro ao buscar notícias" }, { status: 500 });
   }
 }
-

@@ -3,6 +3,7 @@ import path from "path";
 import { prisma } from "@/lib/prisma";
 import { getConfig, DEFAULT_WORKSPACE_ID } from "@/lib/config";
 import { decrypt } from "@/lib/crypto";
+import { getWordPressSiteConfig } from "@/lib/wordpress-sites";
 
 export interface WpCategory {
   id: number;
@@ -354,7 +355,17 @@ export async function publishArticleToWordPress(
     throw new Error("Selecione uma categoria válida do WordPress antes de aprovar.");
   }
 
-  const config = await getWordPressConfig(article.workspaceId);
+  let config: { url: string; username: string; applicationPassword: string };
+  if (article.wordpressSiteId) {
+    const siteConfig = await getWordPressSiteConfig(article.workspaceId, article.wordpressSiteId);
+    if (!siteConfig) {
+      throw new Error(`Configuração do site WordPress ${article.wordpressSiteId} não encontrada.`);
+    }
+    config = siteConfig;
+  } else {
+    config = await getWordPressConfig(article.workspaceId);
+  }
+
   const headers = getAuthHeaders(config);
 
   // 1. Resolve source credit attribution

@@ -15,13 +15,16 @@ import {
   Globe,
   Sparkles,
   Image as ImageIcon,
+  ShieldAlert,
   Menu,
   X,
+  LogOut,
 } from "lucide-react";
+
 import { ThemeToggle, ThemeToggleRow } from "@/components/theme-toggle";
 import { PlanUsageCard } from "@/components/plan-usage-card";
 
-export function Sidebar() {
+export function Sidebar({ isSuperAdmin = false }: { isSuperAdmin?: boolean }) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const currentStatus = searchParams.get("status");
@@ -208,23 +211,43 @@ export function Sidebar() {
             <div className="pt-2 border-t border-zinc-100 dark:border-zinc-800/60">
               <ThemeToggleRow />
             </div>
+
+            {/* Backoffice Link — EXCLUSIVO para Superadmin */}
+            {isSuperAdmin && (
+              <div className="pt-2 border-t border-zinc-100 dark:border-zinc-800/60">
+                <Link
+                  href="/backoffice"
+                  onClick={() => setIsMobileOpen(false)}
+                  className="flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-semibold bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 hover:bg-amber-500/20 transition"
+                >
+                  <ShieldAlert className="w-4 h-4 text-amber-500" />
+                  Superadmin Backoffice
+                </Link>
+              </div>
+            )}
+            {/* Botão de Logout no Menu */}
+            <div className="pt-2 border-t border-zinc-100 dark:border-zinc-800/60">
+              <button
+                onClick={() => signOut({ callbackUrl: "/login" })}
+                className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-medium text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 border border-transparent hover:border-rose-200 dark:hover:border-rose-900/50 transition"
+              >
+                <LogOut className="w-4 h-4 text-rose-500" />
+                <span>Sair do Sistema</span>
+              </button>
+            </div>
           </nav>
         </div>
 
         {/* Plan Usage Card & Footer info */}
         <div className="p-4 border-t border-zinc-200 dark:border-zinc-800/80 space-y-4">
           <PlanUsageCard />
-          <div className="flex items-center justify-between text-[11px] pt-1">
-            <span className="text-zinc-400 dark:text-zinc-500">GeraFeed v0.6.0</span>
-            <button
-              onClick={() => signOut({ callbackUrl: "/login" })}
-              className="text-zinc-500 dark:text-zinc-400 hover:text-rose-600 dark:hover:text-rose-400 transition"
-            >
-              Sair da conta
-            </button>
+          <div className="flex items-center justify-between text-[11px] pt-1 text-zinc-400 dark:text-zinc-500">
+            <span>GeraFeed v0.6.0</span>
+            <span>Seguro & Criptografado</span>
           </div>
         </div>
       </aside>
+
     </>
   );
 }

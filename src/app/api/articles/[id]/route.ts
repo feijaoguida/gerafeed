@@ -13,7 +13,8 @@ export async function GET(
     const article = await prisma.article.findFirst({
       where: { id, workspaceId },
       include: {
-        source: { select: { id: true, name: true, rssUrl: true } },
+        source: { select: { id: true, name: true, rssUrl: true, creditName: true } },
+        wordpressSite: { select: { id: true, name: true, url: true } },
         suggestedCategory: { select: { id: true, name: true, slug: true, wordpressId: true } },
         category: { select: { id: true, name: true, slug: true, wordpressId: true } },
       },
@@ -51,6 +52,9 @@ export async function PATCH(
     if (typeof body.title === "string") dataToUpdate.title = body.title.trim();
     if (typeof body.summary === "string") dataToUpdate.summary = body.summary.trim();
     if (typeof body.content === "string") dataToUpdate.content = body.content.trim();
+    if (body.wordpressSiteId === null || typeof body.wordpressSiteId === "string") {
+      dataToUpdate.wordpressSiteId = body.wordpressSiteId;
+    }
     if (body.categoryId === null || typeof body.categoryId === "string") {
       dataToUpdate.categoryId = body.categoryId;
     }
@@ -76,6 +80,7 @@ export async function PATCH(
       data: dataToUpdate,
       include: {
         source: true,
+        wordpressSite: true,
         suggestedCategory: true,
         category: true,
       },

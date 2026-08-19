@@ -8,6 +8,7 @@ interface Source {
   name: string;
   creditName?: string | null;
   rssUrl: string;
+  defaultPromptType?: string | null;
   active: boolean;
   createdAt: string;
 }
@@ -19,12 +20,14 @@ export default function SettingsSourcesPage() {
   const [newSourceName, setNewSourceName] = useState("");
   const [newCreditName, setNewCreditName] = useState("");
   const [newSourceUrl, setNewSourceUrl] = useState("");
+  const [newDefaultPromptType, setNewDefaultPromptType] = useState("");
   const [isAddingSource, setIsAddingSource] = useState(false);
 
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState("");
   const [editCreditName, setEditCreditName] = useState("");
   const [editRssUrl, setEditRssUrl] = useState("");
+  const [editDefaultPromptType, setEditDefaultPromptType] = useState("");
   const [isSavingEdit, setIsSavingEdit] = useState(false);
 
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -85,6 +88,7 @@ export default function SettingsSourcesPage() {
           name: newSourceName,
           creditName: newCreditName,
           rssUrl: newSourceUrl,
+          defaultPromptType: newDefaultPromptType.trim() || null,
         }),
       });
 
@@ -96,6 +100,7 @@ export default function SettingsSourcesPage() {
       setNewSourceName("");
       setNewCreditName("");
       setNewSourceUrl("");
+      setNewDefaultPromptType("");
       setSuccessMessage("Fonte RSS cadastrada com sucesso!");
       await refreshSources();
     } catch (err) {
@@ -110,6 +115,7 @@ export default function SettingsSourcesPage() {
     setEditName(src.name);
     setEditCreditName(src.creditName || "");
     setEditRssUrl(src.rssUrl);
+    setEditDefaultPromptType(src.defaultPromptType || "");
     setErrorMessage(null);
     setSuccessMessage(null);
   };
@@ -119,6 +125,7 @@ export default function SettingsSourcesPage() {
     setEditName("");
     setEditCreditName("");
     setEditRssUrl("");
+    setEditDefaultPromptType("");
   };
 
   const handleSaveEdit = async (id: string) => {
@@ -129,12 +136,13 @@ export default function SettingsSourcesPage() {
 
     try {
       const res = await fetch(`/api/sources/${id}`, {
-        method: "PUT",
+        method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name: editName,
           creditName: editCreditName,
           rssUrl: editRssUrl,
+          defaultPromptType: editDefaultPromptType.trim() || null,
         }),
       });
 
@@ -221,9 +229,9 @@ export default function SettingsSourcesPage() {
       {/* Form Add Source */}
       <form onSubmit={handleAddSource} className="p-6 rounded-xl bg-white dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 space-y-4 shadow-sm dark:shadow-none">
         <h2 className="text-sm font-semibold text-zinc-900 dark:text-zinc-200">Cadastrar Nova Fonte RSS</h2>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <div>
-            <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">Nome da Fonte</label>
+            <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">Nome da Fonte *</label>
             <input
               type="text"
               placeholder="Ex: TechCrunch, G1..."
@@ -248,13 +256,26 @@ export default function SettingsSourcesPage() {
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">URL do Feed RSS</label>
+            <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">URL do Feed RSS *</label>
             <input
               type="url"
               placeholder="https://exemplo.com/feed.xml"
               value={newSourceUrl}
               onChange={(e) => setNewSourceUrl(e.target.value)}
               required
+              className="w-full px-3 py-2 rounded-lg bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-xs text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-zinc-600 focus:outline-none focus:border-indigo-500"
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">
+              Prompt Padrão <span className="text-[10px] text-zinc-400 dark:text-zinc-500">(Opcional)</span>
+            </label>
+            <input
+              type="text"
+              placeholder="Ex: Informativo, Humorístico..."
+              value={newDefaultPromptType}
+              onChange={(e) => setNewDefaultPromptType(e.target.value)}
               className="w-full px-3 py-2 rounded-lg bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-xs text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-zinc-600 focus:outline-none focus:border-indigo-500"
             />
           </div>
@@ -288,7 +309,7 @@ export default function SettingsSourcesPage() {
                 {editingId === src.id ? (
                   /* Inline Editing Form */
                   <div className="space-y-3">
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                       <div>
                         <label className="block text-[11px] text-zinc-600 dark:text-zinc-400 mb-1">Nome</label>
                         <input
@@ -317,6 +338,16 @@ export default function SettingsSourcesPage() {
                           className="w-full px-2.5 py-1.5 rounded bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 text-zinc-900 dark:text-white text-xs"
                         />
                       </div>
+                      <div>
+                        <label className="block text-[11px] text-zinc-600 dark:text-zinc-400 mb-1">Prompt Padrão</label>
+                        <input
+                          type="text"
+                          value={editDefaultPromptType}
+                          onChange={(e) => setEditDefaultPromptType(e.target.value)}
+                          placeholder="Ex: Informativo..."
+                          className="w-full px-2.5 py-1.5 rounded bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 text-zinc-900 dark:text-white text-xs"
+                        />
+                      </div>
                     </div>
                     <div className="flex items-center gap-2 pt-1">
                       <button
@@ -340,11 +371,16 @@ export default function SettingsSourcesPage() {
                   /* Display View */
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                     <div className="space-y-0.5 min-w-0">
-                      <div className="flex items-center gap-2">
+                      <div className="flex flex-wrap items-center gap-2">
                         <p className="font-semibold text-zinc-900 dark:text-white">{src.name}</p>
                         {src.creditName && (
                           <span className="px-2 py-0.5 rounded bg-indigo-50 dark:bg-indigo-500/10 border border-indigo-200 dark:border-indigo-500/20 text-indigo-700 dark:text-indigo-300 text-[10px]">
                             Crédito: {src.creditName}
+                          </span>
+                        )}
+                        {src.defaultPromptType && (
+                          <span className="px-2 py-0.5 rounded bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20 text-amber-700 dark:text-amber-300 text-[10px]">
+                            Prompt: {src.defaultPromptType}
                           </span>
                         )}
                       </div>

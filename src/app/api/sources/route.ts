@@ -22,7 +22,7 @@ export async function POST(request: Request) {
   try {
     const workspaceId = await getSessionWorkspaceId();
     const body = await request.json();
-    const { name, creditName, rssUrl, active = true } = body;
+    const { name, creditName, rssUrl, defaultPromptType, active = true } = body;
 
     if (!name || typeof name !== "string" || !name.trim()) {
       return NextResponse.json({ error: "Nome da fonte é obrigatório" }, { status: 400 });
@@ -46,6 +46,7 @@ export async function POST(request: Request) {
         name: name.trim(),
         creditName: typeof creditName === "string" ? creditName.trim() || null : null,
         rssUrl: rssUrl.trim(),
+        defaultPromptType: typeof defaultPromptType === "string" ? defaultPromptType.trim() || null : null,
         active: Boolean(active),
       },
     });

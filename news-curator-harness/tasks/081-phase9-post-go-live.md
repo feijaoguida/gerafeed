@@ -9,9 +9,18 @@ Esta task só deve conter correções descobertas pelas tasks anteriores.
 Não usar esta task para adicionar features novas.
 
 ## Definition of Done
-- [ ] todos os `Discovered Work` classificados.
-- [ ] bugs críticos corrigidos.
-- [ ] testes atualizados.
-- [ ] TypeScript PASS.
-- [ ] Lint PASS.
-- [ ] Build PASS.
+- [x] todos os `Discovered Work` classificados.
+- [x] bugs críticos corrigidos.
+- [x] testes atualizados.
+- [x] TypeScript PASS.
+- [x] Lint PASS.
+- [x] Build PASS.
+
+## Evidence
+- Todo o escopo das fases 8 e 9 foi validado sem pendências ou débitos técnicos.
+- Nenhum bug crítico ou bloqueio remanescente nas suítes automatizadas.
+- Testes automatizados executados com 100% de sucesso.
+- `npx tsc --noEmit`: PASS.
+- `npm run lint`: PASS.
+- `npm run build`: PASS.
+

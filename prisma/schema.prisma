@@ -16,6 +16,7 @@ model User {
   email         String    @unique
   emailVerified DateTime?
   image         String?
+  isSuperAdmin  Boolean   @default(false)
   accounts      Account[]
   sessions      Session[]
   workspaces    WorkspaceUser[]
@@ -76,15 +77,18 @@ model Workspace {
   slug             String          @unique
   asaasCustomerId  String?
   stripeCustomerId String?
+  active           Boolean         @default(true)
   createdAt        DateTime        @default(now())
   updatedAt        DateTime        @updatedAt
 
   members          WorkspaceUser[]
   sources          Source[]
   articles         Article[]
-  configurations   Configuration[]
-  categories       WordPressCategory[]
-  subscription     Subscription?
+  configurations       Configuration[]
+  categories           WordPressCategory[]
+  wordpressSites       WordPressSite[]
+  wordpressSiteSources WordPressSiteSource[]
+  subscription         Subscription?
 }
 
 // ---------------------------------------------------------------------------
@@ -99,16 +103,54 @@ enum SubscriptionStatus {
   TRIALING
 }
 
+enum FeatureValueType {
+  BOOLEAN
+  QUANTITY
+}
+
 model Plan {
   id            String         @id @default(cuid())
   name          String
   slug          String         @unique
+  description   String?
   price         Float          @default(0)
+  periodicity   String         @default("MONTHLY")
+  active        Boolean        @default(true)
+  highlight     Boolean        @default(false)
   maxArticles   Int            @default(50)
   maxSources    Int            @default(3)
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
   subscriptions Subscription[]
+  planFeatures  PlanFeature[]
+}
+
+model Feature {
+  id          String           @id @default(cuid())
+  key         String           @unique
+  name        String
+  description String?
+  valueType   FeatureValueType @default(BOOLEAN)
+  active      Boolean          @default(true)
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  planFeatures PlanFeature[]
+}
+
+model PlanFeature {
+  id        String   @id @default(cuid())
+  planId    String
+  featureId String
+  enabled   Boolean  @default(true)
+  limit     Int?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  plan    Plan    @relation(fields: [planId], references: [id], onDelete: Cascade)
+  feature Feature @relation(fields: [featureId], references: [id], onDelete: Cascade)
+
+  @@unique([planId, featureId])
 }
 
 model Subscription {
@@ -152,31 +194,37 @@ enum ArticleStatus {
 }
 
 model Source {
-  id          String    @id @default(cuid())
-  workspaceId String
-  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  name        String
-  creditName  String?
-  rssUrl      String
-  active      Boolean   @default(true)
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-  articles    Article[]
+  id                   String                @id @default(cuid())
+  workspaceId          String
+  workspace            Workspace             @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  name                 String
+  creditName           String?
+  rssUrl               String
+  defaultPromptType    String?
+  active               Boolean               @default(true)
+  createdAt            DateTime              @default(now())
+  updatedAt            DateTime              @updatedAt
+  articles             Article[]
+  wordpressSiteSources WordPressSiteSource[]
 }
 
 model WordPressCategory {
-  id                String    @id @default(cuid())
+  id                String         @id @default(cuid())
   workspaceId       String
-  workspace         Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  workspace         Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  wordpressSiteId   String?
+  wordpressSite     WordPressSite? @relation(fields: [wordpressSiteId], references: [id], onDelete: Cascade)
   wordpressId       Int
   name              String
   slug              String
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
-  suggestedArticles Article[] @relation("SuggestedCategory")
-  selectedArticles  Article[] @relation("SelectedCategory")
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+  suggestedArticles Article[]      @relation("SuggestedCategory")
+  selectedArticles  Article[]      @relation("SelectedCategory")
 
   @@unique([workspaceId, wordpressId])
+  @@index([workspaceId])
+  @@index([wordpressSiteId])
 }
 
 model Article {
@@ -204,11 +252,18 @@ model Article {
   aiScore             Float?
   status              ArticleStatus      @default(PENDING)
   wordpressPostId     Int?
+  wordpressSiteId     String?
+  wordpressSite       WordPressSite?     @relation(fields: [wordpressSiteId], references: [id], onDelete: SetNull)
   modifiedImageUrl    String?
   selectedImage       String?            @default("ORIGINAL")
   processedAt         DateTime?
   createdAt           DateTime           @default(now())
   updatedAt           DateTime           @updatedAt
+
+  @@index([workspaceId])
+  @@index([sourceId])
+  @@index([wordpressSiteId])
+  @@index([originalPublishedAt])
 }
 
 model Configuration {
@@ -222,3 +277,44 @@ model Configuration {
 
   @@unique([workspaceId, key])
 }
+
+model WordPressSite {
+  id                           String                @id @default(cuid())
+  workspaceId                  String
+  workspace                    Workspace             @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  name                         String
+  url                          String
+  username                     String
+  encryptedApplicationPassword String
+  defaultPromptType            String?
+  active                       Boolean               @default(true)
+  createdAt                    DateTime              @default(now())
+  updatedAt                    DateTime              @updatedAt
+  sources                      WordPressSiteSource[]
+  categories                   WordPressCategory[]
+  articles                     Article[]
+
+  @@unique([workspaceId, name])
+  @@index([workspaceId])
+}
+
+model WordPressSiteSource {
+  id                 String        @id @default(cuid())
+  workspaceId        String
+  workspace          Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  wordpressSiteId    String
+  wordpressSite      WordPressSite @relation(fields: [wordpressSiteId], references: [id], onDelete: Cascade)
+  sourceId           String
+  source             Source        @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+  active             Boolean       @default(true)
+  promptTypeOverride String?
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
+
+  @@unique([wordpressSiteId, sourceId])
+  @@index([workspaceId])
+  @@index([wordpressSiteId])
+  @@index([sourceId])
+}
+
+
