@@ -2,6 +2,12 @@ import { NextResponse } from "next/server";
 import { getConfig, setConfig } from "@/lib/config";
 import { PromptSettings, DEFAULT_PROMPT_SETTINGS } from "@/lib/ai";
 import { getSessionWorkspaceId } from "@/lib/workspace";
+import {
+  BillingService,
+  AI_FEATURES,
+  ALLOWED_NICHES_RESTRICTED,
+  ALLOWED_STYLES_RESTRICTED,
+} from "@/lib/billing";
 
 export async function GET() {
   try {
@@ -41,6 +47,24 @@ export async function POST(request: Request) {
     const body = await request.json();
     const { portalArea, customPortalArea, writingStyles, customWritingStyle } = body;
 
+    // Plan restriction: validate portalArea against allowed niches
+    if (typeof portalArea === "string") {
+      const hasUnlimitedNiches = await BillingService.hasFeature(workspaceId, AI_FEATURES.UNLIMITED_NICHES);
+      if (!hasUnlimitedNiches) {
+        const allowedNiches: readonly string[] = ALLOWED_NICHES_RESTRICTED;
+        if (!allowedNiches.includes(portalArea)) {
+          return NextResponse.json(
+            {
+              error: `A área de atuação "${portalArea}" não está disponível no seu plano. As opções disponíveis são: ${ALLOWED_NICHES_RESTRICTED.join(", ")}. Faça upgrade para acessar todos os nichos.`,
+              limitReached: true,
+              resource: "AI_NICHES",
+            },
+            { status: 403 }
+          );
+        }
+      }
+    }
+
     // Validation: writingStyles must be an array with max 3 items
     if (writingStyles !== undefined) {
       if (!Array.isArray(writingStyles)) {
@@ -62,6 +86,23 @@ export async function POST(request: Request) {
           return NextResponse.json(
             { error: "Todos os estilos de escrita devem ser strings." },
             { status: 400 }
+          );
+        }
+      }
+
+      // Plan restriction: validate writing styles against allowed list
+      const hasUnlimitedStyles = await BillingService.hasFeature(workspaceId, AI_FEATURES.UNLIMITED_STYLES);
+      if (!hasUnlimitedStyles) {
+        const allowedStyles: readonly string[] = ALLOWED_STYLES_RESTRICTED;
+        const invalidStyles = writingStyles.filter((s: string) => !allowedStyles.includes(s));
+        if (invalidStyles.length > 0) {
+          return NextResponse.json(
+            {
+              error: `Os estilos "${invalidStyles.join(", ")}" não estão disponíveis no seu plano. Os estilos disponíveis são: ${ALLOWED_STYLES_RESTRICTED.join(", ")}. Faça upgrade para acessar todos os estilos.`,
+              limitReached: true,
+              resource: "AI_STYLES",
+            },
+            { status: 403 }
           );
         }
       }
@@ -115,4 +156,3 @@ export async function POST(request: Request) {
     );
   }
 }
-

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSessionWorkspaceId } from "@/lib/workspace";
-import { BillingService } from "@/lib/billing";
+import { BillingService, AI_FEATURES } from "@/lib/billing";
 
 export async function GET() {
   try {
@@ -9,6 +9,13 @@ export async function GET() {
 
     const articlesCheck = await BillingService.checkLimit(workspaceId, "ARTICLES");
     const sourcesCheck = await BillingService.checkLimit(workspaceId, "SOURCES");
+
+    // Load AI feature entitlements
+    const [unlimitedNiches, unlimitedStyles, advancedProviders] = await Promise.all([
+      BillingService.hasFeature(workspaceId, AI_FEATURES.UNLIMITED_NICHES),
+      BillingService.hasFeature(workspaceId, AI_FEATURES.UNLIMITED_STYLES),
+      BillingService.hasFeature(workspaceId, AI_FEATURES.ADVANCED_PROVIDERS),
+    ]);
 
     return NextResponse.json({
       subscription: {
@@ -30,6 +37,11 @@ export async function GET() {
           limit: sourcesCheck.limit,
           allowed: sourcesCheck.allowed,
         },
+      },
+      aiFeatures: {
+        unlimitedNiches,
+        unlimitedStyles,
+        advancedProviders,
       },
     });
   } catch (error) {

@@ -5,6 +5,7 @@ import {
   getWordPressSites,
   sanitizeWordPressSite,
 } from "@/lib/wordpress-sites";
+import { BillingService } from "@/lib/billing";
 
 export async function GET() {
   try {
@@ -28,6 +29,16 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const workspaceId = await getSessionWorkspaceId();
+
+    // Check WordPress sites plan limit
+    const limitCheck = await BillingService.checkLimit(workspaceId, "WORDPRESS_SITES");
+    if (!limitCheck.allowed) {
+      return NextResponse.json(
+        { error: limitCheck.message, limitReached: true, resource: "WORDPRESS_SITES" },
+        { status: 403 }
+      );
+    }
+
     const body = await request.json();
     const { name, url, username, applicationPassword, defaultPromptType, active } = body;
 

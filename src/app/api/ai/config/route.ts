@@ -3,6 +3,11 @@ import { getConfig, setConfig } from "@/lib/config";
 import { encrypt } from "@/lib/crypto";
 import { AIProviderType } from "@/lib/ai";
 import { getSessionWorkspaceId } from "@/lib/workspace";
+import {
+  BillingService,
+  AI_FEATURES,
+  ALLOWED_PROVIDERS_RESTRICTED,
+} from "@/lib/billing";
 
 export interface AIConfigStored {
   provider: AIProviderType;
@@ -56,6 +61,23 @@ export async function POST(request: Request) {
     if (!provider || !validProviders.includes(provider as AIProviderType)) {
       return NextResponse.json({ error: "Provedor de IA inválido." }, { status: 400 });
     }
+
+    // Plan restriction check
+    const hasAdvancedProviders = await BillingService.hasFeature(workspaceId, AI_FEATURES.ADVANCED_PROVIDERS);
+    if (!hasAdvancedProviders) {
+      const allowedProviders: readonly string[] = ALLOWED_PROVIDERS_RESTRICTED;
+      if (!allowedProviders.includes(provider as string)) {
+        return NextResponse.json(
+          {
+            error: `O provedor "${provider}" não está disponível no seu plano. Os provedores disponíveis são: ${ALLOWED_PROVIDERS_RESTRICTED.join(", ")}. Faça upgrade para utilizar Gemini ou Anthropic.`,
+            limitReached: true,
+            resource: "AI_PROVIDERS",
+          },
+          { status: 403 }
+        );
+      }
+    }
+
 
     const existing = await getConfig<AIConfigStored>("aiProvider", workspaceId);
     let encryptedKey = existing?.apiKey || "";

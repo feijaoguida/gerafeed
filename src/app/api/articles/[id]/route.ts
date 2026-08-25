@@ -17,6 +17,21 @@ export async function GET(
         wordpressSite: { select: { id: true, name: true, url: true } },
         suggestedCategory: { select: { id: true, name: true, slug: true, wordpressId: true } },
         category: { select: { id: true, name: true, slug: true, wordpressId: true } },
+        articleProducts: {
+          orderBy: { position: "asc" },
+          include: {
+            product: {
+              include: {
+                category: true,
+                offers: {
+                  where: { status: "ACTIVE" },
+                  orderBy: { price: "asc" },
+                },
+              },
+            },
+            offer: true,
+          },
+        },
       },
     });
 
@@ -52,6 +67,12 @@ export async function PATCH(
     if (typeof body.title === "string") dataToUpdate.title = body.title.trim();
     if (typeof body.summary === "string") dataToUpdate.summary = body.summary.trim();
     if (typeof body.content === "string") dataToUpdate.content = body.content.trim();
+    if (body.canonicalContent && typeof body.canonicalContent === "object") {
+      dataToUpdate.canonicalContent = body.canonicalContent;
+    }
+    if (typeof body.commercialType === "string") {
+      dataToUpdate.commercialType = body.commercialType;
+    }
     if (body.wordpressSiteId === null || typeof body.wordpressSiteId === "string") {
       dataToUpdate.wordpressSiteId = body.wordpressSiteId;
     }
@@ -83,6 +104,13 @@ export async function PATCH(
         wordpressSite: true,
         suggestedCategory: true,
         category: true,
+        articleProducts: {
+          orderBy: { position: "asc" },
+          include: {
+            product: true,
+            offer: true,
+          },
+        },
       },
     });
 

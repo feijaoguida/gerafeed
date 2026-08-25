@@ -1,54 +1,102 @@
 import { prisma } from "@/lib/prisma";
 import { DEFAULT_WORKSPACE_ID } from "@/lib/workspace";
+import {
+  LimitResource,
+  LimitCheckResult,
+  SEED_PLANS,
+} from "./billing-constants";
 
-export type LimitResource = "ARTICLES" | "SOURCES";
+export * from "./billing-constants";
 
-export interface LimitCheckResult {
-  allowed: boolean;
-  current: number;
-  limit: number;
-  resource: LimitResource;
-  planName: string;
-  message?: string;
-}
 
-export const SEED_PLANS = [
+export const SEED_FEATURES = [
   {
-    slug: "free",
-    name: "Plano Gratuito",
-    price: 0,
-    maxArticles: 50,
-    maxSources: 3,
+    key: "affiliate_module",
+    name: "Módulo de Afiliados",
+    description: "Habilita acesso à plataforma e ferramentas de curadoria e conteúdo de afiliados",
+    valueType: "BOOLEAN" as const,
+    active: true,
   },
   {
-    slug: "starter",
-    name: "Plano Starter",
-    price: 47.0,
-    maxArticles: 200,
-    maxSources: 10,
+    key: "affiliate_analytics",
+    name: "Analytics de Afiliados",
+    description: "Métricas e rastreamento de cliques e conversões de links afiliados",
+    valueType: "BOOLEAN" as const,
+    active: true,
   },
   {
-    slug: "pro",
-    name: "Plano Pro",
-    price: 97.0,
-    maxArticles: 1000,
-    maxSources: 30,
+    key: "affiliate_max_products",
+    name: "Limite de Produtos Afiliados",
+    description: "Quantidade máxima de produtos cadastrados no catálogo de afiliados",
+    valueType: "QUANTITY" as const,
+    active: true,
+  },
+  {
+    key: "affiliate_max_programs",
+    name: "Limite de Programas de Afiliados",
+    description: "Quantidade máxima de programas/marketplaces de afiliados ativos",
+    valueType: "QUANTITY" as const,
+    active: true,
+  },
+  {
+    key: "ai_unlimited_niches",
+    name: "Nichos de Portal Ilimitados",
+    description: "Permite selecionar qualquer área de atuação do portal. Quando desabilitado, somente Política, Negócios e Meio Ambiente estão disponíveis.",
+    valueType: "BOOLEAN" as const,
+    active: true,
+  },
+  {
+    key: "ai_unlimited_styles",
+    name: "Estilos de Escrita Ilimitados",
+    description: "Permite selecionar qualquer estilo de escrita. Quando desabilitado, somente Sério, Informativo, Alegre e Atraente estão disponíveis.",
+    valueType: "BOOLEAN" as const,
+    active: true,
+  },
+  {
+    key: "ai_advanced_providers",
+    name: "Provedores de IA Avançados",
+    description: "Permite selecionar Gemini e Anthropic como provedores. Quando desabilitado, somente OpenAI e OpenAI-Compatible estão disponíveis.",
+    valueType: "BOOLEAN" as const,
+    active: true,
   },
 ];
 
 export class BillingService {
   /**
-   * Ensures default plans exist in the database.
+   * Ensures default features exist in the database.
+   */
+  static async ensureDefaultFeatures() {
+    for (const feat of SEED_FEATURES) {
+      await prisma.feature.upsert({
+        where: { key: feat.key },
+        update: {
+          name: feat.name,
+          description: feat.description,
+          valueType: feat.valueType,
+          active: feat.active,
+        },
+        create: feat,
+      });
+    }
+  }
+
+  /**
+   * Ensures default plans and features exist in the database.
    */
   static async ensureDefaultPlans() {
+    await this.ensureDefaultFeatures();
     for (const plan of SEED_PLANS) {
       await prisma.plan.upsert({
         where: { slug: plan.slug },
         update: {
           name: plan.name,
           price: plan.price,
+          monthlyPrice: plan.monthlyPrice,
+          annualDiscountPercent: plan.annualDiscountPercent,
           maxArticles: plan.maxArticles,
+          maxDailyArticles: plan.maxDailyArticles,
           maxSources: plan.maxSources,
+          maxWordPressSites: plan.maxWordPressSites,
         },
         create: plan,
       });
@@ -121,6 +169,7 @@ export class BillingService {
       });
 
       const allowed = current < plan.maxArticles;
+      const renewsOn = new Date(now.getFullYear(), now.getMonth() + 1, 1);
       return {
         allowed,
         current,
@@ -129,7 +178,38 @@ export class BillingService {
         planName: plan.name,
         message: allowed
           ? undefined
-          : `Limite de artigos atingido para o plano ${plan.name} (${current}/${plan.maxArticles} neste mês). Faça upgrade para continuar.`,
+          : `Limite mensal de artigos atingido para o plano ${plan.name} (${current}/${plan.maxArticles} este mês). Renova em ${renewsOn.toLocaleDateString("pt-BR")}. Faça upgrade para continuar.`,
+      };
+    }
+
+    if (resource === "ARTICLES_DAILY") {
+      // Count articles processed today (processedAt != null, within current day)
+      const now = new Date();
+      const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
+      const endOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+
+      const current = await prisma.article.count({
+        where: {
+          workspaceId,
+          processedAt: {
+            not: null,
+            gte: startOfDay,
+            lte: endOfDay,
+          },
+        },
+      });
+
+      const allowed = current < plan.maxDailyArticles;
+      const tomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+      return {
+        allowed,
+        current,
+        limit: plan.maxDailyArticles,
+        resource: "ARTICLES_DAILY",
+        planName: plan.name,
+        message: allowed
+          ? undefined
+          : `Limite diário de artigos atingido para o plano ${plan.name} (${current}/${plan.maxDailyArticles} hoje). Renova amanhã em ${tomorrow.toLocaleDateString("pt-BR")}. Faça upgrade para aumentar o limite.`,
       };
     }
 
@@ -155,6 +235,25 @@ export class BillingService {
       };
     }
 
+    if (resource === "WORDPRESS_SITES") {
+      // Count all WordPress sites for the workspace
+      const current = await prisma.wordPressSite.count({
+        where: { workspaceId },
+      });
+
+      const allowed = current < plan.maxWordPressSites;
+      return {
+        allowed,
+        current,
+        limit: plan.maxWordPressSites,
+        resource: "WORDPRESS_SITES",
+        planName: plan.name,
+        message: allowed
+          ? undefined
+          : `Limite de sites WordPress atingido para o plano ${plan.name} (${current}/${plan.maxWordPressSites}). Faça upgrade para adicionar mais sites.`,
+      };
+    }
+
     throw new Error(`Recurso desconhecido para verificação de limite: ${resource}`);
   }
 
@@ -171,4 +270,138 @@ export class BillingService {
     }
     return result;
   }
+
+  /**
+   * Retrieves the PlanFeature record for a given workspace and feature key.
+   * Returns null if subscription, plan, feature or PlanFeature does not exist.
+   */
+  static async getPlanFeature(workspaceId: string = DEFAULT_WORKSPACE_ID, featureKey: string) {
+    const sub = await this.getWorkspaceSubscription(workspaceId);
+    const cleanKey = featureKey.trim().toLowerCase();
+
+    return prisma.planFeature.findFirst({
+      where: {
+        planId: sub.planId,
+        feature: {
+          key: cleanKey,
+          active: true,
+        },
+      },
+      include: {
+        feature: true,
+      },
+    });
+  }
+
+  /**
+   * Checks whether a feature is enabled for the workspace.
+   * Returns false if the plan does not have the feature or if enabled is false.
+   */
+  static async hasFeature(workspaceId: string = DEFAULT_WORKSPACE_ID, featureKey: string): Promise<boolean> {
+    const planFeature = await this.getPlanFeature(workspaceId, featureKey);
+    if (!planFeature) return false;
+    return Boolean(planFeature.enabled);
+  }
+
+  /**
+   * Retrieves the feature limit configuration for a workspace.
+   */
+  static async getFeatureLimit(
+    workspaceId: string = DEFAULT_WORKSPACE_ID,
+    featureKey: string
+  ): Promise<{ enabled: boolean; limit: number | null; featureKey: string; planName: string }> {
+    const sub = await this.getWorkspaceSubscription(workspaceId);
+    const planFeature = await this.getPlanFeature(workspaceId, featureKey);
+
+    if (!planFeature || !planFeature.enabled) {
+      return {
+        enabled: false,
+        limit: 0,
+        featureKey: featureKey.trim().toLowerCase(),
+        planName: sub.plan.name,
+      };
+    }
+
+    return {
+      enabled: true,
+      limit: planFeature.limit, // null means unlimited
+      featureKey: featureKey.trim().toLowerCase(),
+      planName: sub.plan.name,
+    };
+  }
+
+  /**
+   * Asserts that a feature is enabled for the workspace.
+   * Throws an Error if not enabled.
+   */
+  static async assertFeature(
+    workspaceId: string = DEFAULT_WORKSPACE_ID,
+    featureKey: string,
+    customMessage?: string
+  ): Promise<void> {
+    const enabled = await this.hasFeature(workspaceId, featureKey);
+    if (!enabled) {
+      const cleanKey = featureKey.trim().toLowerCase();
+      throw new Error(
+        customMessage || `A funcionalidade '${cleanKey}' não está habilitada no seu plano atual. Faça upgrade para ter acesso.`
+      );
+    }
+  }
+
+  /**
+   * Checks if current usage is within the feature quantity limit.
+   */
+  static async checkFeatureLimit(
+    workspaceId: string = DEFAULT_WORKSPACE_ID,
+    featureKey: string,
+    currentCount: number
+  ): Promise<{ allowed: boolean; current: number; limit: number | null; message?: string; planName: string }> {
+    const info = await this.getFeatureLimit(workspaceId, featureKey);
+
+    if (!info.enabled) {
+      return {
+        allowed: false,
+        current: currentCount,
+        limit: 0,
+        planName: info.planName,
+        message: `A funcionalidade '${info.featureKey}' não está disponível no plano ${info.planName}.`,
+      };
+    }
+
+    if (info.limit === null) {
+      return {
+        allowed: true,
+        current: currentCount,
+        limit: null,
+        planName: info.planName,
+      };
+    }
+
+    const allowed = currentCount < info.limit;
+    return {
+      allowed,
+      current: currentCount,
+      limit: info.limit,
+      planName: info.planName,
+      message: allowed
+        ? undefined
+        : `Limite atingido para '${info.featureKey}' no plano ${info.planName} (${currentCount}/${info.limit}). Faça upgrade para aumentar o limite.`,
+    };
+  }
+
+  /**
+   * Asserts that a feature quantity limit has not been reached.
+   */
+  static async assertFeatureLimit(
+    workspaceId: string = DEFAULT_WORKSPACE_ID,
+    featureKey: string,
+    currentCount: number,
+    customMessage?: string
+  ): Promise<void> {
+    const check = await this.checkFeatureLimit(workspaceId, featureKey, currentCount);
+    if (!check.allowed) {
+      throw new Error(customMessage || check.message || `Limite excedido para a funcionalidade '${featureKey}'.`);
+    }
+  }
 }
+

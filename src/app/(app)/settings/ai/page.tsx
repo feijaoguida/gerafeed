@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect } from "react";
 import {
   Sparkles,
   Save,
@@ -10,12 +10,14 @@ import {
   RefreshCw,
   Sliders,
   FileText,
-  Eye,
+  Lock,
 } from "lucide-react";
+import { DEFAULT_PROMPT_SETTINGS } from "@/lib/ai/types";
 import {
-  DEFAULT_PROMPT_SETTINGS,
-  buildSystemPrompt,
-} from "@/lib/ai/types";
+  ALLOWED_NICHES_RESTRICTED,
+  ALLOWED_STYLES_RESTRICTED,
+  ALLOWED_PROVIDERS_RESTRICTED,
+} from "@/lib/billing-constants";
 
 type AIProviderType = "openai" | "gemini" | "anthropic" | "openai-compatible";
 type TabType = "connection" | "prompt";
@@ -74,6 +76,11 @@ export default function SettingsAiPage() {
   const [writingStyles, setWritingStyles] = useState<string[]>(DEFAULT_PROMPT_SETTINGS.writingStyles);
   const [customWritingStyle, setCustomWritingStyle] = useState(DEFAULT_PROMPT_SETTINGS.customWritingStyle);
 
+  // Plan entitlements for AI restrictions
+  const [unlimitedNiches, setUnlimitedNiches] = useState(false);
+  const [unlimitedStyles, setUnlimitedStyles] = useState(false);
+  const [advancedProviders, setAdvancedProviders] = useState(false);
+
   const [isLoadingPrompt, setIsLoadingPrompt] = useState(true);
   const [isSavingPrompt, setIsSavingPrompt] = useState(false);
 
@@ -113,22 +120,39 @@ export default function SettingsAiPage() {
     };
   }, []);
 
-  // Load prompt settings
+  // Load prompt settings and billing entitlements
   useEffect(() => {
     let active = true;
 
     async function loadPromptConfig() {
       try {
-        const res = await fetch("/api/ai/prompt-settings");
-        if (!res.ok) throw new Error("Erro ao carregar prompt settings.");
-        const data = await res.json();
+        const [settingsRes, billingRes] = await Promise.all([
+          fetch("/api/ai/prompt-settings"),
+          fetch("/api/billing/subscription"),
+        ]);
+
+        if (!settingsRes.ok) throw new Error("Erro ao carregar prompt settings.");
+        const data = await settingsRes.json();
 
         if (!active) return;
 
-        if (data.portalArea) setPortalArea(data.portalArea);
-        if (data.customPortalArea !== undefined) setCustomPortalArea(data.customPortalArea);
-        if (Array.isArray(data.writingStyles)) setWritingStyles(data.writingStyles);
-        if (data.customWritingStyle !== undefined) setCustomWritingStyle(data.customWritingStyle);
+        const settings = data.settings || data;
+        if (settings.portalArea) setPortalArea(settings.portalArea);
+        if (settings.customPortalArea !== undefined) setCustomPortalArea(settings.customPortalArea);
+        if (Array.isArray(settings.writingStyles)) {
+          const validStyles = settings.writingStyles.filter((s: string) => WRITING_STYLES.includes(s));
+          setWritingStyles(validStyles);
+        }
+        if (settings.customWritingStyle !== undefined) setCustomWritingStyle(settings.customWritingStyle);
+
+        // Load AI feature entitlements
+        if (billingRes.ok) {
+          const billing = await billingRes.json();
+          const features = billing.aiFeatures || {};
+          setUnlimitedNiches(Boolean(features.unlimitedNiches));
+          setUnlimitedStyles(Boolean(features.unlimitedStyles));
+          setAdvancedProviders(Boolean(features.advancedProviders));
+        }
       } catch (err) {
         if (!active) return;
         console.error("Error loading prompt settings:", err);
@@ -143,16 +167,6 @@ export default function SettingsAiPage() {
       active = false;
     };
   }, []);
-
-  // Live prompt preview calculation
-  const promptPreview = useMemo(() => {
-    return buildSystemPrompt({
-      portalArea,
-      customPortalArea,
-      writingStyles,
-      customWritingStyle,
-    });
-  }, [portalArea, customPortalArea, writingStyles, customWritingStyle]);
 
   // Handler for writing style toggle (max 3)
   const handleStyleToggle = (style: string) => {
@@ -311,7 +325,7 @@ export default function SettingsAiPage() {
       </div>
 
       {/* Tabs Navigation */}
-      <div className="flex items-center gap-2 border-b border-zinc-200 dark:border-zinc-800 pb-px">
+      <div className="flex items-center gap-2 border-b border-zinc-200 dark:border-zinc-800 pb-px mt-6">
         <button
           type="button"
           onClick={() => setActiveTab("connection")}
@@ -367,6 +381,20 @@ export default function SettingsAiPage() {
             </button>
           </div>
 
+          {/* Incompatibility Warning for Advanced Providers */}
+          {!advancedProviders && !(ALLOWED_PROVIDERS_RESTRICTED as readonly string[]).includes(provider) && (
+            <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-800 dark:text-amber-300 text-xs flex items-start gap-3">
+              <AlertCircle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
+              <div>
+                <p className="font-semibold">Provedor incompatível com seu plano atual</p>
+                <p className="mt-0.5 text-[11px]">
+                  O provedor atualmente salvo (<strong className="uppercase">{provider}</strong>) requer o recurso de Provedores Avançados.
+                  Para utilizar Gemini ou Anthropic, faça o <a href="/billing" className="underline font-bold">upgrade do plano</a> ou altere para OpenAI / OpenAI-Compatible abaixo.
+                </p>
+              </div>
+            </div>
+          )}
+
           {/* Alerts */}
           {connectionError && (
             <div className="p-4 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-600 dark:text-rose-300 text-xs flex items-center justify-between">
@@ -408,8 +436,12 @@ export default function SettingsAiPage() {
                   className="w-full px-3.5 py-2.5 rounded-lg bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-xs text-zinc-900 dark:text-white focus:outline-none focus:border-emerald-500"
                 >
                   <option value="openai">OpenAI (GPT-4o / GPT-4o-mini)</option>
-                  <option value="gemini">Google Gemini (Gemini 1.5 Flash / Pro)</option>
-                  <option value="anthropic">Anthropic Claude (Claude 3.5 Haiku / Sonnet)</option>
+                  <option value="gemini" disabled={!advancedProviders}>
+                    Google Gemini (Gemini 1.5 Flash / Pro){!advancedProviders ? " 🔒 (Requer Upgrade)" : ""}
+                  </option>
+                  <option value="anthropic" disabled={!advancedProviders}>
+                    Anthropic Claude (Claude 3.5 Haiku / Sonnet){!advancedProviders ? " 🔒 (Requer Upgrade)" : ""}
+                  </option>
                   <option value="openai-compatible">OpenAI-Compatible (DeepSeek, OpenRouter, Kimi, etc.)</option>
                 </select>
               </div>
@@ -519,26 +551,51 @@ export default function SettingsAiPage() {
               </div>
 
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2.5">
-                {PORTAL_AREAS.map((area) => (
-                  <label
-                    key={area}
-                    className={`flex items-center gap-2.5 p-3 rounded-lg border text-xs font-medium cursor-pointer transition select-none ${
-                      portalArea === area
-                        ? "bg-emerald-50 dark:bg-emerald-950/30 border-emerald-500 text-emerald-700 dark:text-emerald-300 shadow-sm"
-                        : "bg-zinc-50 dark:bg-zinc-950/60 border-zinc-200 dark:border-zinc-800 text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200 hover:border-zinc-300 dark:hover:border-zinc-700"
-                    }`}
-                  >
-                    <input
-                      type="radio"
-                      name="portalArea"
-                      value={area}
-                      checked={portalArea === area}
-                      onChange={() => setPortalArea(area)}
-                      className="text-emerald-500 focus:ring-emerald-500 h-3.5 w-3.5 bg-zinc-100 dark:bg-zinc-900 border-zinc-300 dark:border-zinc-700"
-                    />
-                    <span>{area}</span>
-                  </label>
-                ))}
+                {PORTAL_AREAS.map((area) => {
+                  const isAllowed = unlimitedNiches ||
+                    (ALLOWED_NICHES_RESTRICTED as readonly string[]).includes(area);
+                  const isLocked = !isAllowed;
+
+                  return (
+                    <label
+                      key={area}
+                      title={isLocked ? `Disponível apenas em planos superiores. Opções disponíveis: ${ALLOWED_NICHES_RESTRICTED.join(", ")}` : undefined}
+                      className={`relative flex items-center gap-2.5 p-3 rounded-lg border text-xs font-medium transition select-none ${
+                        isLocked
+                          ? "opacity-50 cursor-not-allowed bg-zinc-100 dark:bg-zinc-950/30 border-zinc-200 dark:border-zinc-800 text-zinc-400 dark:text-zinc-600"
+                          : portalArea === area
+                          ? "cursor-pointer bg-emerald-50 dark:bg-emerald-950/30 border-emerald-500 text-emerald-700 dark:text-emerald-300 shadow-sm"
+                          : "cursor-pointer bg-zinc-50 dark:bg-zinc-950/60 border-zinc-200 dark:border-zinc-800 text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200 hover:border-zinc-300 dark:hover:border-zinc-700"
+                      }`}
+                    >
+                      {isLocked ? (
+                        <>
+                          <Lock className="w-3.5 h-3.5 shrink-0" />
+                          <span className="flex-1">{area}</span>
+                          <a
+                            href="/billing"
+                            onClick={(e) => e.stopPropagation()}
+                            className="ml-auto px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-600 dark:text-amber-400 border border-amber-500/30 hover:bg-amber-500/30 transition"
+                          >
+                            Upgrade
+                          </a>
+                        </>
+                      ) : (
+                        <>
+                          <input
+                            type="radio"
+                            name="portalArea"
+                            value={area}
+                            checked={portalArea === area}
+                            onChange={() => setPortalArea(area)}
+                            className="text-emerald-500 focus:ring-emerald-500 h-3.5 w-3.5 bg-zinc-100 dark:bg-zinc-900 border-zinc-300 dark:border-zinc-700"
+                          />
+                          <span>{area}</span>
+                        </>
+                      )}
+                    </label>
+                  );
+                })}
               </div>
 
               {portalArea === "Outro" && (
@@ -584,28 +641,51 @@ export default function SettingsAiPage() {
 
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2.5">
                 {WRITING_STYLES.map((style) => {
+                  const isAllowed = unlimitedStyles ||
+                    (ALLOWED_STYLES_RESTRICTED as readonly string[]).includes(style);
+                  const isLocked = !isAllowed;
                   const isChecked = writingStyles.includes(style);
-                  const isDisabled = !isChecked && writingStyles.length >= 3;
+                  const isDisabledByCount = !isChecked && writingStyles.length >= 3;
+                  const isDisabled = isLocked || isDisabledByCount;
 
                   return (
                     <label
                       key={style}
-                      className={`flex items-center gap-2.5 p-3 rounded-lg border text-xs font-medium transition select-none ${
-                        isDisabled
+                      title={isLocked ? `Disponível apenas em planos superiores. Estilos disponíveis: ${ALLOWED_STYLES_RESTRICTED.join(", ")}` : undefined}
+                      className={`relative flex items-center gap-2.5 p-3 rounded-lg border text-xs font-medium transition select-none ${
+                        isLocked
+                          ? "opacity-50 cursor-not-allowed bg-zinc-100 dark:bg-zinc-950/30 border-zinc-200 dark:border-zinc-800 text-zinc-400 dark:text-zinc-600"
+                          : isDisabledByCount
                           ? "opacity-40 cursor-not-allowed bg-zinc-100 dark:bg-zinc-950/30 border-zinc-200 dark:border-zinc-800 text-zinc-400 dark:text-zinc-600"
                           : isChecked
                           ? "cursor-pointer bg-emerald-50 dark:bg-emerald-950/30 border-emerald-500 text-emerald-700 dark:text-emerald-300 shadow-sm"
                           : "cursor-pointer bg-zinc-50 dark:bg-zinc-950/60 border-zinc-200 dark:border-zinc-800 text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200 hover:border-zinc-300 dark:hover:border-zinc-700"
                       }`}
                     >
-                      <input
-                        type="checkbox"
-                        checked={isChecked}
-                        disabled={isDisabled}
-                        onChange={() => handleStyleToggle(style)}
-                        className="rounded text-emerald-500 focus:ring-emerald-500 h-3.5 w-3.5 bg-zinc-100 dark:bg-zinc-900 border-zinc-300 dark:border-zinc-700 disabled:opacity-40"
-                      />
-                      <span>{style}</span>
+                      {isLocked ? (
+                        <>
+                          <Lock className="w-3.5 h-3.5 shrink-0" />
+                          <span className="flex-1">{style}</span>
+                          <a
+                            href="/billing"
+                            onClick={(e) => e.stopPropagation()}
+                            className="ml-auto px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-600 dark:text-amber-400 border border-amber-500/30 hover:bg-amber-500/30 transition"
+                          >
+                            Upgrade
+                          </a>
+                        </>
+                      ) : (
+                        <>
+                          <input
+                            type="checkbox"
+                            checked={isChecked}
+                            disabled={isDisabled}
+                            onChange={() => handleStyleToggle(style)}
+                            className="rounded text-emerald-500 focus:ring-emerald-500 h-3.5 w-3.5 bg-zinc-100 dark:bg-zinc-900 border-zinc-300 dark:border-zinc-700 disabled:opacity-40"
+                          />
+                          <span>{style}</span>
+                        </>
+                      )}
                     </label>
                   );
                 })}
@@ -630,21 +710,6 @@ export default function SettingsAiPage() {
                   />
                 </div>
               )}
-            </div>
-
-            {/* Section 3: Live Prompt Preview */}
-            <div className="p-6 rounded-xl bg-white dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 space-y-3 shadow-sm dark:shadow-none">
-              <div className="flex items-center gap-2 border-b border-zinc-200 dark:border-zinc-800 pb-3">
-                <Eye className="w-4 h-4 text-emerald-500 dark:text-emerald-400" />
-                <h2 className="text-sm font-semibold text-zinc-900 dark:text-zinc-200">Preview do System Prompt Gerado</h2>
-              </div>
-              <p className="text-[11px] text-zinc-500 dark:text-zinc-400">
-                Visualização em tempo real das instruções de sistema que serão enviadas para o modelo de IA.
-              </p>
-
-              <div className="mt-2 p-4 rounded-lg bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 font-mono text-[11px] text-zinc-800 dark:text-zinc-300 whitespace-pre-wrap leading-relaxed max-h-80 overflow-y-auto">
-                {promptPreview}
-              </div>
             </div>
 
             {/* Save Prompt Settings Button */}

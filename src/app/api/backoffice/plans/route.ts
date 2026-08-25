@@ -1,12 +1,13 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireSuperAdmin } from "@/lib/superadmin";
+import { validatePlanPricing, toDecimal } from "@/lib/pricing";
 
 export async function GET() {
   try {
     await requireSuperAdmin();
     const plans = await prisma.plan.findMany({
-      orderBy: { price: "asc" },
+      orderBy: { monthlyPrice: "asc" },
       include: {
         planFeatures: {
           include: {
@@ -35,11 +36,15 @@ export async function POST(request: Request) {
       slug,
       description,
       price,
+      monthlyPrice,
+      annualDiscountPercent,
       periodicity,
       active,
       highlight,
       maxArticles,
+      maxDailyArticles,
       maxSources,
+      maxWordPressSites,
       features,
     } = body;
 
@@ -48,6 +53,14 @@ export async function POST(request: Request) {
     }
     if (!slug || typeof slug !== "string" || !slug.trim()) {
       return NextResponse.json({ error: "Slug do plano é obrigatório." }, { status: 400 });
+    }
+
+    const resolvedMonthlyPrice = monthlyPrice !== undefined ? monthlyPrice : (price !== undefined ? price : 0);
+    const resolvedAnnualDiscount = annualDiscountPercent !== undefined ? annualDiscountPercent : 0;
+
+    const validation = validatePlanPricing(resolvedMonthlyPrice, resolvedAnnualDiscount);
+    if (!validation.valid) {
+      return NextResponse.json({ error: validation.error }, { status: 400 });
     }
 
     const cleanSlug = slug.trim().toLowerCase().replace(/[^a-z0-9_-]/g, "-");
@@ -59,17 +72,24 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Já existe um plano com este slug." }, { status: 409 });
     }
 
+    const decMonthly = toDecimal(resolvedMonthlyPrice);
+    const decDiscount = toDecimal(resolvedAnnualDiscount);
+
     const plan = await prisma.plan.create({
       data: {
         name: name.trim(),
         slug: cleanSlug,
         description: description?.trim() || null,
-        price: typeof price === "number" ? price : parseFloat(price) || 0,
+        monthlyPrice: decMonthly,
+        annualDiscountPercent: decDiscount,
+        price: decMonthly.toNumber(),
         periodicity: typeof periodicity === "string" ? periodicity : "MONTHLY",
         active: active !== undefined ? Boolean(active) : true,
         highlight: highlight !== undefined ? Boolean(highlight) : false,
         maxArticles: typeof maxArticles === "number" ? maxArticles : parseInt(maxArticles, 10) || 50,
+        maxDailyArticles: typeof maxDailyArticles === "number" ? maxDailyArticles : parseInt(maxDailyArticles, 10) || 5,
         maxSources: typeof maxSources === "number" ? maxSources : parseInt(maxSources, 10) || 3,
+        maxWordPressSites: typeof maxWordPressSites === "number" ? maxWordPressSites : parseInt(maxWordPressSites, 10) || 1,
         ...(Array.isArray(features) && features.length > 0
           ? {
               planFeatures: {

@@ -19,12 +19,27 @@ import {
   Menu,
   X,
   LogOut,
+  ShoppingBag,
+  ArrowDownToLine,
+  Package,
+  Tag,
+  FileText,
+  TrendingUp,
+  Lock,
+  Send,
+  CreditCard,
 } from "lucide-react";
 
 import { ThemeToggle, ThemeToggleRow } from "@/components/theme-toggle";
 import { PlanUsageCard } from "@/components/plan-usage-card";
 
-export function Sidebar({ isSuperAdmin = false }: { isSuperAdmin?: boolean }) {
+export function Sidebar({
+  isSuperAdmin = false,
+  hasAffiliateModule = false,
+}: {
+  isSuperAdmin?: boolean;
+  hasAffiliateModule?: boolean;
+}) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const currentStatus = searchParams.get("status");
@@ -101,6 +116,22 @@ export function Sidebar({ isSuperAdmin = false }: { isSuperAdmin?: boolean }) {
               </Link>
             </div>
 
+            {/* Publicar Posts */}
+            <div>
+              <Link
+                href="/publishing"
+                onClick={() => setIsMobileOpen(false)}
+                className={`flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-semibold transition ${
+                  isActive("/publishing")
+                    ? "bg-indigo-600 text-white shadow-md shadow-indigo-600/20"
+                    : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800/60"
+                }`}
+              >
+                <Send className="w-4 h-4 text-indigo-400" />
+                Publicar Posts
+              </Link>
+            </div>
+
             {/* Notícias Fila */}
             <div className="space-y-1">
               <div className="px-3 text-[10px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-wider">
@@ -147,12 +178,121 @@ export function Sidebar({ isSuperAdmin = false }: { isSuperAdmin?: boolean }) {
               </Link>
             </div>
 
+            {/* Afiliados */}
+            <div className="space-y-1">
+              <div className="px-3 text-[10px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-wider flex items-center justify-between">
+                <div className="flex items-center gap-1.5">
+                  <ShoppingBag className="w-3 h-3 text-emerald-500" />
+                  <span>Afiliados</span>
+                </div>
+                {!hasAffiliateModule && (
+                  <span className="text-[9px] px-1.5 py-0.2 bg-amber-500/10 text-amber-600 dark:text-amber-400 rounded border border-amber-500/20 font-semibold">
+                    PRO
+                  </span>
+                )}
+              </div>
+
+              {hasAffiliateModule ? (
+                <>
+                  <Link
+                    href="/affiliates/import"
+                    onClick={() => setIsMobileOpen(false)}
+                    className={`flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-medium transition ${
+                      isActive("/affiliates/import")
+                        ? "bg-emerald-50 dark:bg-emerald-600/20 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-500/30 font-semibold"
+                        : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800/60"
+                    }`}
+                  >
+                    <ArrowDownToLine className="w-4 h-4 text-emerald-500 dark:text-emerald-400" />
+                    Importar Produto
+                  </Link>
+
+                  <Link
+                    href="/affiliates/products"
+                    onClick={() => setIsMobileOpen(false)}
+                    className={`flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-medium transition ${
+                      isActive("/affiliates/products")
+                        ? "bg-emerald-50 dark:bg-emerald-600/20 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-500/30 font-semibold"
+                        : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800/60"
+                    }`}
+                  >
+                    <Package className="w-4 h-4 text-emerald-500 dark:text-emerald-400" />
+                    Catálogo de Produtos
+                  </Link>
+
+                  <Link
+                    href="/affiliates/offers"
+                    onClick={() => setIsMobileOpen(false)}
+                    className={`flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-medium transition ${
+                      isActive("/affiliates/offers")
+                        ? "bg-emerald-50 dark:bg-emerald-600/20 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-500/30 font-semibold"
+                        : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800/60"
+                    }`}
+                  >
+                    <Tag className="w-4 h-4 text-emerald-500 dark:text-emerald-400" />
+                    Ofertas
+                  </Link>
+
+                  <Link
+                    href="/affiliates/prompts"
+                    onClick={() => setIsMobileOpen(false)}
+                    className={`flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-medium transition ${
+                      isActive("/affiliates/prompts")
+                        ? "bg-emerald-50 dark:bg-emerald-600/20 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-500/30 font-semibold"
+                        : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800/60"
+                    }`}
+                  >
+                    <FileText className="w-4 h-4 text-emerald-500 dark:text-emerald-400" />
+                    Prompts Afiliados
+                  </Link>
+
+                  <Link
+                    href="/affiliates/dashboard"
+                    onClick={() => setIsMobileOpen(false)}
+                    className={`flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-medium transition ${
+                      isActive("/affiliates/dashboard")
+                        ? "bg-emerald-50 dark:bg-emerald-600/20 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-500/30 font-semibold"
+                        : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800/60"
+                    }`}
+                  >
+                    <TrendingUp className="w-4 h-4 text-emerald-500 dark:text-emerald-400" />
+                    Analytics Afiliados
+                  </Link>
+                </>
+              ) : (
+                <Link
+                  href="/settings/billing/upgrade"
+                  onClick={() => setIsMobileOpen(false)}
+                  className="flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800/40 transition"
+                >
+                  <div className="flex items-center gap-3">
+                    <Lock className="w-3.5 h-3.5 text-amber-500" />
+                    <span>Módulo Afiliados</span>
+                  </div>
+                  <span className="text-[10px] text-amber-600 dark:text-amber-400 font-semibold">Upgrade</span>
+                </Link>
+              )}
+            </div>
+
             {/* Configurações */}
             <div className="space-y-1">
               <div className="px-3 text-[10px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-wider flex items-center gap-1.5">
                 <Settings className="w-3 h-3" />
                 Configurações
               </div>
+
+              <Link
+                href="/settings/billing"
+                onClick={() => setIsMobileOpen(false)}
+                className={`flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-medium transition ${
+                  isActive("/settings/billing")
+                    ? "bg-indigo-50 dark:bg-indigo-600/20 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-500/30 font-semibold"
+                    : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800/60"
+                }`}
+              >
+                <CreditCard className="w-4 h-4 text-amber-500 dark:text-amber-400" />
+                Plano & Cobrança
+              </Link>
 
               <Link
                 href="/settings/sources"

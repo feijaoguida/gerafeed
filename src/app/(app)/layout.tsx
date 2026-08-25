@@ -1,6 +1,7 @@
 import { Suspense } from "react";
 import { Sidebar } from "@/components/sidebar";
-import { auth } from "@/auth";
+import { auth, DEFAULT_WORKSPACE_ID } from "@/auth";
+import { BillingService, AFFILIATE_FEATURES } from "@/lib/billing";
 
 /**
  * Layout da área autenticada.
@@ -13,6 +14,18 @@ export default async function AppLayout({
 }) {
   const session = await auth();
   const isSuperAdmin = Boolean(session?.user?.isSuperAdmin);
+  const workspaceId =
+    session?.user?.workspaceId || session?.workspaceId || DEFAULT_WORKSPACE_ID;
+
+  let hasAffiliateModule = false;
+  try {
+    hasAffiliateModule = await BillingService.hasFeature(
+      workspaceId,
+      AFFILIATE_FEATURES.MODULE
+    );
+  } catch {
+    hasAffiliateModule = false;
+  }
 
   return (
     <div className="flex min-h-screen bg-slate-50 dark:bg-zinc-950 text-slate-900 dark:text-zinc-100 transition-colors duration-200">
@@ -21,7 +34,10 @@ export default async function AppLayout({
           <div className="w-64 bg-white dark:bg-zinc-900 border-r border-zinc-200 dark:border-zinc-800 shrink-0" />
         }
       >
-        <Sidebar isSuperAdmin={isSuperAdmin} />
+        <Sidebar
+          isSuperAdmin={isSuperAdmin}
+          hasAffiliateModule={hasAffiliateModule}
+        />
       </Suspense>
       <div className="flex-1 min-w-0 flex flex-col">{children}</div>
     </div>

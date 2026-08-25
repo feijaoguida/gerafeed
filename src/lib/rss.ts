@@ -1,5 +1,6 @@
 import Parser from "rss-parser";
 import { prisma } from "@/lib/prisma";
+import { scrapeArticleContent } from "@/lib/scraper";
 
 
 export interface ExtractedRssItem {
@@ -88,7 +89,7 @@ export async function parseFeedUrl(url: string, sourceId: string): Promise<Extra
 
       const rawDescription = item.contentSnippet || item.summary || item.content || item.description || "";
       // Strip HTML tags for clean description if needed
-      const cleanDescription = rawDescription.replace(/<[^>]*>/g, "").trim().substring(0, 1000) || null;
+      const cleanDescription = rawDescription.replace(/<[^>]*>/g, "").trim() || null;
 
       let publishedAt: Date | null = null;
       if (item.isoDate) {
@@ -175,15 +176,31 @@ export async function processRssSources(
     // Apply limit per feed
     const selectedItems = newItems.slice(0, limitPerFeed);
 
-    // Persist selected articles with status PENDING
+    // Check if source has an associated WordPress site
+    const siteAssignment = await prisma.wordPressSiteSource.findFirst({
+      where: { sourceId: source.id, workspaceId },
+      select: { wordpressSiteId: true },
+    });
+    const defaultWpSiteId = siteAssignment?.wordpressSiteId || null;
+
+    // Persist selected articles with status PENDING and extract full content
     for (const item of selectedItems) {
+      let scrapedContent: string | null = null;
+      try {
+        scrapedContent = await scrapeArticleContent(item.originalUrl);
+      } catch (scrapeErr) {
+        console.warn(`[RSS] Erro ao extrair conteúdo da URL ${item.originalUrl}:`, scrapeErr);
+      }
+
       const article = await prisma.article.create({
         data: {
           workspaceId,
           sourceId: item.sourceId,
+          wordpressSiteId: defaultWpSiteId,
           originalUrl: item.originalUrl,
           originalTitle: item.originalTitle,
           originalDescription: item.originalDescription,
+          originalContent: scrapedContent,
           originalImageUrl: item.originalImageUrl,
           originalPublishedAt: item.originalPublishedAt,
           status: "PENDING",

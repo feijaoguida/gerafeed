@@ -4,16 +4,44 @@ export type BillingCycle = "MONTHLY" | "YEARLY";
 
 export type BillingType = "PIX" | "BOLETO" | "CREDIT_CARD" | "UNDEFINED";
 
+export interface PaymentProviderCapabilities {
+  customer: boolean;
+  checkout: boolean;
+  subscription: boolean;
+  payments: boolean;
+  webhooks: boolean;
+}
+
 export interface CreateCustomerParams {
   workspaceId: string;
   name: string;
   email: string;
   cpfCnpj?: string;
   phone?: string;
+  providerCustomerId?: string;
+  postalCode?: string;
+  address?: string;
+  addressNumber?: string;
+  complement?: string;
+  province?: string;
+  city?: string;
+  state?: string;
 }
 
 export interface CustomerResult {
   customerId: string;
+  provider: PaymentProviderType;
+  created?: boolean;
+  updated?: boolean;
+}
+
+export interface CustomerDTO {
+  id: string;
+  name: string;
+  email: string;
+  cpfCnpj?: string;
+  phone?: string;
+  externalReference?: string;
   provider: PaymentProviderType;
 }
 

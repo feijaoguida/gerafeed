@@ -18,7 +18,7 @@ async function main() {
   if (!defaultPrompt.includes("portal de notícias de tecnologia e negócios")) {
     throw new Error("FAILED: Default prompt missing standard area 'tecnologia e negócios'.");
   }
-  if (!defaultPrompt.includes("totalmente autoral, atraente,")) {
+  if (!defaultPrompt.includes("atraente")) {
     throw new Error("FAILED: Default prompt missing standard style 'atraente'.");
   }
   if (defaultPrompt !== SYSTEM_PROMPT_EDITORIAL) {
@@ -38,10 +38,10 @@ async function main() {
   if (!prompt1.includes("portal de notícias de Política")) {
     throw new Error("FAILED: Custom prompt did not inject 'Política' area.");
   }
-  if (!prompt1.includes("totalmente autoral, sério, analítico, informativo,")) {
+  if (!prompt1.includes("sério, analítico, informativo")) {
     throw new Error("FAILED: Custom prompt did not inject styles 'sério, analítico, informativo'.");
   }
-  if (!prompt1.includes("1. Relevância: Avalie se a notícia é relevante para um portal de Política.")) {
+  if (!prompt1.includes("Avalie se a notícia possui relação real com um portal de Política.")) {
     throw new Error("FAILED: Custom prompt guideline 1 missing 'Política'.");
   }
   console.log("✓ buildSystemPrompt(customSettings) correctly injects area and multiple styles.");

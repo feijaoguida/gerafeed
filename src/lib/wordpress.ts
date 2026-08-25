@@ -3,7 +3,9 @@ import path from "path";
 import { prisma } from "@/lib/prisma";
 import { getConfig, DEFAULT_WORKSPACE_ID } from "@/lib/config";
 import { decrypt } from "@/lib/crypto";
-import { getWordPressSiteConfig } from "@/lib/wordpress-sites";
+import { getWordPressSiteConfig, getWordPressSites } from "@/lib/wordpress-sites";
+import { ArticlePlacementService } from "@/lib/affiliate/placement-service";
+import { CanonicalDocumentService } from "@/lib/affiliate/canonical-document";
 
 export interface WpCategory {
   id: number;
@@ -45,22 +47,24 @@ export async function getWordPressConfig(workspaceId: string = DEFAULT_WORKSPACE
     }
   }
 
-  // 2. Fallback to Environment Variables
-  const url = process.env.WORDPRESS_URL;
-  const username = process.env.WORDPRESS_USERNAME;
-  const applicationPassword = process.env.WORDPRESS_APPLICATION_PASSWORD;
+  // 2. Fallback to Environment Variables (Apenas para o tenant principal ou compatibilidade legada)
+  if (workspaceId === DEFAULT_WORKSPACE_ID) {
+    const url = process.env.WORDPRESS_URL;
+    const username = process.env.WORDPRESS_USERNAME;
+    const applicationPassword = process.env.WORDPRESS_APPLICATION_PASSWORD;
 
-  if (!url || !username || !applicationPassword) {
-    throw new Error(
-      "Configuração do WordPress não encontrada no banco de dados nem nas variáveis de ambiente."
-    );
+    if (url && username && applicationPassword) {
+      return {
+        url: url.replace(/\/+$/, ""),
+        username,
+        applicationPassword,
+      };
+    }
   }
 
-  return {
-    url: url.replace(/\/+$/, ""),
-    username,
-    applicationPassword,
-  };
+  throw new Error("Configuração do WordPress não encontrada para esta Empresa.");
+
+
 }
 
 
@@ -217,9 +221,18 @@ export async function testWordPressConnection(
 
   if (!res.ok) {
     const errorText = await res.text().catch(() => "");
-    throw new Error(
-      `Falha na conexão com o WordPress (${res.status} ${res.statusText}): ${errorText.substring(0, 200)}`
-    );
+    console.error(`Erro detalhado do WordPress [${res.status} ${res.statusText}]:`, errorText.substring(0, 500));
+    
+    let userFriendlyMessage = "Erro desconhecido ao tentar acessar a API do WordPress.";
+    if (res.status === 401) {
+      userFriendlyMessage = "Credenciais incorretas ou o servidor está bloqueando a autenticação. Verifique o Usuário e a Senha de Aplicativo. Em alguns servidores, pode ser necessário habilitar o cabeçalho Authorization no arquivo .htaccess.";
+    } else if (res.status === 404) {
+      userFriendlyMessage = "A API REST do WordPress não foi encontrada. Verifique se a URL do site está correta e não possui redirecionamentos inesperados.";
+    } else if (res.status === 403) {
+      userFriendlyMessage = "Acesso negado. Um plugin de segurança (ex: Wordfence, iThemes) ou o firewall do servidor pode estar bloqueando o acesso à API REST.";
+    }
+    
+    throw new Error(`Falha na conexão com o WordPress (${res.status}): ${userFriendlyMessage}`);
   }
 
   const user = await res.json();
@@ -238,9 +251,16 @@ export async function testWordPressConnection(
  * Fetches all categories directly from WordPress REST API (/wp-json/wp/v2/categories).
  */
 export async function fetchWordPressCategories(
-  workspaceId: string = DEFAULT_WORKSPACE_ID
+  workspaceId: string = DEFAULT_WORKSPACE_ID,
+  siteId?: string
 ): Promise<WpCategory[]> {
-  const config = await getWordPressConfig(workspaceId);
+  let config;
+  if (siteId) {
+    config = await getWordPressSiteConfig(workspaceId, siteId);
+    if (!config) throw new Error(`Configuração do site WordPress ${siteId} não encontrada.`);
+  } else {
+    config = await getWordPressConfig(workspaceId);
+  }
   const headers = getAuthHeaders(config);
 
   const allCategories: WpCategory[] = [];
@@ -281,33 +301,67 @@ export async function fetchWordPressCategories(
 
 /**
  * Syncs WordPress categories into Prisma DB for a specific workspace.
+ * Iterates through all active WordPress sites for the workspace.
  */
 export async function syncWordPressCategories(
   workspaceId: string = DEFAULT_WORKSPACE_ID
 ) {
-  const categories = await fetchWordPressCategories(workspaceId);
+  const sites = await getWordPressSites(workspaceId, { activeOnly: true });
+
+  if (sites.length === 0) {
+    // If it's the default workspace, we might still want to try the legacy global fallback
+    if (workspaceId === DEFAULT_WORKSPACE_ID) {
+      try {
+        const categories = await fetchWordPressCategories(workspaceId);
+        const synced = [];
+        for (const cat of categories) {
+          const upserted = await prisma.wordPressCategory.upsert({
+            where: {
+              workspaceId_wordpressId: { workspaceId, wordpressId: cat.id },
+            },
+            update: { name: cat.name, slug: cat.slug },
+            create: { workspaceId, wordpressId: cat.id, name: cat.name, slug: cat.slug },
+          });
+          synced.push(upserted);
+        }
+        return { success: true, syncedCount: synced.length, categories: synced };
+      } catch (err) {
+        throw new Error("Configuração do WordPress não encontrada para esta Empresa.");
+      }
+    }
+    throw new Error("Configuração do WordPress não encontrada para esta Empresa.");
+  }
 
   const synced = [];
-  for (const cat of categories) {
-    const upserted = await prisma.wordPressCategory.upsert({
-      where: {
-        workspaceId_wordpressId: {
-          workspaceId,
-          wordpressId: cat.id,
-        },
-      },
-      update: {
-        name: cat.name,
-        slug: cat.slug,
-      },
-      create: {
-        workspaceId,
-        wordpressId: cat.id,
-        name: cat.name,
-        slug: cat.slug,
-      },
-    });
-    synced.push(upserted);
+  for (const site of sites) {
+    try {
+      const categories = await fetchWordPressCategories(workspaceId, site.id);
+      for (const cat of categories) {
+        const upserted = await prisma.wordPressCategory.upsert({
+          where: {
+            workspaceId_wordpressId: {
+              workspaceId,
+              wordpressId: cat.id,
+            },
+          },
+          update: {
+            name: cat.name,
+            slug: cat.slug,
+            wordpressSiteId: site.id,
+          },
+          create: {
+            workspaceId,
+            wordpressSiteId: site.id,
+            wordpressId: cat.id,
+            name: cat.name,
+            slug: cat.slug,
+          },
+        });
+        synced.push(upserted);
+      }
+    } catch (err) {
+      console.warn(`Erro ao sincronizar categorias do site ${site.id}:`, err);
+    }
   }
 
   return {
@@ -335,6 +389,15 @@ export async function publishArticleToWordPress(
       category: true,
       suggestedCategory: true,
       source: true,
+      affiliatePlacements: {
+        include: {
+          product: {
+            include: { category: true },
+          },
+          offer: true,
+        },
+        orderBy: [{ position: "asc" }, { createdAt: "asc" }],
+      },
     },
   });
 
@@ -359,20 +422,67 @@ export async function publishArticleToWordPress(
   if (article.wordpressSiteId) {
     const siteConfig = await getWordPressSiteConfig(article.workspaceId, article.wordpressSiteId);
     if (!siteConfig) {
-      throw new Error(`Configuração do site WordPress ${article.wordpressSiteId} não encontrada.`);
+      throw new Error(`Configuração do site WordPress não encontrada.`);
     }
     config = siteConfig;
   } else {
-    config = await getWordPressConfig(article.workspaceId);
+    try {
+      config = await getWordPressConfig(article.workspaceId);
+    } catch (err) {
+      const sites = await getWordPressSites(article.workspaceId, { activeOnly: true });
+      if (sites.length > 0) {
+        const siteConfig = await getWordPressSiteConfig(article.workspaceId, sites[0].id);
+        if (!siteConfig) throw new Error("Configuração do WordPress não encontrada.");
+        config = siteConfig;
+        
+        // Autocorrect article in background
+        prisma.article.update({
+          where: { id: articleId },
+          data: { wordpressSiteId: sites[0].id }
+        }).catch(() => {});
+      } else {
+        throw new Error("Configuração do WordPress não encontrada para esta Empresa. Configure em Configurações > WordPress.");
+      }
+    }
   }
 
   const headers = getAuthHeaders(config);
 
-  // 1. Resolve source credit attribution
-  let finalContent = article.content.trim();
-  const creditName = article.source?.creditName || article.source?.name;
-  if (creditName && !finalContent.toLowerCase().includes("fonte:")) {
-    finalContent += `<br><br><p><em>Fonte: ${creditName}</em></p>`;
+  // 1. Resolve content: Commercial Canonical Document OR RSS with Source Credit & Placements
+  let finalContent = "";
+
+  if (article.commercialType && article.canonicalContent) {
+    const canonicalDoc = CanonicalDocumentService.parse(article.canonicalContent);
+    const referencedProductIds = CanonicalDocumentService.extractReferencedProductIds(canonicalDoc);
+    const products = await prisma.product.findMany({
+      where: {
+        id: { in: referencedProductIds },
+        workspaceId: article.workspaceId,
+      },
+      include: {
+        offers: {
+          where: { status: "ACTIVE" },
+          orderBy: { price: "asc" },
+        },
+      },
+    });
+
+    finalContent = CanonicalDocumentService.renderToHtml(canonicalDoc, products);
+  } else {
+    finalContent = (article.content || "").trim();
+
+    // Inject active affiliate product placements if present
+    if (article.affiliatePlacements && article.affiliatePlacements.length > 0) {
+      finalContent = ArticlePlacementService.renderPlacementsInHtml(
+        finalContent,
+        article.affiliatePlacements
+      );
+    }
+
+    const creditName = article.source?.creditName || article.source?.name;
+    if (creditName && !finalContent.toLowerCase().includes("fonte:")) {
+      finalContent += `<br><br><p><em>Fonte: ${creditName}</em></p>`;
+    }
   }
 
   // 2. Resolve selected featured media image

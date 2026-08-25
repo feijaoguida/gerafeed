@@ -1,20 +1,34 @@
 import {
   CreateCustomerParams,
   CustomerResult,
+  CustomerDTO,
   CreateSubscriptionParams,
   SubscriptionResult,
   CheckoutParams,
   WebhookEventResult,
   PaymentProviderType,
+  PaymentProviderCapabilities,
 } from "./types";
 
 export interface PaymentGateway {
   readonly provider: PaymentProviderType;
+  readonly capabilities: PaymentProviderCapabilities;
 
   /**
    * Creates or resolves a customer in the payment gateway.
    */
   createCustomer(params: CreateCustomerParams): Promise<CustomerResult>;
+
+  /**
+   * Idempotent method: recovers/updates existing customer or creates a new one,
+   * associating externalReference (workspaceId) and avoiding duplicates.
+   */
+  ensureCustomer(params: CreateCustomerParams): Promise<CustomerResult>;
+
+  /**
+   * Retrieves a normalized customer DTO by customerId.
+   */
+  getCustomer(customerId: string): Promise<CustomerDTO | null>;
 
   /**
    * Creates a recurring subscription in the payment gateway.

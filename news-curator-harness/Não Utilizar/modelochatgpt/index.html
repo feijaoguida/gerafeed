@@ -1,0 +1,263 @@
+<!doctype html>
+<html lang="pt-BR" data-theme="dark">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>GeraFeed • Painel Editorial & IA</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div class="brand-row">
+        <div class="brand-icon">▣</div>
+        <div>
+          <strong>GeraFeed</strong>
+          <span>Painel Editorial & IA</span>
+        </div>
+        <button class="icon-btn theme-toggle" aria-label="Alternar tema">☀</button>
+      </div>
+
+      <nav class="nav">
+        <button class="nav-item active" data-view="dashboard"><span>⌘</span> Dashboard</button>
+        <button class="nav-item" data-view="publish"><span>✈</span> Publicar Posts</button>
+
+        <div class="nav-label">NOTÍCIAS</div>
+        <button class="nav-item sub" data-view="publish"><span class="dot amber">◷</span> Pendentes</button>
+        <button class="nav-item sub"><span class="dot green">✓</span> Publicadas</button>
+        <button class="nav-item sub"><span class="dot red">×</span> Rejeitadas</button>
+
+        <div class="nav-label row-between">
+          <span>AFILIADOS</span><span class="pill warning">PRO</span>
+        </div>
+        <button class="nav-item sub"><span>▣</span> Módulo Afiliados <span class="upgrade-inline">Upgrade</span></button>
+
+        <div class="nav-label">CONFIGURAÇÕES</div>
+        <button class="nav-item sub" data-view="billing"><span>▱</span> Plano & Cobrança</button>
+        <button class="nav-item sub"><span>◔</span> Fontes RSS</button>
+        <button class="nav-item sub"><span>◎</span> WordPress</button>
+        <button class="nav-item sub"><span>✣</span> Inteligência Artificial</button>
+        <button class="nav-item sub"><span>▧</span> Estratégia de Imagens</button>
+      </nav>
+
+      <div class="sidebar-footer">
+        <button class="mode-card theme-toggle">
+          <span>☀</span><strong>Modo Escuro</strong><span class="mode-badge">DARK</span>
+        </button>
+        <button class="logout">↪ Sair do Sistema</button>
+
+        <div class="plan-mini">
+          <div class="plan-mini-head">
+            <span><b>ϟ</b> Plano Gratuito</span><span class="status-pill">Ativo</span>
+          </div>
+          <div class="mini-metric"><span>Posts gerados</span><b>0 / 50</b></div>
+          <div class="progress"><i style="width:0%"></i></div>
+          <div class="mini-user">
+            <div class="avatar">N</div>
+            <span>Plano: Vitalício</span>
+            <a href="#" data-view="billing">Upgrade ↗</a>
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <main class="content">
+      <section id="view-dashboard" class="view active-view">
+        <header class="topbar">
+          <div>
+            <h1>Visão Geral & Indicadores</h1>
+            <p>Acompanhe o desempenho editorial, catálogo comercial de afiliados e consumo do plano em tempo real.</p>
+          </div>
+          <div class="top-actions">
+            <button class="btn secondary">◇ Catálogo Afiliados</button>
+            <button class="btn secondary">◔ Gerenciar Feeds</button>
+            <button class="btn primary">ϟ Planos & Limites</button>
+          </div>
+        </header>
+
+        <div class="stats-grid">
+          <article class="card stat-card">
+            <div class="stat-head"><span>ARTIGOS PENDENTES</span><span class="square amber-bg">◷</span></div>
+            <div class="stat-value">0 <small>aguardando revisão</small></div>
+            <div class="stat-note green-text">✓ Fila de revisão em dia</div>
+          </article>
+
+          <article class="card stat-card">
+            <div class="stat-head"><span>PUBLICADOS NO PORTAL</span><span class="square green-bg">✓</span></div>
+            <div class="stat-value">0 <small>artigos publicados</small></div>
+            <div class="stat-note cyan-text">⌁ Conteúdo monetizado ativo</div>
+          </article>
+
+          <article class="card stat-card">
+            <div class="stat-head"><span>CATÁLOGO AFILIADOS</span><span class="square blue-bg">◇</span></div>
+            <div class="stat-value">0 <small>produtos (0 ofertas)</small></div>
+            <a class="link" href="#">Acessar catálogo →</a>
+          </article>
+
+          <article class="card stat-card">
+            <div class="stat-head"><span>CLIQUES AFILIADOS</span><span class="square purple-bg">✣</span></div>
+            <div class="stat-value">0 <small>cliques rastreados</small></div>
+            <a class="link purple-text" href="#">Ver analytics detalhado →</a>
+          </article>
+        </div>
+
+        <div class="dashboard-mid">
+          <article class="card limits-card">
+            <div class="section-title row-between">
+              <div>
+                <h2><span class="amber-text">ϟ</span> Consumo e Limites do Plano</h2>
+                <p>Plano Atual: <b>Plano Gratuito</b> · Status: <span class="green-text">Ativo</span></p>
+              </div>
+              <a class="link" href="#" data-view="billing">Fazer Upgrade</a>
+            </div>
+            <div class="divider"></div>
+            <div class="limits-grid">
+              <div class="limit-box">
+                <div class="row-between"><strong>Artigos por Dia (Hoje)</strong><span>0 / 5</span></div>
+                <div class="progress"><i style="width:0%"></i></div>
+                <div class="row-between muted"><span>5 restantes hoje</span><span>0%</span></div>
+              </div>
+              <div class="limit-box">
+                <div class="row-between"><strong>Artigos no Mês</strong><span>0 / 50</span></div>
+                <div class="progress"><i style="width:0%"></i></div>
+                <div class="row-between muted"><span>50 restantes no ciclo</span><span>0%</span></div>
+              </div>
+              <div class="limit-box">
+                <div class="row-between"><strong>Sites WordPress Conectados</strong><span>0 / 1</span></div>
+                <div class="progress"><i style="width:0%"></i></div>
+                <div class="row-between muted"><span>1 slots livres</span><span>0%</span></div>
+              </div>
+              <div class="limit-box">
+                <div class="row-between"><strong>Fontes RSS Ativas</strong><span>0 / 3</span></div>
+                <div class="progress"><i style="width:0%"></i></div>
+                <div class="row-between muted"><span>3 fontes disponíveis</span><span>0%</span></div>
+              </div>
+            </div>
+          </article>
+
+          <article class="card integrations-card">
+            <div class="section-title">
+              <h2><span class="blue-text">◎</span> Destinos & Integrações</h2>
+              <p>Conecte novos portais WordPress e gerencie o motor de publicação multicanal.</p>
+            </div>
+            <div class="integration-row">
+              <div><span>◎</span><div><b>WordPress</b><small>0 site(s) conectado(s)</small></div></div><span>↗</span>
+            </div>
+            <div class="integration-row">
+              <div><span>◔</span><div><b>Feeds RSS</b><small>0 fonte(s) ativa(s)</small></div></div><span>↗</span>
+            </div>
+            <div class="divider"></div>
+            <button class="btn wide">▣ Ver Fila de Publicação</button>
+          </article>
+        </div>
+
+        <div class="feature-grid">
+          <article class="card feature-card">
+            <h3><span class="blue-text">✣</span> Motor de Conteúdo Afiliado (Fase 12)</h3>
+            <p>Gere reviews completos, tabelas comparativas e guias de compra estruturados com grounding inteligente no catálogo de produtos importados.</p>
+            <div class="feature-links"><a href="#">Explorar Catálogo →</a><span>•</span><a href="#">Importar Mercado Livre →</a></div>
+          </article>
+          <article class="card feature-card">
+            <h3><span class="purple-text">▱</span> Central de Publicação (Fase 18)</h3>
+            <p>Área unificada para publicação de notícias RSS e conteúdo comercial de afiliados, com inserção automática de produtos e categorização inteligente.</p>
+            <a class="purple-text" href="#" data-view="publish">Acessar Fila de Artigos →</a>
+          </article>
+        </div>
+      </section>
+
+      <section id="view-publish" class="view">
+        <div class="narrow-page">
+          <div class="crumb">▱ Central de Publicação / <span>Fluxo Noticioso</span></div>
+          <div class="page-heading row-between align-start">
+            <div>
+              <h1><span class="amber-text">▣</span> Publicação de Notícias & Curadoria RSS</h1>
+              <p>Filtre por destino WordPress e feeds de origem, processe reescritas com IA e revise antes de publicar.</p>
+            </div>
+            <div class="top-actions">
+              <button class="btn secondary">↻ Sincronizar Categorias</button>
+              <button class="btn orange">⟳ Buscar Novas Notícias nos Feeds</button>
+            </div>
+          </div>
+          <div class="divider"></div>
+
+          <article class="card filters-card">
+            <h3>▽ FILTROS DE PUBLICAÇÃO & DESTINO</h3>
+            <div class="filters-grid">
+              <label>Status da Notícia<select><option>Pendentes de Revisão</option></select></label>
+              <label>Destino WordPress<select><option>Todos os Portais</option></select></label>
+              <label>Feed RSS de Origem<select><option>Todos os Feeds</option></select></label>
+              <label>Data Inicial<input type="date"></label>
+              <label>Data Final<input type="date"></label>
+            </div>
+          </article>
+
+          <article class="card empty-state">
+            <div class="empty-icon">▤</div>
+            <h2>Nenhuma notícia encontrada</h2>
+            <p>Não há artigos correspondentes aos filtros selecionados. Clique em “Buscar Novas Notícias nos Feeds” para atualizar a fila de curadoria.</p>
+          </article>
+        </div>
+      </section>
+
+      <section id="view-billing" class="view">
+        <div class="narrow-page billing-page">
+          <div class="page-heading">
+            <h1><span class="blue-text">▱</span> Plano & Cobrança</h1>
+            <p>Gerencie seu plano ativo, consumo mensal de IA e atualize os dados cadastrais de faturamento do seu Workspace.</p>
+          </div>
+
+          <article class="card active-plan-card">
+            <div class="row-between align-start">
+              <div>
+                <span class="eyebrow amber-text">PLANO ATIVO DO WORKSPACE</span>
+                <h2>Plano Gratuito <span class="status-pill">ACTIVE</span></h2>
+              </div>
+              <div class="price">R$ 0,00 <small>/mês</small></div>
+            </div>
+            <div class="divider"></div>
+            <div class="plan-metrics">
+              <div><span>Artigos IA / Mês:</span><strong>0</strong><small>/ 50</small></div>
+              <div><span>Fontes RSS Ativas:</span><strong>0</strong><small>/ 3</small></div>
+              <div><span>Sites WordPress:</span><strong>0</strong><small>/ 1</small></div>
+            </div>
+          </article>
+
+          <article class="card billing-form-card">
+            <div class="row-between">
+              <div>
+                <h2><span class="blue-text">♙</span> Dados Cadastrais de Cobrança</h2>
+                <p>Informações necessárias para emissão de faturas e identificação junto ao gateway de pagamento.</p>
+              </div>
+              <span class="secure-pill">◉ PII Protegido & Sem Cartão</span>
+            </div>
+            <div class="divider"></div>
+
+            <form class="billing-form">
+              <label>Nome Completo ou Razão Social *<input placeholder="Ex: ACME Notícias Ltda."></label>
+              <label>CPF ou CNPJ *<input placeholder="000.000.000-00 ou 00.000.000/0001-00"></label>
+              <label>E-mail de Faturamento *<input type="email" placeholder="financeiro@empresa.com"></label>
+              <label>Telefone / Celular<input placeholder="(11) 99999-9999"></label>
+
+              <div class="form-section-title">⌖ ENDEREÇO DE FATURAMENTO</div>
+              <label>CEP<input placeholder="00000-000"></label>
+              <label class="span-3">Logradouro / Endereço<input placeholder="Av. Paulista"></label>
+              <label>Número<input placeholder="1000"></label>
+              <label>Complemento<input placeholder="Sala 12"></label>
+              <label>Bairro<input placeholder="Bela Vista"></label>
+              <label>Cidade<input placeholder="São Paulo"></label>
+              <label>UF<input placeholder="SP"></label>
+
+              <div class="form-actions span-all"><button type="button" class="btn primary">▣ Salvar Dados Cadastrais</button></div>
+            </form>
+          </article>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

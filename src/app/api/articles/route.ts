@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { ArticleStatus, Prisma } from "@prisma/client";
 import { getSessionWorkspaceId } from "@/lib/workspace";
+import { CommercialArticleType } from "@/lib/affiliate";
+
 
 export async function GET(request: Request) {
   try {
@@ -11,6 +13,8 @@ export async function GET(request: Request) {
     const statusParam = searchParams.get("status");
     const sourceIdParam = searchParams.get("sourceId") || searchParams.get("feed");
     const wordpressSiteIdParam = searchParams.get("wordpressSiteId") || searchParams.get("wordpress");
+    const commercialTypeParam = searchParams.get("commercialType");
+    const isAffiliateParam = searchParams.get("isAffiliate");
     const startDateParam = searchParams.get("startDate");
     const endDateParam = searchParams.get("endDate");
 
@@ -21,6 +25,15 @@ export async function GET(request: Request) {
     // Filter by Status
     if (statusParam && ["PENDING", "PUBLISHED", "REJECTED"].includes(statusParam.toUpperCase())) {
       whereClause.status = statusParam.toUpperCase() as ArticleStatus;
+    }
+
+    // Filter by Commercial / Affiliate Type
+    if (commercialTypeParam && commercialTypeParam.trim() && commercialTypeParam !== "ALL") {
+      whereClause.commercialType = commercialTypeParam.toUpperCase() as CommercialArticleType;
+    } else if (isAffiliateParam === "true") {
+      whereClause.commercialType = { not: null };
+    } else if (isAffiliateParam === "false") {
+      whereClause.commercialType = null;
     }
 
     // Filter by Feed / Source

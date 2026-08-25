@@ -61,7 +61,7 @@ async function main() {
     });
 
     const targetStyle = style === "Outro" ? "sarcástico" : style.toLowerCase();
-    if (!prompt.includes(`totalmente autoral, ${targetStyle},`)) {
+    if (!prompt.includes(targetStyle)) {
       throw new Error(`FAILED: Prompt generation failed for style '${style}'`);
     }
   }

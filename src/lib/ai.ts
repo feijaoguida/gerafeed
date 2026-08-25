@@ -3,6 +3,7 @@ import { getConfig } from "@/lib/config";
 import { PromptSettings } from "./ai/types";
 import { getActiveAIProvider } from "./ai/service";
 import { processAndStoreImage } from "./imageProcessor";
+import { scrapeArticleContent } from "@/lib/scraper";
 
 export * from "./ai/index";
 
@@ -40,6 +41,23 @@ export async function processArticleWithAi(
 
   const effectiveWorkspaceId = workspaceId || article.workspaceId;
 
+  // If originalContent is not yet cached on the article, try scraping it now
+  let originalContent = article.originalContent;
+  if (!originalContent && article.originalUrl) {
+    try {
+      const scraped = await scrapeArticleContent(article.originalUrl);
+      if (scraped) {
+        originalContent = scraped;
+        await prisma.article.update({
+          where: { id: articleId },
+          data: { originalContent: scraped },
+        });
+      }
+    } catch (err) {
+      console.warn(`[AI Process] Falha ao extrair conteúdo da URL ${article.originalUrl}:`, err);
+    }
+  }
+
   const categories = await prisma.wordPressCategory.findMany({
     where: { workspaceId: effectiveWorkspaceId },
     select: { id: true, name: true, slug: true },
@@ -53,8 +71,9 @@ export async function processArticleWithAi(
 
   const provider = await getActiveAIProvider(undefined, effectiveWorkspaceId);
   const aiResult = await provider.generateArticle({
-    originalTitle: article.originalTitle,
+    originalTitle: article.originalTitle || article.title || "",
     originalDescription: article.originalDescription,
+    originalContent,
     categories,
     promptSettings,
   });
@@ -79,6 +98,31 @@ export async function processArticleWithAi(
     if (processedUrl) {
       modifiedImageUrl = processedUrl;
     }
+  }
+
+  // If AI determined article is NOT relevant for the portal area or returned empty text
+  if (!aiResult.relevant || aiResult.score < 6 || !aiResult.title?.trim() || !aiResult.content?.trim()) {
+    const updatedArticle = await prisma.article.update({
+      where: { id: articleId },
+      data: {
+        aiScore: aiResult.score,
+        processedAt: new Date(),
+      },
+    });
+
+    const portalAreaName =
+      promptSettings?.portalArea === "Outro" && promptSettings?.customPortalArea?.trim()
+        ? promptSettings.customPortalArea.trim()
+        : promptSettings?.portalArea?.trim() || "tecnologia e negócios";
+
+    return {
+      success: false,
+      notRelevant: true,
+      score: aiResult.score,
+      message: `A IA classificou esta notícia como irrelevante (Score: ${aiResult.score}/10) para a área de atuação do portal (${portalAreaName}). Nenhum campo foi alterado.`,
+      article: updatedArticle,
+      aiResult,
+    };
   }
 
   const updatedArticle = await prisma.article.update({

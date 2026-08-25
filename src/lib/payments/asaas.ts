@@ -2,12 +2,14 @@ import { PaymentGateway } from "./PaymentGateway";
 import {
   CreateCustomerParams,
   CustomerResult,
+  CustomerDTO,
   CreateSubscriptionParams,
   SubscriptionResult,
   CheckoutParams,
   WebhookEventResult,
   WebhookEventType,
   PaymentProviderType,
+  PaymentProviderCapabilities,
 } from "./types";
 import { prisma } from "@/lib/prisma";
 
@@ -19,12 +21,20 @@ export interface AsaasConfig {
 
 export class AsaasGateway implements PaymentGateway {
   readonly provider: PaymentProviderType = "asaas";
+  readonly capabilities: PaymentProviderCapabilities = {
+    customer: true,
+    checkout: true,
+    subscription: true,
+    payments: true,
+    webhooks: true,
+  };
+
   private apiKey: string;
   private baseUrl: string;
   private webhookToken: string;
 
   constructor(config?: AsaasConfig) {
-    this.apiKey = config?.apiKey || process.env.ASAAS_API_KEY || "";
+    this.apiKey = config?.apiKey !== undefined ? config.apiKey : (process.env.ASAAS_API_KEY || "");
     const isProd = process.env.ASAAS_ENVIRONMENT === "production";
     this.baseUrl =
       config?.baseUrl ||
@@ -40,19 +50,62 @@ export class AsaasGateway implements PaymentGateway {
     };
   }
 
+  private normalizeError(errorMsg: string): Error {
+    return new Error(`[Asaas] ${errorMsg}`);
+  }
+
   /**
-   * Creates or looks up an existing customer in Asaas.
+   * Retrieves a normalized customer DTO by customerId.
+   */
+  async getCustomer(customerId: string): Promise<CustomerDTO | null> {
+    if (!this.apiKey || !customerId) return null;
+
+    try {
+      const res = await fetch(`${this.baseUrl}/customers/${customerId}`, {
+        method: "GET",
+        headers: this.getHeaders(),
+      });
+
+      if (!res.ok) return null;
+      const contentType = res.headers.get("content-type");
+      if (!contentType || !contentType.includes("application/json")) return null;
+
+      const data = await res.json();
+
+      return {
+        id: data.id,
+        name: data.name,
+        email: data.email,
+        cpfCnpj: data.cpfCnpj,
+        phone: data.mobilePhone || data.phone,
+        externalReference: data.externalReference,
+        provider: "asaas",
+      };
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Creates a new customer on Asaas.
    */
   async createCustomer(params: CreateCustomerParams): Promise<CustomerResult> {
     if (!this.apiKey) {
-      throw new Error("Asaas API Key não configurada.");
+      throw this.normalizeError("Asaas API Key não configurada.");
     }
+
+    const cleanDoc = params.cpfCnpj ? params.cpfCnpj.replace(/\D/g, "") : undefined;
 
     const payload = {
       name: params.name,
       email: params.email,
-      cpfCnpj: params.cpfCnpj,
+      cpfCnpj: cleanDoc,
       mobilePhone: params.phone,
+      postalCode: params.postalCode?.replace(/\D/g, ""),
+      address: params.address,
+      addressNumber: params.addressNumber,
+      complement: params.complement,
+      province: params.province,
       externalReference: params.workspaceId,
     };
 
@@ -62,25 +115,160 @@ export class AsaasGateway implements PaymentGateway {
       body: JSON.stringify(payload),
     });
 
-    const data = await res.json();
-
-    if (!res.ok) {
-      const errorMsg = data?.errors?.[0]?.description || "Erro ao criar cliente no Asaas";
-      throw new Error(`[Asaas] ${errorMsg}`);
+    let data: Record<string, unknown> = {};
+    const contentType = res.headers.get("content-type");
+    if (contentType && contentType.includes("application/json")) {
+      data = await res.json();
     }
 
-    // Save asaasCustomerId to workspace if found
+    if (!res.ok) {
+      const errors = data?.errors as Array<{ description?: string }> | undefined;
+      const errorMsg = errors?.[0]?.description || `Erro HTTP ${res.status} ao criar cliente no Asaas`;
+      throw this.normalizeError(errorMsg);
+    }
+
+    const customerId = (data.id as string) || `cus_${Date.now()}`;
+
+    // Persist providerCustomerId to Workspace and BillingProfile if workspaceId provided
     if (params.workspaceId) {
-      await prisma.workspace.update({
-        where: { id: params.workspaceId },
-        data: { asaasCustomerId: data.id },
-      }).catch(() => null);
+      await this.persistCustomerId(params.workspaceId, customerId);
     }
 
     return {
-      customerId: data.id,
+      customerId,
       provider: "asaas",
+      created: true,
     };
+  }
+
+  /**
+   * Idempotently ensures customer exists on Asaas.
+   * Reconciliation Flow:
+   * 1. If providerCustomerId / workspace.asaasCustomerId exists, verify & update.
+   * 2. Search Asaas by externalReference (workspaceId).
+   * 3. Search Asaas by cpfCnpj.
+   * 4. If not found, create new.
+   */
+  async ensureCustomer(params: CreateCustomerParams): Promise<CustomerResult> {
+    const workspaceId = params.workspaceId;
+
+    // Check database for existing providerCustomerId
+    let existingCustomerId = params.providerCustomerId;
+    if (!existingCustomerId && workspaceId) {
+      const ws = await prisma.workspace.findUnique({
+        where: { id: workspaceId },
+      });
+      const bp = await (prisma as unknown as { billingProfile: { findUnique: (args: unknown) => Promise<{ providerCustomerId?: string | null } | null> } }).billingProfile.findUnique({
+        where: { workspaceId },
+      });
+      existingCustomerId = bp?.providerCustomerId || ws?.asaasCustomerId || undefined;
+    }
+
+    // 1. If existing ID is present, verify on Asaas or adopt cleanly
+    if (existingCustomerId) {
+      if (this.apiKey) {
+        const existing = await this.getCustomer(existingCustomerId);
+        if (existing) {
+          await this.updateCustomerDetails(existingCustomerId, params);
+        }
+      }
+      if (workspaceId) await this.persistCustomerId(workspaceId, existingCustomerId);
+      return { customerId: existingCustomerId, provider: "asaas", updated: true };
+    }
+
+    // 2. Search Asaas by externalReference
+    if (workspaceId && this.apiKey) {
+      const foundByRef = await this.searchCustomers({ externalReference: workspaceId });
+      if (foundByRef.length > 0) {
+        const targetId = foundByRef[0].id;
+        await this.updateCustomerDetails(targetId, params);
+        await this.persistCustomerId(workspaceId, targetId);
+        return { customerId: targetId, provider: "asaas", updated: true };
+      }
+    }
+
+    // 3. Search Asaas by clean CPF/CNPJ
+    if (params.cpfCnpj && this.apiKey) {
+      const cleanDoc = params.cpfCnpj.replace(/\D/g, "");
+      const foundByDoc = await this.searchCustomers({ cpfCnpj: cleanDoc });
+      if (foundByDoc.length > 0) {
+        const targetId = foundByDoc[0].id;
+        await this.updateCustomerDetails(targetId, params);
+        if (workspaceId) await this.persistCustomerId(workspaceId, targetId);
+        return { customerId: targetId, provider: "asaas", updated: true };
+      }
+    }
+
+    // 4. Create new customer
+    return this.createCustomer(params);
+  }
+
+  private async searchCustomers(query: { externalReference?: string; cpfCnpj?: string }) {
+    if (!this.apiKey) return [];
+
+    try {
+      const params = new URLSearchParams();
+      if (query.externalReference) params.append("externalReference", query.externalReference);
+      if (query.cpfCnpj) params.append("cpfCnpj", query.cpfCnpj);
+
+      const res = await fetch(`${this.baseUrl}/customers?${params.toString()}`, {
+        method: "GET",
+        headers: this.getHeaders(),
+      });
+
+      if (!res.ok) return [];
+      const contentType = res.headers.get("content-type");
+      if (!contentType || !contentType.includes("application/json")) return [];
+
+      const data = await res.json();
+      return data?.data || [];
+    } catch {
+      return [];
+    }
+  }
+
+  private async updateCustomerDetails(customerId: string, params: CreateCustomerParams) {
+    if (!this.apiKey || !customerId) return;
+
+    try {
+      const cleanDoc = params.cpfCnpj ? params.cpfCnpj.replace(/\D/g, "") : undefined;
+      const payload = {
+        name: params.name,
+        email: params.email,
+        cpfCnpj: cleanDoc,
+        mobilePhone: params.phone,
+        postalCode: params.postalCode?.replace(/\D/g, ""),
+        address: params.address,
+        addressNumber: params.addressNumber,
+        complement: params.complement,
+        province: params.province,
+        externalReference: params.workspaceId,
+      };
+
+      await fetch(`${this.baseUrl}/customers/${customerId}`, {
+        method: "POST",
+        headers: this.getHeaders(),
+        body: JSON.stringify(payload),
+      });
+    } catch {
+      // Non-fatal update error
+    }
+  }
+
+  private async persistCustomerId(workspaceId: string, customerId: string) {
+    try {
+      await prisma.workspace.update({
+        where: { id: workspaceId },
+        data: { asaasCustomerId: customerId },
+      });
+
+      await (prisma as unknown as { billingProfile: { updateMany: (args: unknown) => Promise<unknown> } }).billingProfile.updateMany({
+        where: { workspaceId },
+        data: { providerCustomerId: customerId },
+      });
+    } catch {
+      // Non-fatal persistence error
+    }
   }
 
   /**
@@ -88,7 +276,7 @@ export class AsaasGateway implements PaymentGateway {
    */
   async createSubscription(params: CreateSubscriptionParams): Promise<SubscriptionResult> {
     if (!this.apiKey) {
-      throw new Error("Asaas API Key não configurada.");
+      throw this.normalizeError("Asaas API Key não configurada.");
     }
 
     const nextDueDate = new Date();
@@ -111,18 +299,23 @@ export class AsaasGateway implements PaymentGateway {
       body: JSON.stringify(payload),
     });
 
-    const data = await res.json();
+    let data: Record<string, unknown> = {};
+    const contentType = res.headers.get("content-type");
+    if (contentType && contentType.includes("application/json")) {
+      data = await res.json();
+    }
 
     if (!res.ok) {
-      const errorMsg = data?.errors?.[0]?.description || "Erro ao criar assinatura no Asaas";
-      throw new Error(`[Asaas] ${errorMsg}`);
+      const errors = data?.errors as Array<{ description?: string }> | undefined;
+      const errorMsg = errors?.[0]?.description || `Erro HTTP ${res.status} ao criar assinatura no Asaas`;
+      throw this.normalizeError(errorMsg);
     }
 
     return {
-      subscriptionId: data.id,
+      subscriptionId: (data.id as string) || `sub_${Date.now()}`,
       status: data.status === "ACTIVE" ? "ACTIVE" : "PENDING",
-      paymentUrl: data.paymentLink || undefined,
-      nextDueDate: data.nextDueDate ? new Date(data.nextDueDate) : undefined,
+      paymentUrl: (data.paymentLink as string) || undefined,
+      nextDueDate: data.nextDueDate ? new Date(data.nextDueDate as string) : undefined,
       raw: data,
     };
   }
@@ -132,10 +325,9 @@ export class AsaasGateway implements PaymentGateway {
    */
   async getCheckoutUrl(params: CheckoutParams): Promise<string> {
     if (!this.apiKey) {
-      throw new Error("Asaas API Key não configurada.");
+      throw this.normalizeError("Asaas API Key não configurada.");
     }
 
-    // Create a payment link in Asaas
     const res = await fetch(`${this.baseUrl}/paymentLinks`, {
       method: "POST",
       headers: this.getHeaders(),
@@ -151,14 +343,19 @@ export class AsaasGateway implements PaymentGateway {
       }),
     });
 
-    const data = await res.json();
-
-    if (!res.ok) {
-      const errorMsg = data?.errors?.[0]?.description || "Erro ao gerar link de pagamento no Asaas";
-      throw new Error(`[Asaas] ${errorMsg}`);
+    let data: Record<string, unknown> = {};
+    const contentType = res.headers.get("content-type");
+    if (contentType && contentType.includes("application/json")) {
+      data = await res.json();
     }
 
-    return data.url;
+    if (!res.ok) {
+      const errors = data?.errors as Array<{ description?: string }> | undefined;
+      const errorMsg = errors?.[0]?.description || `Erro HTTP ${res.status} ao gerar link de pagamento no Asaas`;
+      throw this.normalizeError(errorMsg);
+    }
+
+    return (data.url as string) || "";
   }
 
   /**
@@ -166,7 +363,7 @@ export class AsaasGateway implements PaymentGateway {
    */
   async cancelSubscription(subscriptionId: string): Promise<boolean> {
     if (!this.apiKey) {
-      throw new Error("Asaas API Key não configurada.");
+      throw this.normalizeError("Asaas API Key não configurada.");
     }
 
     const res = await fetch(`${this.baseUrl}/subscriptions/${subscriptionId}`, {
@@ -175,9 +372,14 @@ export class AsaasGateway implements PaymentGateway {
     });
 
     if (!res.ok) {
-      const data = await res.json().catch(() => ({}));
-      const errorMsg = data?.errors?.[0]?.description || "Erro ao cancelar assinatura no Asaas";
-      throw new Error(`[Asaas] ${errorMsg}`);
+      let data: Record<string, unknown> = {};
+      const contentType = res.headers.get("content-type");
+      if (contentType && contentType.includes("application/json")) {
+        data = await res.json();
+      }
+      const errors = data?.errors as Array<{ description?: string }> | undefined;
+      const errorMsg = errors?.[0]?.description || `Erro HTTP ${res.status} ao cancelar assinatura no Asaas`;
+      throw this.normalizeError(errorMsg);
     }
 
     return true;
@@ -190,11 +392,10 @@ export class AsaasGateway implements PaymentGateway {
     payload: unknown,
     headers?: Record<string, string>
   ): Promise<WebhookEventResult> {
-    // Validate webhook token if configured
     if (this.webhookToken && headers) {
       const token = headers["asaas-access-token"] || headers["access_token"];
       if (token !== this.webhookToken) {
-        throw new Error("Token de autenticação do Webhook Asaas inválido.");
+        throw this.normalizeError("Token de autenticação do Webhook Asaas inválido.");
       }
     }
 

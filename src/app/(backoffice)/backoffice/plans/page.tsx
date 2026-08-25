@@ -1,7 +1,10 @@
 import { prisma } from "@/lib/prisma";
 import { PlanManager } from "@/components/backoffice/plan-manager";
+import { BillingService } from "@/lib/billing";
 
 export default async function BackofficePlansPage() {
+  await BillingService.ensureDefaultFeatures();
+
   const [plans, features] = await Promise.all([
     prisma.plan.findMany({
       orderBy: { price: "asc" },

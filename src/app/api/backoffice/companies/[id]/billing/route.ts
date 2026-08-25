@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireSuperAdmin } from "@/lib/superadmin";
 import { BillingService } from "@/lib/billing";
+import { BillingProfileService, maskCpfCnpj } from "@/lib/billing-profile";
 import { SubscriptionStatus } from "@prisma/client";
 
 export async function GET(
@@ -31,9 +32,17 @@ export async function GET(
     const subscription = await BillingService.getWorkspaceSubscription(workspaceId);
     const articlesLimit = await BillingService.checkLimit(workspaceId, "ARTICLES");
     const sourcesLimit = await BillingService.checkLimit(workspaceId, "SOURCES");
+    const rawProfile = await BillingProfileService.getProfile(workspaceId);
 
     const totalArticlesCount = await prisma.article.count({ where: { workspaceId } });
     const totalSourcesCount = await prisma.source.count({ where: { workspaceId } });
+
+    const billingProfile = rawProfile
+      ? {
+          ...rawProfile,
+          maskedCpfCnpj: maskCpfCnpj(rawProfile.cpfCnpj),
+        }
+      : null;
 
     return NextResponse.json({
       workspace: {
@@ -45,6 +54,7 @@ export async function GET(
         stripeCustomerId: workspace.stripeCustomerId,
         createdAt: workspace.createdAt,
       },
+      billingProfile,
       subscription: {
         id: subscription.id,
         status: subscription.status,
@@ -84,7 +94,7 @@ export async function PATCH(
     await requireSuperAdmin();
     const { id: workspaceId } = await params;
     const body = await request.json();
-    const { planId, status, asaasCustomerId, stripeCustomerId } = body;
+    const { planId, status, asaasCustomerId, stripeCustomerId, billingProfile } = body;
 
     const workspace = await prisma.workspace.findUnique({
       where: { id: workspaceId },
@@ -107,7 +117,12 @@ export async function PATCH(
       });
     }
 
-    // 2. Update subscription plan and status
+    // 2. Update billing profile if provided by SuperAdmin
+    if (billingProfile && typeof billingProfile === "object") {
+      await BillingProfileService.upsertProfile(workspaceId, billingProfile);
+    }
+
+    // 3. Update subscription plan and status
     if (planId || status) {
       let validStatus: SubscriptionStatus | undefined;
       if (status && Object.values(SubscriptionStatus).includes(status as SubscriptionStatus)) {
@@ -144,11 +159,15 @@ export async function PATCH(
     }
 
     const updatedSub = await BillingService.getWorkspaceSubscription(workspaceId);
+    const updatedProfile = await BillingProfileService.getProfile(workspaceId);
 
     return NextResponse.json({
       success: true,
       message: "Dados de faturamento e assinatura atualizados com sucesso!",
       subscription: updatedSub,
+      billingProfile: updatedProfile
+        ? { ...updatedProfile, maskedCpfCnpj: maskCpfCnpj(updatedProfile.cpfCnpj) }
+        : null,
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Erro ao atualizar faturamento";

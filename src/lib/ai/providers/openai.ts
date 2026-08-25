@@ -6,6 +6,7 @@ import {
   GeneratedArticle,
   AIConnectionResult,
   buildSystemPrompt,
+  parseAIJsonResponse,
 } from "../types";
 
 export class OpenAIProvider implements AIProvider {
@@ -26,7 +27,9 @@ export class OpenAIProvider implements AIProvider {
     const userPrompt = `Analise e reescreva a seguinte notícia:
 
 Título Original: ${input.originalTitle}
-Descrição Original: ${input.originalDescription || "Nenhuma descrição fornecida."}
+Descrição Original: ${input.originalDescription || "Nenhuma descrição fornecida."}${
+      input.originalContent ? `\n\nConteúdo Completo da Matéria Original:\n${input.originalContent}` : ""
+    }
 
 Categorias disponíveis no WordPress:
 ${JSON.stringify(input.categories, null, 2)}
@@ -47,18 +50,28 @@ ${JSON.stringify(input.categories, null, 2)}
       throw new Error("A API da OpenAI não retornou nenhum conteúdo.");
     }
 
-    const parsed = JSON.parse(rawContent);
+    const parsed = parseAIJsonResponse<Record<string, unknown>>(rawContent);
     return {
       relevant: Boolean(parsed.relevant),
       score: typeof parsed.score === "number" ? parsed.score : 5.0,
-      title: parsed.title || input.originalTitle,
-      summary: parsed.summary || "",
-      content: parsed.content || `<p>${input.originalTitle}</p>`,
-      suggestedCategoryId: parsed.suggestedCategoryId || null,
+      title: typeof parsed.title === "string" ? parsed.title : input.originalTitle,
+      summary: typeof parsed.summary === "string" ? parsed.summary : "",
+      content: typeof parsed.content === "string" ? parsed.content : `<p>${input.originalTitle}</p>`,
+      suggestedCategoryId: typeof parsed.suggestedCategoryId === "string" ? parsed.suggestedCategoryId : null,
       tags: Array.isArray(parsed.tags) ? parsed.tags.map(String) : [],
-      seoFocusKeyword: parsed.seoFocusKeyword || "",
-      seoTitle: parsed.seoTitle || parsed.title || input.originalTitle,
-      seoDescription: parsed.seoDescription || parsed.summary || "",
+      seoFocusKeyword: typeof parsed.seoFocusKeyword === "string" ? parsed.seoFocusKeyword : "",
+      seoTitle:
+        typeof parsed.seoTitle === "string"
+          ? parsed.seoTitle
+          : typeof parsed.title === "string"
+          ? parsed.title
+          : input.originalTitle,
+      seoDescription:
+        typeof parsed.seoDescription === "string"
+          ? parsed.seoDescription
+          : typeof parsed.summary === "string"
+          ? parsed.summary
+          : "",
     };
   }
 

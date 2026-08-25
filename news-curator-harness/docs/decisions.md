@@ -98,3 +98,237 @@ Não hardcodar credenciais.
 Status: Accepted
 
 Mesmo SuperAdmin não recebe Application Password/API Keys descriptografadas. O Backoffice permite substituir secrets, não visualizá-los.
+
+# Affiliate Platform Decisions
+
+## ADR-033. Mercado Livre e canal são pré-condições externas
+Status: Accepted
+O MVP assume que conta afiliada e canal/site já estão configurados/validados externamente. GeraFeed não gerencia essa aprovação.
+
+## ADR-034. affiliateUrl é a entrada principal
+Status: Accepted
+Usuário faz curadoria no Mercado Livre, gera o link e cola no GeraFeed. URL original é derivada quando possível.
+
+## ADR-035. Import Preview antes de persistir
+Status: Accepted
+Importação gera preview. Product/ProductOffer são persistidos apenas após confirmação.
+
+## ADR-036. Safe Affiliate Link Resolver
+Status: Accepted
+Toda resolução usa proteção SSRF, allowlist, validação de redirects, timeout e limites.
+
+## ADR-037. Best-effort metadata import
+Status: Accepted
+Importador retorna COMPLETE/PARTIAL/FAILED e nunca inventa dados ausentes.
+
+## ADR-038. externalProductId como identidade externa preferencial
+Status: Accepted
+Deduplicação prioriza workspace + programa + externalProductId.
+
+## ADR-039. Product separado de ProductOffer
+Status: Accepted
+Product é item conceitual. ProductOffer é oferta concreta e contém affiliateUrl.
+
+## ADR-040. AffiliateProvider
+Status: Accepted
+Mercado Livre é o primeiro provider; provider encapsula validação, resolução e metadados.
+
+## ADR-041. Affiliate por entitlement
+Status: Accepted
+Acesso usa Feature/PlanFeature, não nome do plano.
+
+## ADR-042. Conteúdo canônico Affiliate
+Status: Accepted
+Conteúdo comercial novo é estruturado e independente do WordPress.
+
+## ADR-043. PublisherAdapter
+Status: Accepted
+WordPress é primeiro destino; arquitetura permite Blogger/Custom.
+
+## ADR-044. Link não pertence ao HTML canônico
+Status: Accepted
+Renderer resolve ProductOffer na publicação.
+
+## ADR-045. Clique não é venda
+Status: Accepted
+AffiliateClick mede clique; venda/comissão dependem de fonte externa confiável.
+
+# Phase 17+. Product Intelligence & Publishing Decisions
+
+## ADR-046. Source data separado de editorial
+Status: Accepted
+Marketplace metadata não sobrescreve silenciosamente campos editoriais.
+
+## ADR-047. Marketplace Category não é ProductCategory
+Status: Accepted
+Categoria externa é metadata/sugestão; taxonomia interna continua decisão do Workspace.
+
+## ADR-048. ProductReviewSample
+Status: Accepted
+Até 5 amostras públicas, sem PII desnecessária, usadas como grounding qualitativo.
+
+## ADR-049. ProductReferenceSource
+Status: Accepted
+URLs externas podem ser resumidas por IA via Safe Fetch; não copiar artigo integral.
+
+## ADR-050. Dashboard informativo
+Status: Accepted
+Operação de publicação migra para Central de Publicação.
+
+## ADR-051. Central de Publicação com dois fluxos
+Status: Accepted
+RSS/Notícias e Conteúdo Affiliate.
+
+## ADR-052. RSS pode usar Affiliate Placements
+Status: Accepted
+IA pode sugerir catálogo real, usuário aprova, renderer resolve link no publish.
+
+## ADR-053. Regras de seleção pertencem ao Template
+Status: Accepted
+selectionMode/min/max/category são source of truth compartilhada por UI/backend.
+
+## ADR-054. Prompts Affiliate globais
+Status: Accepted
+Substitui override Affiliate por Workspace. Apenas SuperAdmin administra no Backoffice.
+
+## ADR-055. Usuário seleciona template, não edita prompt
+Status: Accepted
+Área funcional fornece inputs e seleciona tipo/template.
+
+## ADR-056. Prompt Affiliate versionado
+Status: Accepted
+Artigo guarda template ID/versão para auditoria.
+
+# Phase 20. Billing Asaas Decisions
+
+## ADR-057. GeraFeed controla regra comercial, Asaas executa cobrança
+Status: Accepted
+
+Plan, preço contratado, entitlements, acesso e histórico local pertencem ao GeraFeed.
+
+Asaas é Payment Provider.
+
+## ADR-058. Preço anual derivado
+Status: Accepted
+
+Plan armazena `monthlyPrice` e `annualDiscountPercent`.
+
+Preço anual é calculado.
+
+Não manter dois preços editáveis independentes nesta fase.
+
+## ADR-059. Subscription guarda snapshot
+Status: Accepted
+
+Subscription persiste `amount`, `billingCycle` e desconto contratado.
+
+Alterar Plan não altera automaticamente assinatura existente.
+
+## ADR-060. Sem fidelidade = cancelamento de renovação
+Status: Accepted
+
+Cancelar impede renovação futura.
+
+Acesso permanece até `currentPeriodEnd`.
+
+Sem pró-rata/reembolso automático nesta fase.
+
+## ADR-061. Hosted Checkout para cartão
+Status: Accepted
+
+Preferir checkout hospedado pelo Asaas para impedir que dados brutos de cartão trafeguem pelo backend GeraFeed.
+
+## ADR-062. BillingProfile por Workspace
+Status: Accepted
+
+Dados cadastrais de faturamento e `providerCustomerId` pertencem ao Workspace.
+
+Evitar Customer Asaas duplicado.
+
+## ADR-063. externalReference
+Status: Accepted
+
+Usar identificador interno estável como `externalReference` quando suportado, especialmente para Customer/Checkout/Subscription.
+
+## ADR-064. Asaas Subscription não é pagamento
+Status: Accepted
+
+Subscription agenda cobranças.
+
+Invoice/Payment representa eventos financeiros de cada período.
+
+## ADR-065. PAYMENT_CONFIRMED pode liberar acesso
+Status: Accepted
+
+Não esperar `PAYMENT_RECEIVED` quando o pagamento já foi confirmado.
+
+`PAYMENT_RECEIVED` continua sendo persistido para conciliação/liquidação.
+
+## ADR-066. Webhook é fonte financeira primária
+Status: Accepted
+
+Callback de checkout não confirma pagamento.
+
+Estado é atualizado por Webhook e reconciliação.
+
+## ADR-067. Idempotência por provider event ID
+Status: Accepted
+
+Eventos Asaas podem ser reenviados.
+
+Persistir `providerEventId` único por provider.
+
+## ADR-068. Webhook token diferente da API Key
+Status: Accepted
+
+Validar `asaas-access-token` usando `ASAAS_WEBHOOK_TOKEN`.
+
+Não reutilizar API Key.
+
+## ADR-069. Grace period
+Status: Accepted
+
+Pagamento overdue leva a PAST_DUE.
+
+Bloqueio ocorre somente após grace period configurável.
+
+Default inicial recomendado: 3 dias.
+
+## ADR-070. Pix recorrente possui capability gate
+Status: Accepted
+
+A documentação pública do Asaas apresenta informações divergentes entre páginas sobre Pix em assinaturas tradicionais.
+
+A integração só habilita Pix recorrente direto após teste de sandbox.
+
+Pix Automático é fora de escopo desta fase.
+
+## ADR-071. Sem Cron para billing reconciliation
+Status: Accepted
+
+Webhook é o fluxo primário.
+
+Backoffice oferece reconciliação manual.
+
+Automação periódica pode ser fase futura.
+
+## ADR-072. PaymentProvider v2
+Status: Accepted
+
+Evoluir abstração existente com Customer, Checkout, Subscription, Payment, Webhook e capabilities.
+
+Código de domínio não chama API Asaas diretamente.
+
+## ADR-073. Sem dados de cartão
+Status: Accepted
+
+Não persistir número de cartão, CVV ou validade.
+
+Fluxos devem preferir superfícies hospedadas pelo provider.
+
+## ADR-074. Mudança de plano sem pró-rata complexo
+Status: Accepted
+
+Phase 20 prefere troca no próximo ciclo.
+
+Pró-rata/immediate upgrade sofisticado fica fora de escopo até regra comercial explícita.

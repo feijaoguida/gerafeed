@@ -17,6 +17,12 @@ import {
   Image as ImageIcon,
 } from "lucide-react";
 
+import {
+  AffiliateArticleEditor,
+  ArticleProductItem,
+} from "@/components/affiliate/affiliate-article-editor";
+import { CanonicalDocument } from "@/lib/affiliate/canonical-document";
+
 interface Category {
   id: string;
   name: string;
@@ -33,6 +39,8 @@ interface ArticleDetail {
   title: string | null;
   summary: string | null;
   content: string | null;
+  commercialType?: string | null;
+  canonicalContent?: CanonicalDocument | null;
   suggestedCategoryId: string | null;
   categoryId: string | null;
   tags: string[];
@@ -41,13 +49,16 @@ interface ArticleDetail {
   seoDescription: string | null;
   aiScore: number | null;
   status: "PENDING" | "PUBLISHED" | "REJECTED";
+  needsRepublish?: boolean;
   wordpressPostId: number | null;
+  wordpressSiteId?: string | null;
   originalImageUrl?: string | null;
   modifiedImageUrl?: string | null;
   selectedImage?: string | null;
   source?: { id: string; name: string; rssUrl?: string } | null;
   suggestedCategory: Category | null;
   category: Category | null;
+  articleProducts?: ArticleProductItem[];
 }
 
 export default function ReviewArticlePage({ params }: { params: Promise<{ id: string }> }) {
@@ -175,7 +186,13 @@ export default function ReviewArticlePage({ params }: { params: Promise<{ id: st
       const res = await fetch(`/api/articles/${id}/process-ai`, { method: "POST" });
       const data = await res.json();
 
-      if (!res.ok) throw new Error(data.error || "Erro no processamento da IA.");
+      if (!res.ok) {
+        if (data.notRelevant || data.message) {
+          setErrorMessage(data.message || `Notícia considerada irrelevante para a área de atuação do portal. Os campos foram preservados.`);
+          return;
+        }
+        throw new Error(data.error || "Erro no processamento da IA.");
+      }
 
       // API returns { success, article, aiResult } — read from data.article
       const updated = data.article;
@@ -274,6 +291,45 @@ export default function ReviewArticlePage({ params }: { params: Promise<{ id: st
           <ArrowLeft className="w-4 h-4" /> Voltar ao Dashboard
         </Link>
         <p className="text-rose-500">Notícia não encontrada.</p>
+      </div>
+    );
+  }
+
+  if (article.commercialType) {
+    return (
+      <div className="min-h-screen bg-slate-50 dark:bg-zinc-950 text-slate-900 dark:text-zinc-100 font-sans p-6 max-w-7xl mx-auto space-y-6">
+        <div className="flex items-center justify-between">
+          <Link
+            href="/dashboard"
+            className="inline-flex items-center gap-2 text-zinc-500 hover:text-zinc-900 dark:hover:text-white text-sm"
+          >
+            <ArrowLeft className="w-4 h-4" /> Voltar ao Dashboard
+          </Link>
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-semibold px-2.5 py-1 rounded bg-primary/10 text-primary">
+              Módulo Comercial & Afiliados
+            </span>
+          </div>
+        </div>
+
+        <AffiliateArticleEditor
+          articleId={article.id}
+          initialTitle={article.title || article.originalTitle || ""}
+          initialSummary={article.summary || ""}
+          initialContent={article.content || ""}
+          initialCommercialType={article.commercialType}
+          initialStatus={article.status}
+          initialSeoFocusKeyword={article.seoFocusKeyword || ""}
+          initialSeoTitle={article.seoTitle || ""}
+          initialSeoDescription={article.seoDescription || ""}
+          initialTags={article.tags || []}
+          initialProducts={article.articleProducts || []}
+          initialCanonicalDocument={article.canonicalContent || null}
+          initialNeedsRepublish={article.needsRepublish || false}
+          initialWordpressSiteId={article.wordpressSiteId}
+          initialCategoryId={article.categoryId || article.suggestedCategoryId}
+          initialOriginalImageUrl={article.originalImageUrl || article.modifiedImageUrl || null}
+        />
       </div>
     );
   }

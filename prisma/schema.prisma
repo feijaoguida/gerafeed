@@ -89,6 +89,16 @@ model Workspace {
   wordpressSites       WordPressSite[]
   wordpressSiteSources WordPressSiteSource[]
   subscription         Subscription?
+  billingProfile       BillingProfile?
+  productCategories    ProductCategory[]
+  products             Product[]
+  productOffers        ProductOffer[]
+  promptTemplates      PromptTemplate[]
+  affiliateClicks      AffiliateClick[]
+  reviewSamples        ProductReviewSample[]
+  referenceSources     ProductReferenceSource[]
+  articleAffiliatePlacements ArticleAffiliatePlacement[]
+  checkoutSessions           BillingCheckoutSession[]
 }
 
 // ---------------------------------------------------------------------------
@@ -109,20 +119,25 @@ enum FeatureValueType {
 }
 
 model Plan {
-  id            String         @id @default(cuid())
-  name          String
-  slug          String         @unique
-  description   String?
-  price         Float          @default(0)
-  periodicity   String         @default("MONTHLY")
-  active        Boolean        @default(true)
-  highlight     Boolean        @default(false)
-  maxArticles   Int            @default(50)
-  maxSources    Int            @default(3)
-  createdAt     DateTime       @default(now())
-  updatedAt     DateTime       @updatedAt
-  subscriptions Subscription[]
-  planFeatures  PlanFeature[]
+  id               String         @id @default(cuid())
+  name             String
+  slug             String         @unique
+  description      String?
+  price            Float          @default(0)
+  periodicity      String         @default("MONTHLY")
+  monthlyPrice     Decimal        @default(0) @db.Decimal(10, 2)
+  annualDiscountPercent Decimal   @default(0) @db.Decimal(5, 2)
+  active           Boolean        @default(true)
+  highlight        Boolean        @default(false)
+  maxArticles      Int            @default(50)
+  maxDailyArticles Int            @default(5)
+  maxSources       Int            @default(3)
+  maxWordPressSites Int           @default(1)
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+  subscriptions    Subscription[]
+  planFeatures     PlanFeature[]
+  checkoutSessions BillingCheckoutSession[]
 }
 
 model Feature {
@@ -227,40 +242,65 @@ model WordPressCategory {
   @@index([wordpressSiteId])
 }
 
+enum CommercialArticleType {
+  PRODUCT_REVIEW
+  COMPARISON
+  BEST_PRODUCTS
+  BUYING_GUIDE
+  PROBLEM_SOLUTION
+  DEALS
+  SEASONAL
+}
+
 model Article {
-  id                  String             @id @default(cuid())
+  id                  String                 @id @default(cuid())
   workspaceId         String
-  workspace           Workspace          @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  sourceId            String
-  source              Source             @relation(fields: [sourceId], references: [id], onDelete: Cascade)
-  originalUrl         String             @unique
-  originalTitle       String
+  workspace           Workspace              @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  sourceId            String?
+  source              Source?                @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+  originalUrl         String?                @unique
+  originalTitle       String?
   originalDescription String?
+  originalContent     String?
   originalImageUrl    String?
   originalPublishedAt DateTime?
+  commercialType      CommercialArticleType?
   title               String?
   summary             String?
   content             String?
+  canonicalContent    Json?
   suggestedCategoryId String?
-  suggestedCategory   WordPressCategory? @relation("SuggestedCategory", fields: [suggestedCategoryId], references: [id], onDelete: SetNull)
+  suggestedCategory   WordPressCategory?     @relation("SuggestedCategory", fields: [suggestedCategoryId], references: [id], onDelete: SetNull)
   categoryId          String?
-  category            WordPressCategory? @relation("SelectedCategory", fields: [categoryId], references: [id], onDelete: SetNull)
+  category            WordPressCategory?     @relation("SelectedCategory", fields: [categoryId], references: [id], onDelete: SetNull)
   tags                String[]
   seoFocusKeyword     String?
   seoTitle            String?
   seoDescription      String?
   aiScore             Float?
-  status              ArticleStatus      @default(PENDING)
+  status              ArticleStatus          @default(PENDING)
   wordpressPostId     Int?
   wordpressSiteId     String?
-  wordpressSite       WordPressSite?     @relation(fields: [wordpressSiteId], references: [id], onDelete: SetNull)
+  wordpressSite       WordPressSite?         @relation(fields: [wordpressSiteId], references: [id], onDelete: SetNull)
   modifiedImageUrl    String?
-  selectedImage       String?            @default("ORIGINAL")
+  selectedImage       String?                @default("ORIGINAL")
   processedAt         DateTime?
-  createdAt           DateTime           @default(now())
-  updatedAt           DateTime           @updatedAt
+  renderedContentHash String?
+  needsRepublish      Boolean                @default(false)
+  lastPublishedAt     DateTime?
+  promptTemplateId    String?
+  promptTemplateVersion Int?
+  promptTemplate      PromptTemplate?        @relation(fields: [promptTemplateId], references: [id], onDelete: SetNull)
+  createdAt           DateTime               @default(now())
+  updatedAt           DateTime               @updatedAt
+  articleProducts     ArticleProduct[]
+  affiliateClicks     AffiliateClick[]
+  affiliatePlacements ArticleAffiliatePlacement[]
 
   @@index([workspaceId])
+  @@index([workspaceId, commercialType])
+  @@index([workspaceId, needsRepublish])
+  @@index([promptTemplateId])
   @@index([sourceId])
   @@index([wordpressSiteId])
   @@index([originalPublishedAt])
@@ -316,5 +356,327 @@ model WordPressSiteSource {
   @@index([wordpressSiteId])
   @@index([sourceId])
 }
+
+// ---------------------------------------------------------------------------
+// Affiliate Platform — Programas, Produtos e Provedores
+// ---------------------------------------------------------------------------
+
+model AffiliateProgram {
+  id           String         @id @default(cuid())
+  code         String         @unique
+  name         String
+  providerType String         @default("MERCADO_LIVRE")
+  active       Boolean        @default(true)
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+  offers       ProductOffer[]
+}
+
+enum ProductStatus {
+  DRAFT
+  ACTIVE
+  ARCHIVED
+}
+
+model ProductCategory {
+  id          String            @id @default(cuid())
+  workspaceId String
+  workspace   Workspace         @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  parentId    String?
+  parent      ProductCategory?  @relation("ProductCategoryHierarchy", fields: [parentId], references: [id], onDelete: SetNull)
+  children    ProductCategory[] @relation("ProductCategoryHierarchy")
+  name        String
+  slug        String
+  description String?
+  active      Boolean           @default(true)
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+  products    Product[]
+
+  @@unique([workspaceId, slug])
+  @@index([workspaceId])
+  @@index([workspaceId, parentId])
+}
+
+model Product {
+  id          String           @id @default(cuid())
+  workspaceId String
+  workspace   Workspace        @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  categoryId  String?
+  category    ProductCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  name        String
+  slug        String
+  brand       String?
+  description             String?
+  sourceDescription       String?          @db.Text
+  imageUrl                String?
+  images                  String[]         @default([])
+  specs                   Json?
+  sourceSpecs             Json?
+  marketplaceCategoryId   String?
+  marketplaceCategoryName String?
+  pros                    String[]
+  cons                    String[]
+  rating                  Float?
+  sourceRating            Float?
+  sourceReviewCount       Int?
+  status                  ProductStatus    @default(ACTIVE)
+  createdAt   DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  offers           ProductOffer[]
+  articleProducts  ArticleProduct[]
+  affiliateClicks  AffiliateClick[]
+  reviewSamples    ProductReviewSample[]
+  referenceSources ProductReferenceSource[]
+  affiliatePlacements ArticleAffiliatePlacement[]
+
+  @@unique([workspaceId, slug])
+  @@index([workspaceId])
+  @@index([categoryId])
+}
+
+enum OfferStatus {
+  ACTIVE
+  PAUSED
+  OUT_OF_STOCK
+  ARCHIVED
+}
+
+model ProductOffer {
+  id                    String           @id @default(cuid())
+  workspaceId           String
+  workspace             Workspace        @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  productId             String
+  product               Product          @relation(fields: [productId], references: [id], onDelete: Cascade)
+  affiliateProgramId    String
+  affiliateProgram      AffiliateProgram @relation(fields: [affiliateProgramId], references: [id], onDelete: Cascade)
+  externalProductId     String?
+  originalUrl           String?
+  resolvedUrl           String?
+  affiliateUrl          String
+  seller                String?
+  price                 Float?
+  oldPrice              Float?
+  currency              String           @default("BRL")
+  trackingLabel         String?
+  metadataSource        String?
+  metadataLastFetchedAt DateTime?
+  status                OfferStatus      @default(ACTIVE)
+  createdAt             DateTime         @default(now())
+  updatedAt             DateTime         @updatedAt
+  articleProducts       ArticleProduct[]
+  affiliateClicks       AffiliateClick[]
+  affiliatePlacements   ArticleAffiliatePlacement[]
+
+  @@index([workspaceId])
+  @@index([productId])
+  @@index([affiliateProgramId])
+  @@index([workspaceId, affiliateProgramId, externalProductId])
+}
+
+model PromptTemplate {
+  id                 String                @id @default(cuid())
+  workspaceId        String?
+  workspace          Workspace?            @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  type               CommercialArticleType
+  name               String
+  description        String?
+  systemPrompt       String                @db.Text
+  userPromptTemplate String                @db.Text
+  version               Int                   @default(1)
+  active                Boolean               @default(true)
+  selectionMode         String?
+  minProducts           Int?
+  maxProducts           Int?
+  requiresCategory      Boolean?              @default(false)
+  allowsSuggestedTitle  Boolean?              @default(true)
+  variables             String[]              @default([])
+  createdAt             DateTime              @default(now())
+  updatedAt             DateTime              @updatedAt
+  articles              Article[]
+
+  @@unique([workspaceId, type, version])
+  @@index([workspaceId])
+  @@index([type])
+}
+
+model ArticleProduct {
+  id             String        @id @default(cuid())
+  articleId      String
+  article        Article       @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  productId      String
+  product        Product       @relation(fields: [productId], references: [id], onDelete: Cascade)
+  offerId        String?
+  offer          ProductOffer? @relation(fields: [offerId], references: [id], onDelete: SetNull)
+  position       Int           @default(0)
+  badge          String?
+  score          Float?
+  recommendation String?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  @@unique([articleId, productId])
+  @@index([articleId, position])
+  @@index([productId])
+  @@index([offerId])
+}
+
+model AffiliateClick {
+  id            String        @id @default(cuid())
+  workspaceId   String
+  workspace     Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  articleId     String?
+  article       Article?      @relation(fields: [articleId], references: [id], onDelete: SetNull)
+  productId     String?
+  product       Product?      @relation(fields: [productId], references: [id], onDelete: SetNull)
+  offerId       String?
+  offer         ProductOffer? @relation(fields: [offerId], references: [id], onDelete: SetNull)
+  publicationId String?
+  component     String?
+  position      Int?
+  eventToken    String?       @db.Text
+  createdAt     DateTime      @default(now())
+
+  @@index([workspaceId])
+  @@index([articleId])
+  @@index([productId])
+  @@index([offerId])
+  @@index([createdAt])
+  @@index([workspaceId, createdAt])
+}
+
+model ProductReviewSample {
+  id          String    @id @default(cuid())
+  workspaceId String
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  productId   String
+  product     Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
+  provider    String    @default("MERCADO_LIVRE")
+  rating      Float?
+  title       String?
+  text        String    @db.Text
+  authorName  String?
+  sourceUrl   String?
+  capturedAt  DateTime  @default(now())
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([workspaceId])
+  @@index([productId])
+}
+
+enum ReferenceSourceStatus {
+  PENDING
+  PROCESSING
+  READY
+  FAILED
+}
+
+model ProductReferenceSource {
+  id          String                @id @default(cuid())
+  workspaceId String
+  workspace   Workspace             @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  productId   String
+  product     Product               @relation(fields: [productId], references: [id], onDelete: Cascade)
+  url         String
+  title       String?
+  summary     String?               @db.Text
+  status      ReferenceSourceStatus @default(PENDING)
+  error       String?
+  capturedAt  DateTime              @default(now())
+  createdAt   DateTime              @default(now())
+  updatedAt   DateTime              @updatedAt
+
+  @@index([workspaceId])
+  @@index([productId])
+}
+
+// ---------------------------------------------------------------------------
+// Article Affiliate Placements (Monetização de Artigos RSS)
+// ---------------------------------------------------------------------------
+
+enum AffiliatePlacementType {
+  PRODUCT_CARD
+  INLINE_CTA
+  AFTER_PARAGRAPH
+  TOP_RECOMMENDATION
+}
+
+model ArticleAffiliatePlacement {
+  id             String                 @id @default(cuid())
+  workspaceId    String
+  workspace      Workspace              @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  articleId      String
+  article        Article                @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  productId      String
+  product        Product                @relation(fields: [productId], references: [id], onDelete: Cascade)
+  offerId        String?
+  offer          ProductOffer?          @relation(fields: [offerId], references: [id], onDelete: SetNull)
+  placementType  AffiliatePlacementType @default(PRODUCT_CARD)
+  paragraphIndex Int?
+  position       Int                    @default(0)
+  label          String?
+  createdAt      DateTime               @default(now())
+  updatedAt      DateTime               @updatedAt
+
+  @@index([workspaceId, articleId])
+  @@index([workspaceId, productId])
+}
+
+enum BillingCycle {
+  MONTHLY
+  YEARLY
+}
+
+enum BillingMethod {
+  CREDIT_CARD
+  BOLETO
+  PIX
+}
+
+model BillingProfile {
+  id                 String    @id @default(cuid())
+  workspaceId        String    @unique
+  workspace          Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  name               String
+  cpfCnpj            String
+  email              String
+  mobilePhone        String?
+  postalCode         String?
+  address            String?
+  addressNumber      String?
+  complement         String?
+  province           String?
+  city               String?
+  state              String?
+  providerCustomerId String?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  @@index([workspaceId])
+}
+
+model BillingCheckoutSession {
+  id                 String        @id @default(cuid())
+  workspaceId        String
+  workspace          Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  planId             String
+  plan               Plan          @relation(fields: [planId], references: [id])
+  cycle              BillingCycle  @default(MONTHLY)
+  billingMethod      BillingMethod @default(CREDIT_CARD)
+  amount             Decimal       @db.Decimal(10, 2)
+  status             String        @default("PENDING") // PENDING, COMPLETED, EXPIRED, CANCELED
+  providerCheckoutId String?
+  checkoutUrl        String?
+  successUrl         String?
+  cancelUrl          String?
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
+
+  @@index([workspaceId])
+  @@index([status])
+}
+
+
 
 

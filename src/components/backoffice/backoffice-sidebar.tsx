@@ -9,6 +9,7 @@ import {
   LayoutDashboard,
   Building2,
   Layers,
+  Sparkles,
   Settings,
   FileText,
   ArrowLeft,
@@ -119,9 +120,22 @@ export function BackofficeSidebar({ userEmail }: { userEmail?: string | null }) 
                 <Layers className="w-4 h-4 text-indigo-400" />
                 Planos & Features
               </Link>
+
+              <Link
+                href="/backoffice/affiliate-prompts"
+                onClick={() => setIsMobileOpen(false)}
+                className={`flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-medium transition ${
+                  isActive("/backoffice/affiliate-prompts")
+                    ? "bg-amber-500/10 text-amber-300 border border-amber-500/20 shadow-sm font-semibold"
+                    : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900"
+                }`}
+              >
+                <Sparkles className="w-4 h-4 text-amber-400" />
+                Prompts de Afiliados
+              </Link>
             </div>
 
-            {/* System / Audit (Future) */}
+            {/* System / Audit */}
             <div className="space-y-1">
               <p className="px-3 text-[10px] font-bold uppercase tracking-wider text-zinc-500">
                 Governança & Logs

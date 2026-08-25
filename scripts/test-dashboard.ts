@@ -73,7 +73,7 @@ async function main() {
   if (!foundPending) {
     throw new Error("FAILED: Created pending article was not found in filtered articles list query.");
   }
-  console.log(`✓ Article "${foundPending.originalTitle}" correctly retrieved with source "${foundPending.source.name}" and AI score ${foundPending.aiScore}.`);
+  console.log(`✓ Article "${foundPending.originalTitle}" correctly retrieved with source "${foundPending.source?.name || "N/A"}" and AI score ${foundPending.aiScore}.`);
 
   // 4. Cleanup
   await prisma.article.delete({ where: { id: pendingArt.id } });
