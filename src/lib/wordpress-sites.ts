@@ -10,6 +10,7 @@ export interface CreateWordPressSiteInput {
   encryptedApplicationPassword?: string;
   defaultPromptType?: string | null;
   active?: boolean;
+  isDefault?: boolean;
 }
 
 export interface UpdateWordPressSiteInput {
@@ -20,6 +21,7 @@ export interface UpdateWordPressSiteInput {
   encryptedApplicationPassword?: string;
   defaultPromptType?: string | null;
   active?: boolean;
+  isDefault?: boolean;
 }
 
 export interface WordPressSiteClientSafe {
@@ -31,6 +33,7 @@ export interface WordPressSiteClientSafe {
   hasPassword: boolean;
   defaultPromptType: string | null;
   active: boolean;
+  isDefault: boolean;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -58,6 +61,7 @@ export function sanitizeWordPressSite(site: {
   encryptedApplicationPassword: string;
   defaultPromptType: string | null;
   active: boolean;
+  isDefault: boolean;
   createdAt: Date;
   updatedAt: Date;
 }): WordPressSiteClientSafe {
@@ -70,6 +74,7 @@ export function sanitizeWordPressSite(site: {
     hasPassword: !!site.encryptedApplicationPassword,
     defaultPromptType: site.defaultPromptType,
     active: site.active,
+    isDefault: site.isDefault,
     createdAt: site.createdAt,
     updatedAt: site.updatedAt,
   };
@@ -106,8 +111,16 @@ export async function createWordPressSite(input: CreateWordPressSiteInput) {
       encryptedApplicationPassword: encryptedPassword,
       defaultPromptType: input.defaultPromptType || null,
       active: input.active !== undefined ? input.active : true,
+      isDefault: input.isDefault || false,
     },
   });
+
+  if (input.isDefault) {
+    await prisma.wordPressSite.updateMany({
+      where: { workspaceId: input.workspaceId, id: { not: site.id } },
+      data: { isDefault: false },
+    });
+  }
 
   return site;
 }
@@ -210,6 +223,7 @@ export async function updateWordPressSite(
     encryptedApplicationPassword?: string;
     defaultPromptType?: string | null;
     active?: boolean;
+    isDefault?: boolean;
   } = {};
 
   if (input.name !== undefined) data.name = input.name.trim();
@@ -217,6 +231,7 @@ export async function updateWordPressSite(
   if (input.username !== undefined) data.username = input.username.trim();
   if (input.defaultPromptType !== undefined) data.defaultPromptType = input.defaultPromptType;
   if (input.active !== undefined) data.active = input.active;
+  if (input.isDefault !== undefined) data.isDefault = input.isDefault;
 
   if (input.applicationPassword !== undefined) {
     data.encryptedApplicationPassword = encrypt(input.applicationPassword);
@@ -228,6 +243,13 @@ export async function updateWordPressSite(
     where: { id: siteId },
     data,
   });
+
+  if (input.isDefault === true) {
+    await prisma.wordPressSite.updateMany({
+      where: { workspaceId, id: { not: siteId } },
+      data: { isDefault: false },
+    });
+  }
 
   return updated;
 }

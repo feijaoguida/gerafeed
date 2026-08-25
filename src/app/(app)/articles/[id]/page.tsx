@@ -28,6 +28,13 @@ interface Category {
   name: string;
   slug: string;
   wordpressId: number;
+  wordpressSiteId?: string;
+}
+
+interface WordPressSite {
+  id: string;
+  name: string;
+  isDefault: boolean;
 }
 
 interface ArticleDetail {
@@ -67,11 +74,13 @@ export default function ReviewArticlePage({ params }: { params: Promise<{ id: st
 
   const [article, setArticle] = useState<ArticleDetail | null>(null);
   const [categories, setCategories] = useState<Category[]>([]);
+  const [sites, setSites] = useState<WordPressSite[]>([]);
 
   // Editable Form Fields
   const [title, setTitle] = useState("");
   const [summary, setSummary] = useState("");
   const [content, setContent] = useState("");
+  const [wordpressSiteId, setWordpressSiteId] = useState<string>("");
   const [categoryId, setCategoryId] = useState<string>("");
   const [tagsInput, setTagsInput] = useState("");
   const [seoFocusKeyword, setSeoFocusKeyword] = useState("");
@@ -94,9 +103,10 @@ export default function ReviewArticlePage({ params }: { params: Promise<{ id: st
 
     async function loadArticleAndCategories() {
       try {
-        const [articleRes, categoriesRes] = await Promise.all([
+        const [articleRes, categoriesRes, sitesRes] = await Promise.all([
           fetch(`/api/articles/${id}`),
           fetch("/api/wordpress/categories"),
+          fetch("/api/wordpress/sites")
         ]);
 
         if (!active) return;
@@ -107,6 +117,7 @@ export default function ReviewArticlePage({ params }: { params: Promise<{ id: st
           setTitle(artData.title || artData.originalTitle || "");
           setSummary(artData.summary || "");
           setContent(artData.content || "");
+          setWordpressSiteId(artData.wordpressSiteId || "");
           setCategoryId(artData.categoryId || artData.suggestedCategoryId || "");
           setTagsInput((artData.tags || []).join(", "));
           setSeoFocusKeyword(artData.seoFocusKeyword || "");
@@ -120,6 +131,21 @@ export default function ReviewArticlePage({ params }: { params: Promise<{ id: st
         if (categoriesRes.ok) {
           const cats: Category[] = await categoriesRes.json();
           setCategories(cats);
+        }
+
+        if (sitesRes.ok) {
+          const sitesData = await sitesRes.json();
+          const loadedSites = sitesData.sites || [];
+          setSites(loadedSites);
+          
+          // If no site is set yet on the article, try to set the default site
+          setWordpressSiteId(prev => {
+            if (!prev) {
+              const defaultSite = loadedSites.find((s: WordPressSite) => s.isDefault);
+              return defaultSite ? defaultSite.id : (loadedSites[0]?.id || "");
+            }
+            return prev;
+          });
         }
       } catch (err) {
         console.error("Error loading review page:", err);
@@ -155,6 +181,7 @@ export default function ReviewArticlePage({ params }: { params: Promise<{ id: st
           title,
           summary,
           content,
+          wordpressSiteId: wordpressSiteId || null,
           categoryId: categoryId || null,
           tags: tagsArray,
           seoFocusKeyword,
@@ -245,6 +272,10 @@ export default function ReviewArticlePage({ params }: { params: Promise<{ id: st
     }
     if (!content.trim()) {
       setErrorMessage("O Conteúdo do artigo é obrigatório para aprovação.");
+      return;
+    }
+    if (!wordpressSiteId) {
+      setErrorMessage("Selecione um Site WordPress antes de aprovar.");
       return;
     }
     if (!categoryId) {
@@ -474,6 +505,26 @@ export default function ReviewArticlePage({ params }: { params: Promise<{ id: st
                 />
               </div>
 
+              {/* Site WordPress Select */}
+              <div className="space-y-1.5">
+                <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400">Site WordPress Destino</label>
+                <select
+                  value={wordpressSiteId}
+                  onChange={(e) => {
+                    setWordpressSiteId(e.target.value);
+                    setCategoryId(""); // Reset category when site changes
+                  }}
+                  className="w-full px-4 py-2.5 rounded-lg bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-xs text-zinc-900 dark:text-white focus:outline-none focus:border-indigo-500"
+                >
+                  <option value="">-- Selecione um Site --</option>
+                  {sites.map((site) => (
+                    <option key={site.id} value={site.id}>
+                      {site.name} {site.isDefault ? "(Padrão)" : ""}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
               {/* Category Select */}
               <div className="space-y-1.5">
                 <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400">Categoria no WordPress</label>
@@ -483,7 +534,9 @@ export default function ReviewArticlePage({ params }: { params: Promise<{ id: st
                   className="w-full px-4 py-2.5 rounded-lg bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-xs text-zinc-900 dark:text-white focus:outline-none focus:border-indigo-500"
                 >
                   <option value="">-- Selecione uma Categoria --</option>
-                  {categories.map((cat) => (
+                  {categories
+                    .filter((cat) => !wordpressSiteId || cat.wordpressSiteId === wordpressSiteId)
+                    .map((cat) => (
                     <option key={cat.id} value={cat.id}>
                       {cat.name} (slug: {cat.slug})
                     </option>

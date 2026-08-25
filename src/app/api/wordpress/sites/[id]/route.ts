@@ -70,6 +70,7 @@ export async function PATCH(
       applicationPassword?: string;
       defaultPromptType?: string | null;
       active?: boolean;
+      isDefault?: boolean;
     } = {};
 
     if (body.name !== undefined) updateData.name = body.name;
@@ -77,6 +78,7 @@ export async function PATCH(
     if (body.username !== undefined) updateData.username = body.username;
     if (body.defaultPromptType !== undefined) updateData.defaultPromptType = body.defaultPromptType;
     if (body.active !== undefined) updateData.active = body.active;
+    if (body.isDefault !== undefined) updateData.isDefault = body.isDefault === true;
     if (body.applicationPassword && body.applicationPassword.trim()) {
       updateData.applicationPassword = body.applicationPassword.trim();
     }

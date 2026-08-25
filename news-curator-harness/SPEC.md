@@ -80,6 +80,7 @@ url
 username
 encryptedApplicationPassword
 active
+isDefault
 createdAt
 updatedAt
 ```
@@ -104,6 +105,10 @@ updatedAt
 
 `active`
 - Permite desativar o destino sem apagar histórico.
+
+`isDefault`
+- Flag booleana indicando se este é o site WordPress padrão do Workspace.
+- Mutuamente exclusivo: se um for definido como true, os outros do mesmo Workspace devem ser false.
 
 ---
 
@@ -253,7 +258,8 @@ A tela de cada WordPress deve permitir:
 - URL;
 - usuário;
 - Application Password;
-- ativo/inativo.
+- ativo/inativo;
+- Definir como Padrão (isDefault).
 
 ### Conexão
 - testar conexão;
@@ -364,6 +370,10 @@ Motivo:
 - permitir auditoria histórica.
 
 A relação deve respeitar o Workspace.
+
+Na tela de "Revisão Editorial", o usuário deve poder alterar ou definir o `wordpressSiteId` do artigo antes de publicar. 
+Ao selecionar um site WordPress diferente, a lista de categorias disponíveis para o artigo deve ser atualizada para mostrar apenas as categorias daquele site específico.
+O dropdown de site WordPress deve vir pré-selecionado com o site que possuir `isDefault === true`, caso o artigo não tenha um site previamente atribuído.
 
 ---
 

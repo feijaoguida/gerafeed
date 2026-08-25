@@ -29,6 +29,7 @@ interface WordPressSiteItem {
   hasPassword: boolean;
   defaultPromptType: string | null;
   active: boolean;
+  isDefault: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -69,6 +70,7 @@ export default function SettingsWordPressPage() {
   const [applicationPassword, setApplicationPassword] = useState("");
   const [defaultPromptType, setDefaultPromptType] = useState("");
   const [active, setActive] = useState(true);
+  const [isDefault, setIsDefault] = useState(false);
 
   // Modal / Create Site State
   const [isCreatingSite, setIsCreatingSite] = useState(false);
@@ -77,6 +79,7 @@ export default function SettingsWordPressPage() {
   const [newSiteUsername, setNewSiteUsername] = useState("");
   const [newSitePassword, setNewSitePassword] = useState("");
   const [newSitePromptType, setNewSitePromptType] = useState("");
+  const [newSiteIsDefault, setNewSiteIsDefault] = useState(false);
 
   // Quick-create feed state
   const [isAddingNewFeed, setIsAddingNewFeed] = useState(false);
@@ -131,6 +134,7 @@ export default function SettingsWordPressPage() {
       setUsername(data.site.username || "");
       setDefaultPromptType(data.site.defaultPromptType || "");
       setActive(data.site.active);
+      setIsDefault(data.site.isDefault || false);
       setApplicationPassword("");
       setSelectedSiteId(id);
     } catch (err) {
@@ -178,6 +182,7 @@ export default function SettingsWordPressPage() {
         username: string;
         defaultPromptType: string | null;
         active: boolean;
+        isDefault: boolean;
         applicationPassword?: string;
       } = {
         name,
@@ -185,6 +190,7 @@ export default function SettingsWordPressPage() {
         username,
         defaultPromptType: defaultPromptType.trim() || null,
         active,
+        isDefault,
       };
 
       if (applicationPassword.trim()) {
@@ -229,6 +235,7 @@ export default function SettingsWordPressPage() {
           applicationPassword: newSitePassword,
           defaultPromptType: newSitePromptType.trim() || null,
           active: true,
+          isDefault: newSiteIsDefault,
         }),
       });
 
@@ -242,6 +249,7 @@ export default function SettingsWordPressPage() {
       setNewSiteUsername("");
       setNewSitePassword("");
       setNewSitePromptType("");
+      setNewSiteIsDefault(false);
 
       await refreshSites();
       if (data.site?.id) {
@@ -543,6 +551,21 @@ export default function SettingsWordPressPage() {
                 />
               </div>
 
+              <div className="flex items-center gap-3 pt-2">
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={newSiteIsDefault}
+                    onChange={(e) => setNewSiteIsDefault(e.target.checked)}
+                    className="sr-only peer"
+                  />
+                  <div className="w-9 h-5 bg-zinc-300 dark:bg-zinc-700 peer-focus:outline-hidden rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-zinc-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-sky-600"></div>
+                </label>
+                <span className="text-xs font-semibold text-zinc-700 dark:text-zinc-300">
+                  Definir como Destino Padrão
+                </span>
+              </div>
+
               <div className="flex justify-end gap-3 pt-4 border-t border-zinc-100 dark:border-zinc-800">
                 <button
                   type="button"
@@ -598,6 +621,11 @@ export default function SettingsWordPressPage() {
                           className={`w-2.5 h-2.5 rounded-full ${site.active ? "bg-emerald-500" : "bg-zinc-400"}`}
                         />
                         <h3 className="text-sm font-bold text-zinc-900 dark:text-white">{site.name}</h3>
+                        {site.isDefault && (
+                          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-sky-100 dark:bg-sky-500/20 text-sky-600 dark:text-sky-400 uppercase tracking-wider ml-1">
+                            Padrão
+                          </span>
+                        )}
                       </div>
                       <span
                         className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${
@@ -797,6 +825,21 @@ export default function SettingsWordPressPage() {
                   </label>
                   <span className="text-xs font-semibold text-zinc-700 dark:text-zinc-300">
                     Destino Ativo para Curadoria
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-3 pt-4 sm:pt-6">
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={isDefault}
+                      onChange={(e) => setIsDefault(e.target.checked)}
+                      className="sr-only peer"
+                    />
+                    <div className="w-9 h-5 bg-zinc-300 dark:bg-zinc-700 peer-focus:outline-hidden rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-zinc-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-sky-600"></div>
+                  </label>
+                  <span className="text-xs font-semibold text-zinc-700 dark:text-zinc-300">
+                    Definir como Padrão
                   </span>
                 </div>
               </div>

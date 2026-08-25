@@ -97,8 +97,8 @@ export function AffiliateArticleEditor({
   const [originalImageUrl, setOriginalImageUrl] = useState<string>(initialOriginalImageUrl || "");
   const [wordpressSiteId, setWordpressSiteId] = useState<string>(initialWordpressSiteId || "");
   const [categoryId, setCategoryId] = useState<string>(initialCategoryId || "");
-  const [wpSites, setWpSites] = useState<Array<{ id: string; name: string; url: string }>>([]);
-  const [wpCategories, setWpCategories] = useState<Array<{ id: string; name: string; wordpressId: number }>>([]);
+  const [wpSites, setWpSites] = useState<Array<{ id: string; name: string; url: string; isDefault?: boolean }>>([]);
+  const [wpCategories, setWpCategories] = useState<Array<{ id: string; name: string; wordpressId: number; wordpressSiteId?: string }>>([]);
   const [seoFocusKeyword, setSeoFocusKeyword] = useState(initialSeoFocusKeyword);
   const [seoTitle, setSeoTitle] = useState(initialSeoTitle);
   const [seoDescription, setSeoDescription] = useState(initialSeoDescription);
@@ -125,7 +125,8 @@ export function AffiliateArticleEditor({
           const list = Array.isArray(siteData.sites) ? siteData.sites : Array.isArray(siteData) ? siteData : [];
           setWpSites(list);
           if (list.length > 0 && !wordpressSiteId && !initialWordpressSiteId) {
-            setWordpressSiteId(list[0].id);
+            const defaultSite = list.find((s: { id: string; isDefault?: boolean }) => s.isDefault);
+            setWordpressSiteId(defaultSite ? defaultSite.id : list[0].id);
           }
         }
         if (catsRes.ok && !ignore) {
@@ -333,14 +334,17 @@ export function AffiliateArticleEditor({
           <div className="flex flex-wrap items-center gap-2 border-l pl-3 border-border">
             <select
               value={wordpressSiteId}
-              onChange={(e) => setWordpressSiteId(e.target.value)}
+              onChange={(e) => {
+                setWordpressSiteId(e.target.value);
+                setCategoryId(""); // Reset category when site changes
+              }}
               className="text-xs px-2.5 py-1.5 rounded-lg border bg-background text-foreground"
               title="Site WordPress de destino"
             >
               <option value="">Site WordPress Padrão</option>
               {wpSites.map((s) => (
                 <option key={s.id} value={s.id}>
-                  🌐 {s.name}
+                  🌐 {s.name} {s.isDefault ? "(Padrão)" : ""}
                 </option>
               ))}
             </select>
@@ -354,7 +358,9 @@ export function AffiliateArticleEditor({
               title="Categoria do Post no WordPress"
             >
               <option value="">⚠️ Selecione a Categoria WP *</option>
-              {wpCategories.map((c) => (
+              {wpCategories
+                .filter((c) => !wordpressSiteId || c.wordpressSiteId === wordpressSiteId)
+                .map((c) => (
                 <option key={c.id} value={c.id}>
                   📁 {c.name}
                 </option>

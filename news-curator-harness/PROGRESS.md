@@ -4,7 +4,7 @@
 Phase 21. Article Content Enrichment & Scraping
 
 ## Current Task
-200-article-content-scraping-and-enrichment
+201-multi-wordpress-editorial-review
 
 ## Status
 IN_PROGRESS
@@ -50,10 +50,25 @@ IN_PROGRESS
 ## In Progress
 - Nenhuma
 
+## Completed (Current Phase)
+- [x] 201-multi-wordpress-editorial-review
+
 ## Blocked
 - Nenhuma
 
 ## Last Evidence
+Task 201 concluída com sucesso:
+- Modificado o schema Prisma com `isDefault Boolean @default(false)` no modelo `WordPressSite` e `npx prisma db push` efetuado com sucesso.
+- O arquivo `src/lib/wordpress-sites.ts` e as rotas `/api/wordpress/sites` suportam exclusividade mútua no workspace para o campo `isDefault`.
+- A tela `src/app/(app)/settings/wordpress/page.tsx` foi atualizada para expor a seleção e visualização do site Padrão.
+- `ReviewArticlePage` e `AffiliateArticleEditor` agora suportam dropdowns para "Site WordPress Destino" e pré-selecionam o site padrão por default.
+- Os dropdowns de Categoria do WordPress agora filtram as categorias apenas do site destino selecionado.
+- Verificação técnica:
+  - `npx tsc --noEmit`: PASS
+  - `npm run lint`: PASS (0 erros bloqueantes)
+  - `npm run build`: PASS (Build de produção gerado com sucesso)
+
+## Previous Evidence
 Task 200 concluída com sucesso:
 - Campo `originalContent` adicionado ao model `Article` no Prisma (`prisma/schema.prisma`) e sincronizado no banco via `npx prisma db push` e `npx prisma generate`.
 - Criado módulo `src/lib/scraper.ts` para extração resiliente de conteúdo de matérias web com timeout, sanitização profunda de HTML e extração de containers semânticos.
@@ -61,16 +76,8 @@ Task 200 concluída com sucesso:
 - `src/lib/ai.ts` e provedores (`OpenAIProvider`, `GeminiProvider`, `AnthropicProvider`, `OpenAICompatibleProvider`) atualizados para injetar o bloco de `Conteúdo Completo da Matéria Original` no prompt da IA.
 - `buildSystemPrompt` atualizado para guiar a IA na geração de artigos ricos com subtítulos `<h2>` e `<h3>`, números e especificações a partir do conteúdo completo.
 - Script de teste `scripts/test-article-content-scraping.ts`: PASS (9/9 asserts com scraping real de 5.119 caracteres da matéria Abril/Philco).
-- Verificação técnica:
-  - `npx tsc --noEmit`: PASS
-  - `npm run lint`: PASS (0 erros)
-  - `npm run build`: PASS (Build de produção gerado com sucesso)
 - Interface `/settings/billing` atualizada com suporte a tratamento seguro de retorno (`?checkout=success` e `?checkout=canceled`), sem ativar antecipadamente o plano.
 - Script de teste automatizado `scripts/test-hosted-checkout-and-billing-methods.ts`: PASS (100% de sucesso).
-- Verificação técnica:
-  - `npx tsc --noEmit`: PASS
-  - `npm run lint`: PASS (0 erros)
-  - `npm run build`: PASS (Build de produção gerado com sucesso)
 
 ## Discovered Work Evidence (UX & Bugs)
 Concluída correção de bugs e melhorias de UX fora do escopo principal:

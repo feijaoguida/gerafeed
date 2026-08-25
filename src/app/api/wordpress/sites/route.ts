@@ -40,7 +40,7 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json();
-    const { name, url, username, applicationPassword, defaultPromptType, active } = body;
+    const { name, url, username, applicationPassword, defaultPromptType, active, isDefault } = body;
 
     if (!name || !name.trim()) {
       return NextResponse.json(
@@ -69,6 +69,7 @@ export async function POST(request: Request) {
       applicationPassword: applicationPassword || "",
       defaultPromptType: defaultPromptType || null,
       active: active !== undefined ? active : true,
+      isDefault: isDefault === true,
     });
 
     return NextResponse.json({
