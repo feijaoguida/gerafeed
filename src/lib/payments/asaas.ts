@@ -39,7 +39,7 @@ export class AsaasGateway implements PaymentGateway {
     this.baseUrl =
       config?.baseUrl ||
       process.env.ASAAS_API_URL ||
-      (isProd ? "https://api.asaas.com/v3" : "https://sandbox.asaas.com/v3");
+      (isProd ? "https://api.asaas.com/v3" : "https://sandbox.asaas.com/api/v3");
     this.webhookToken = config?.webhookToken || process.env.ASAAS_WEBHOOK_TOKEN || "";
   }
 
@@ -391,6 +391,7 @@ export class AsaasGateway implements PaymentGateway {
         chargeType: "RECURRENT",
         value: params.amount,
         subscriptionCycle: params.cycle || "MONTHLY",
+        dueDateLimitDays: 10,
         externalReference: params.workspaceId,
         callback: {
           successUrl: params.successUrl || "/dashboard",
