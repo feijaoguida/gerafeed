@@ -96,6 +96,8 @@ export class AsaasGateway implements PaymentGateway {
 
     const cleanDoc = params.cpfCnpj ? params.cpfCnpj.replace(/\D/g, "") : undefined;
 
+    console.log(`[Asaas] createCustomer initiating for workspace ${params.workspaceId || "unknown"} (name: ${params.name}, email: ${params.email})`);
+
     const payload = {
       name: params.name,
       email: params.email,
@@ -124,10 +126,12 @@ export class AsaasGateway implements PaymentGateway {
     if (!res.ok) {
       const errors = data?.errors as Array<{ description?: string }> | undefined;
       const errorMsg = errors?.[0]?.description || `Erro HTTP ${res.status} ao criar cliente no Asaas`;
+      console.error(`[Asaas] createCustomer error: ${errorMsg}`, data);
       throw this.normalizeError(errorMsg);
     }
 
     const customerId = (data.id as string) || `cus_${Date.now()}`;
+    console.log(`[Asaas] createCustomer success: ${customerId}`);
 
     // Persist providerCustomerId to Workspace and BillingProfile if workspaceId provided
     if (params.workspaceId) {
@@ -144,13 +148,14 @@ export class AsaasGateway implements PaymentGateway {
   /**
    * Idempotently ensures customer exists on Asaas.
    * Reconciliation Flow:
-   * 1. If providerCustomerId / workspace.asaasCustomerId exists, verify & update.
+   * 1. If providerCustomerId / workspace.asaasCustomerId exists, verify on Asaas & update.
    * 2. Search Asaas by externalReference (workspaceId).
    * 3. Search Asaas by cpfCnpj.
    * 4. If not found, create new.
    */
   async ensureCustomer(params: CreateCustomerParams): Promise<CustomerResult> {
     const workspaceId = params.workspaceId;
+    console.log(`[Asaas] ensureCustomer starting for workspace: ${workspaceId}, email: ${params.email}`);
 
     // Check database for existing providerCustomerId
     let existingCustomerId = params.providerCustomerId;
@@ -166,21 +171,30 @@ export class AsaasGateway implements PaymentGateway {
 
     // 1. If existing ID is present, verify on Asaas or adopt cleanly
     if (existingCustomerId) {
+      console.log(`[Asaas] ensureCustomer found existing local ID: ${existingCustomerId}`);
       if (this.apiKey) {
         const existing = await this.getCustomer(existingCustomerId);
         if (existing) {
+          console.log(`[Asaas] ensureCustomer confirmed existing customer on Asaas, updating details...`);
           await this.updateCustomerDetails(existingCustomerId, params);
+          if (workspaceId) await this.persistCustomerId(workspaceId, existingCustomerId);
+          return { customerId: existingCustomerId, provider: "asaas", updated: true };
+        } else {
+          console.warn(`[Asaas] ensureCustomer: ID ${existingCustomerId} not found on Asaas, will search or create.`);
         }
+      } else {
+        if (workspaceId) await this.persistCustomerId(workspaceId, existingCustomerId);
+        return { customerId: existingCustomerId, provider: "asaas", updated: true };
       }
-      if (workspaceId) await this.persistCustomerId(workspaceId, existingCustomerId);
-      return { customerId: existingCustomerId, provider: "asaas", updated: true };
     }
 
     // 2. Search Asaas by externalReference
     if (workspaceId && this.apiKey) {
+      console.log(`[Asaas] searching customer by externalReference: ${workspaceId}`);
       const foundByRef = await this.searchCustomers({ externalReference: workspaceId });
       if (foundByRef.length > 0) {
         const targetId = foundByRef[0].id;
+        console.log(`[Asaas] found customer by externalReference: ${targetId}`);
         await this.updateCustomerDetails(targetId, params);
         await this.persistCustomerId(workspaceId, targetId);
         return { customerId: targetId, provider: "asaas", updated: true };
@@ -190,9 +204,11 @@ export class AsaasGateway implements PaymentGateway {
     // 3. Search Asaas by clean CPF/CNPJ
     if (params.cpfCnpj && this.apiKey) {
       const cleanDoc = params.cpfCnpj.replace(/\D/g, "");
+      console.log(`[Asaas] searching customer by clean CPF/CNPJ: ${cleanDoc.slice(0, 3)}***`);
       const foundByDoc = await this.searchCustomers({ cpfCnpj: cleanDoc });
       if (foundByDoc.length > 0) {
         const targetId = foundByDoc[0].id;
+        console.log(`[Asaas] found customer by CPF/CNPJ: ${targetId}`);
         await this.updateCustomerDetails(targetId, params);
         if (workspaceId) await this.persistCustomerId(workspaceId, targetId);
         return { customerId: targetId, provider: "asaas", updated: true };
@@ -200,6 +216,7 @@ export class AsaasGateway implements PaymentGateway {
     }
 
     // 4. Create new customer
+    console.log(`[Asaas] customer not found, creating new customer.`);
     return this.createCustomer(params);
   }
 
@@ -283,9 +300,14 @@ export class AsaasGateway implements PaymentGateway {
     nextDueDate.setDate(nextDueDate.getDate() + 1);
     const formattedDueDate = nextDueDate.toISOString().split("T")[0];
 
+    const billingType =
+      params.billingType && params.billingType !== "UNDEFINED"
+        ? params.billingType
+        : "BOLETO";
+
     const payload = {
       customer: params.customerId,
-      billingType: params.billingType || "UNDEFINED",
+      billingType,
       value: params.price,
       nextDueDate: formattedDueDate,
       cycle: params.cycle || "MONTHLY",
@@ -327,18 +349,21 @@ export class AsaasGateway implements PaymentGateway {
           if (firstPayment?.invoiceUrl) {
             invoiceUrl = firstPayment.invoiceUrl;
             paymentUrl = invoiceUrl;
-          } else if (firstPayment?.invoiceUrl === undefined && firstPayment?.bankSlipUrl) {
+          } else if (firstPayment?.bankSlipUrl) {
             invoiceUrl = firstPayment.bankSlipUrl;
+            paymentUrl = invoiceUrl;
+          } else if (firstPayment?.id) {
+            invoiceUrl = `https://www.asaas.com/i/${firstPayment.id}`;
             paymentUrl = invoiceUrl;
           }
         }
       }
     } catch {
-      // Ignora erro no fetch do payment e usa default da assinatura se houver
+      // Non-fatal error during first payment fetch
     }
 
     if (!paymentUrl) {
-       paymentUrl = (data.paymentLink as string) || undefined;
+      paymentUrl = (data.paymentLink as string) || undefined;
     }
 
     return {
@@ -352,72 +377,44 @@ export class AsaasGateway implements PaymentGateway {
   }
 
   /**
-   * Generates a payment link or hosted checkout URL.
+   * Generates a hosted checkout / invoice URL for the plan subscription.
    */
   async getCheckoutUrl(params: CheckoutParams): Promise<string> {
     if (!this.apiKey) {
       throw this.normalizeError("Asaas API Key não configurada.");
     }
 
-    if (params.customerId && params.amount !== undefined && params.planId && params.planName) {
-      // Prioritize creating a subscription to get the invoice URL
-      try {
-        const sub = await this.createSubscription({
-          workspaceId: params.workspaceId,
-          customerId: params.customerId,
-          planId: params.planId,
-          planSlug: params.planSlug,
-          planName: params.planName,
-          price: params.amount,
-          billingType: "UNDEFINED",
-          cycle: params.cycle || "MONTHLY",
-        });
-
-        if (sub.paymentUrl) {
-          return sub.paymentUrl;
-        }
-      } catch (error) {
-        throw this.normalizeError(`Falha ao criar assinatura para checkout: ${error instanceof Error ? error.message : String(error)}`);
-      }
+    if (!params.customerId) {
+      throw this.normalizeError("Cliente inválido ou não informado para checkout.");
     }
 
-    // Fallback: create a payment link
-    const res = await fetch(`${this.baseUrl}/paymentLinks`, {
-      method: "POST",
-      headers: this.getHeaders(),
-      body: JSON.stringify({
-        name: `News Curator - Plano ${params.planName || params.planSlug.toUpperCase()}`,
-        billingType: "UNDEFINED",
-        chargeType: "RECURRENT",
-        value: params.amount,
-        subscriptionCycle: params.cycle || "MONTHLY",
-        dueDateLimitDays: 10,
-        externalReference: params.workspaceId,
-        callback: {
-          successUrl: params.successUrl || "/dashboard",
-          autoRedirect: true,
-        },
-      }),
+    if (params.amount === undefined || !params.planId || !params.planName) {
+      throw this.normalizeError("Dados do plano ou valor incompletos para checkout.");
+    }
+
+    const billingType =
+      params.billingType && params.billingType !== "UNDEFINED"
+        ? params.billingType
+        : "BOLETO";
+
+    const sub = await this.createSubscription({
+      workspaceId: params.workspaceId,
+      customerId: params.customerId,
+      planId: params.planId,
+      planSlug: params.planSlug,
+      planName: params.planName,
+      price: params.amount,
+      billingType,
+      cycle: params.cycle || "MONTHLY",
     });
 
-    let data: Record<string, unknown> = {};
-    const contentType = res.headers.get("content-type");
-    if (contentType && contentType.includes("application/json")) {
-      data = await res.json();
+    const targetUrl = sub.paymentUrl || sub.invoiceUrl;
+
+    if (!targetUrl) {
+      throw this.normalizeError("O gateway de pagamento não retornou a URL da fatura de checkout.");
     }
 
-    if (!res.ok) {
-      const errors = data?.errors as Array<{ description?: string }> | undefined;
-      const errorMsg = errors?.[0]?.description || `Erro HTTP ${res.status} ao gerar link de pagamento no Asaas`;
-      throw this.normalizeError(errorMsg);
-    }
-
-    const url = (data.url as string) || "";
-    if (!url) {
-      throw this.normalizeError("O gateway de pagamento não retornou a URL do checkout.");
-    }
-
-    return url;
+    return targetUrl;
   }
 
   /**
@@ -448,6 +445,48 @@ export class AsaasGateway implements PaymentGateway {
   }
 
   /**
+   * Retrieves subscription details from Asaas API.
+   */
+  async getSubscription(subscriptionId: string): Promise<Record<string, unknown> | null> {
+    if (!this.apiKey) {
+      throw this.normalizeError("Asaas API Key não configurada.");
+    }
+
+    const res = await fetch(`${this.baseUrl}/subscriptions/${subscriptionId}`, {
+      method: "GET",
+      headers: this.getHeaders(),
+    });
+
+    if (!res.ok) {
+      if (res.status === 404) return null;
+      throw this.normalizeError(`Erro ao consultar assinatura ${subscriptionId} no Asaas: HTTP ${res.status}`);
+    }
+
+    return res.json();
+  }
+
+  /**
+   * Retrieves payments for a subscription from Asaas API.
+   */
+  async getSubscriptionPayments(subscriptionId: string): Promise<Array<Record<string, unknown>>> {
+    if (!this.apiKey) {
+      throw this.normalizeError("Asaas API Key não configurada.");
+    }
+
+    const res = await fetch(`${this.baseUrl}/subscriptions/${subscriptionId}/payments?limit=50`, {
+      method: "GET",
+      headers: this.getHeaders(),
+    });
+
+    if (!res.ok) {
+      throw this.normalizeError(`Erro ao consultar cobranças da assinatura ${subscriptionId} no Asaas: HTTP ${res.status}`);
+    }
+
+    const data = await res.json();
+    return Array.isArray(data?.data) ? data.data : [];
+  }
+
+  /**
    * Parses and validates Asaas webhook payloads.
    */
   async handleWebhook(
@@ -462,6 +501,7 @@ export class AsaasGateway implements PaymentGateway {
     }
 
     const raw = payload as {
+      id?: string;
       event?: string;
       payment?: {
         id?: string;
@@ -482,6 +522,12 @@ export class AsaasGateway implements PaymentGateway {
     const rawEvent = raw.event || "";
 
     switch (rawEvent) {
+      case "PAYMENT_CREATED":
+        eventType = "PAYMENT_CREATED";
+        break;
+      case "PAYMENT_UPDATED":
+        eventType = "PAYMENT_UPDATED";
+        break;
       case "PAYMENT_CONFIRMED":
         eventType = "PAYMENT_CONFIRMED";
         break;
@@ -494,11 +540,26 @@ export class AsaasGateway implements PaymentGateway {
       case "PAYMENT_DELETED":
         eventType = "PAYMENT_DELETED";
         break;
+      case "PAYMENT_REFUNDED":
+        eventType = "PAYMENT_REFUNDED";
+        break;
+      case "PAYMENT_PARTIALLY_REFUNDED":
+        eventType = "PAYMENT_PARTIALLY_REFUNDED";
+        break;
+      case "PAYMENT_CREDIT_CARD_CAPTURE_REFUSED":
+        eventType = "PAYMENT_CREDIT_CARD_CAPTURE_REFUSED";
+        break;
+      case "PAYMENT_CHARGEBACK_REQUESTED":
+        eventType = "PAYMENT_CHARGEBACK_REQUESTED";
+        break;
       case "SUBSCRIPTION_CREATED":
         eventType = "SUBSCRIPTION_CREATED";
         break;
       case "SUBSCRIPTION_UPDATED":
         eventType = "SUBSCRIPTION_UPDATED";
+        break;
+      case "SUBSCRIPTION_INACTIVATED":
+        eventType = "SUBSCRIPTION_INACTIVATED";
         break;
       case "SUBSCRIPTION_DELETED":
         eventType = "SUBSCRIPTION_DELETED";
@@ -507,8 +568,14 @@ export class AsaasGateway implements PaymentGateway {
         eventType = "UNKNOWN";
     }
 
+    const providerEventId =
+      raw.id ||
+      (raw.payment?.id ? `${raw.payment.id}_${rawEvent}` : undefined) ||
+      (raw.subscription?.id ? `${raw.subscription.id}_${rawEvent}` : undefined);
+
     const subscriptionId =
       raw.payment?.subscription || raw.subscription?.id || undefined;
+    const paymentId = raw.payment?.id || undefined;
     const customerId = raw.payment?.customer || raw.subscription?.customer || undefined;
     const workspaceId =
       raw.payment?.externalReference || raw.subscription?.externalReference || undefined;
@@ -516,6 +583,8 @@ export class AsaasGateway implements PaymentGateway {
     return {
       type: eventType,
       provider: "asaas",
+      providerEventId,
+      paymentId,
       subscriptionId,
       customerId,
       workspaceId,

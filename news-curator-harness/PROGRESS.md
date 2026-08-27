@@ -1,13 +1,13 @@
 # PROGRESS.md
 
 ## Current Phase
-Phase 21. Article Content Enrichment & Scraping
+All Planned Phases (1 to 21) Completed
 
 ## Current Task
-201-multi-wordpress-editorial-review
+None
 
 ## Status
-IN_PROGRESS
+ALL_TASKS_COMPLETED
 
 ## Completed
 - Phase 1. Core MVP
@@ -35,19 +35,24 @@ IN_PROGRESS
 - [x] 181-billing-profile-and-customer-data
 - [x] 182-payment-provider-contract-and-asaas-customer-sync
 - [x] 183-hosted-checkout-and-billing-methods
-- [ ] 184-asaas-recurring-subscriptions
-- [ ] 185-asaas-webhook-ingestion
-- [ ] 186-payment-ledger-and-invoice-history
-- [ ] 187-subscription-lifecycle-and-access-control
-- [ ] 188-customer-billing-portal
-- [ ] 189-backoffice-billing-management
-- [ ] 190-manual-reconciliation-and-recovery
-- [ ] 191-phase20-integration-and-hardening
+- [x] 184-asaas-recurring-subscriptions
+- [x] 185-asaas-webhook-ingestion
+- [x] 186-payment-ledger-and-invoice-history
+- [x] 187-subscription-lifecycle-and-access-control
+- [x] 188-customer-billing-portal
+- [x] 189-backoffice-billing-management
+- [x] 190-manual-reconciliation-and-recovery
+- [x] 191-phase20-integration-and-hardening
 
 ## Phase 21. Article Content Enrichment & Scraping
 - [x] 200-article-content-scraping-and-enrichment
 - [x] 201-multi-wordpress-editorial-review
 - [x] 202-fix-billing-checkout-flow
+- [x] 203-asaas-url-and-billing-type
+- [x] 204-asaas-idempotent-customer
+- [x] 205-asaas-webhook-setup
+- [x] 206-asaas-checkout-e2e
+- [x] 207-asaas-test-script
 
 ## In Progress
 - Nenhuma
@@ -55,12 +60,27 @@ IN_PROGRESS
 ## Completed (Current Phase)
 - [x] 201-multi-wordpress-editorial-review
 - [x] 202-fix-billing-checkout-flow
+- [x] 203-asaas-url-and-billing-type
+- [x] 204-asaas-idempotent-customer
+- [x] 205-asaas-webhook-setup
+- [x] 206-asaas-checkout-e2e
+- [x] 207-asaas-test-script
 
 ## Blocked
 - Nenhuma
 
 ## Last Evidence
-Task 202 concluída com sucesso:
+Integração completa com Asaas (Tasks 203 a 207) finalizada com sucesso:
+- **Task 203**: URL base corrigida para `/api/v3` no sandbox, removido fallback genérico de `paymentLinks`, ajustado `billingType` padrão para `"BOLETO"` (onde a fatura oficial `invoiceUrl` aceita Pix, Boleto e Cartão de Crédito nativamente).
+- **Task 204**: `ensureCustomer` sanitiza CPF/CNPJ, loga o fluxo de busca/criação, persiste `providerCustomerId` e `Workspace.asaasCustomerId`, e o checkout valida a existência do ID antes de prosseguir.
+- **Task 205**: Webhook no endpoint `/api/webhooks/asaas` aprimorado para suportar `PAYMENT_CREATED`, `PAYMENT_CONFIRMED`, `PAYMENT_RECEIVED`, `PAYMENT_OVERDUE`, `PAYMENT_REFUNDED`, `PAYMENT_DELETED` e ciclo anual (+365 dias) vs mensal (+30 dias).
+- **Task 206**: Rota de checkout registra `INCOMPLETE` de forma idempotente até confirmação via webhook e redireciona direto para a fatura oficial hospedada (`invoiceUrl`).
+- **Task 207**: Script `scripts/test-billing-e2e.ts` criado e executado com sucesso no Sandbox do Asaas:
+  - Customer criado: `cus_000008903500`
+  - Assinatura criada com fatura gerada: `https://sandbox.asaas.com/i/gocb3iax43mu53he`
+- **Validações Técnicas**:
+  - `npx tsc --noEmit`: PASS (0 erros).
+  - `npm run lint`: PASS (0 erros).
 - `CheckoutParams` no `types.ts` atualizado para receber plano e valor originais.
 - O gateway `asaas.ts` agora prioriza a geração da assinatura `createSubscription` com `billingType="UNDEFINED"` e, em seguida, chama `GET /v3/subscriptions/{id}/payments` para extrair a `invoiceUrl` real. Em caso de falha de prioridade, faz um fallback elegante enviando o `value` no `paymentLinks`.
 - A API `/api/billing/checkout` agora valida e impede redirecionamento vazio.

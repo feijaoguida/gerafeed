@@ -99,6 +99,7 @@ model Workspace {
   referenceSources     ProductReferenceSource[]
   articleAffiliatePlacements ArticleAffiliatePlacement[]
   checkoutSessions           BillingCheckoutSession[]
+  invoices                   Invoice[]
 }
 
 // ---------------------------------------------------------------------------
@@ -108,7 +109,9 @@ model Workspace {
 enum SubscriptionStatus {
   ACTIVE
   PAST_DUE
+  SUSPENDED
   CANCELED
+  EXPIRED
   INCOMPLETE
   TRIALING
 }
@@ -169,19 +172,31 @@ model PlanFeature {
 }
 
 model Subscription {
-  id                   String             @id @default(cuid())
-  workspaceId          String             @unique
-  workspace            Workspace          @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  planId               String
-  plan                 Plan               @relation(fields: [planId], references: [id])
-  status               SubscriptionStatus @default(ACTIVE)
-  asaasSubscriptionId  String?            @unique
-  stripeSubscriptionId String?            @unique
-  currentPeriodStart   DateTime           @default(now())
-  currentPeriodEnd     DateTime?
-  validUntil           DateTime?
-  createdAt            DateTime           @default(now())
-  updatedAt            DateTime           @updatedAt
+  id                            String             @id @default(cuid())
+  workspaceId                   String             @unique
+  workspace                     Workspace          @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  planId                        String
+  plan                          Plan               @relation(fields: [planId], references: [id])
+  status                        SubscriptionStatus @default(ACTIVE)
+  billingCycle                  BillingCycle       @default(MONTHLY)
+  billingMethod                 BillingMethod      @default(CREDIT_CARD)
+  amount                        Decimal?           @db.Decimal(10, 2)
+  annualDiscountPercentSnapshot Decimal?           @db.Decimal(5, 2)
+  providerCustomerId            String?
+  providerSubscriptionId        String?
+  asaasSubscriptionId           String?            @unique
+  stripeSubscriptionId          String?            @unique
+  currentPeriodStart            DateTime           @default(now())
+  currentPeriodEnd              DateTime?
+  validUntil                    DateTime?
+  nextDueDate                   DateTime?
+  cancelAtPeriodEnd             Boolean            @default(false)
+  canceledAt                    DateTime?
+  gracePeriodEndsAt             DateTime?
+  pendingPlanId                 String?
+  invoices                      Invoice[]
+  createdAt                     DateTime           @default(now())
+  updatedAt                     DateTime           @updatedAt
 }
 
 
@@ -675,6 +690,67 @@ model BillingCheckoutSession {
   updatedAt          DateTime      @updatedAt
 
   @@index([workspaceId])
+  @@index([status])
+}
+
+model ProviderWebhookEvent {
+  id              String    @id @default(cuid())
+  provider        String    // asaas, stripe, etc
+  providerEventId String
+  eventType       String
+  resourceId      String?
+  status          String    @default("PENDING") // PENDING, PROCESSED, FAILED, IGNORED
+  receivedAt      DateTime  @default(now())
+  processedAt     DateTime?
+  errorCode       String?
+  payload         String?   @db.Text
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@unique([provider, providerEventId])
+  @@index([provider, status])
+  @@index([eventType])
+}
+
+enum InvoiceStatus {
+  PENDING
+  CONFIRMED
+  RECEIVED
+  OVERDUE
+  REFUNDED
+  PARTIALLY_REFUNDED
+  CANCELED
+  FAILED
+}
+
+model Invoice {
+  id                String         @id @default(cuid())
+  workspaceId       String
+  workspace         Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  subscriptionId    String?
+  subscription      Subscription?  @relation(fields: [subscriptionId], references: [id], onDelete: SetNull)
+  provider          String         @default("asaas") // asaas, stripe, etc
+  providerPaymentId String
+  amount            Decimal        @db.Decimal(10, 2)
+  billingMethod     BillingMethod  @default(CREDIT_CARD)
+  status            InvoiceStatus  @default(PENDING)
+  dueDate           DateTime?
+  confirmedAt       DateTime?
+  receivedAt        DateTime?
+  overdueAt         DateTime?
+  refundedAt        DateTime?
+  providerStatus    String?
+  invoiceUrl        String?
+  bankSlipUrl       String?
+  pixQrCode         String?
+  pixCopyPaste      String?
+  creditDate        DateTime?
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+
+  @@unique([provider, providerPaymentId])
+  @@index([workspaceId])
+  @@index([subscriptionId])
   @@index([status])
 }
 

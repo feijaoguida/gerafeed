@@ -1666,7 +1666,11 @@ O GeraFeed também não deve receber esses dados em Route Handler próprio na ar
 
 ## 135. Hosted Checkout e URL da Fatura Asaas
 
-Para pagamento, devemos preferir sempre a fatura oficial do Asaas (`invoiceUrl`) atrelada à assinatura gerada, pois ela já suporta nativamente Pix (QR Code), Cartão de Crédito e Boleto com alta conversão e segurança.
+Para pagamento, devemos preferir a fatura oficial do Asaas (`invoiceUrl`) atrelada à assinatura gerada. A `invoiceUrl` é a tela hospedada do Asaas que aceita Pix (QR Code), Cartão de Crédito e Boleto independentemente do `billingType` configurado na assinatura.
+
+O `billingType` padrão para assinaturas deve ser `"BOLETO"` (a API do Asaas **não aceita** `"UNDEFINED"` em assinaturas). O Asaas gera automaticamente QR Code Pix no boleto quando aplicável. A `invoiceUrl` oferece todas as formas de pagamento ao cliente.
+
+Não usar `paymentLinks` (`POST /v3/paymentLinks`) para checkout de assinaturas — esse endpoint é para links genéricos e exige domínio configurado na conta Asaas.
 
 Fluxo:
 
@@ -1674,12 +1678,13 @@ Fluxo:
 GeraFeed
 → recebe intenção de upgrade (`/api/billing/checkout`)
 → verifica se Dados Cadastrais estão completos (senão retorna `BILLING_PROFILE_REQUIRED`)
-→ garante que Customer existe no Asaas (`ensureCustomer`)
-→ cria Subscription no Asaas com `billingType = "UNDEFINED"` e valor exato
-→ obtém a primeira fatura (`invoiceUrl`) dessa assinatura recém-criada
+→ garante que Customer existe no Asaas (`ensureCustomer`) com CPF/CNPJ válido
+→ cria Subscription no Asaas com `billingType = "BOLETO"` e valor exato
+→ busca cobranças da assinatura (`GET /v3/subscriptions/{id}/payments?limit=1`)
+→ extrai `invoiceUrl` da primeira cobrança
 → redireciona o cliente para a `invoiceUrl`
-→ cliente paga no Asaas (escolhe Pix, Cartão ou Boleto)
-→ Asaas dispara Webhook confirmando o pagamento
+→ cliente paga no Asaas (escolhe Pix, Cartão ou Boleto na tela hospedada)
+→ Asaas dispara Webhook `PAYMENT_CONFIRMED` / `PAYMENT_RECEIVED`
 → Webhook no GeraFeed ativa a assinatura (`ACTIVE`)
 ```
 
@@ -1720,16 +1725,18 @@ Não transformar CheckoutSession em Invoice.
 Criar assinatura recorrente no Asaas via API (`POST /v3/subscriptions`) com:
 
 ```text
-customer
-billingType: "UNDEFINED" (permite todos os métodos)
+customer: (ID do Customer Asaas, obrigatório)
+billingType: "BOLETO" (padrão; a invoiceUrl gerada aceita Pix/Cartão/Boleto)
 value: (valor exato, obrigatório)
-nextDueDate
-cycle
-description
-externalReference
+nextDueDate: (data do primeiro vencimento, formato YYYY-MM-DD)
+cycle: "MONTHLY" ou "YEARLY"
+description: "Assinatura GeraFeed - [Nome do Plano]"
+externalReference: (workspaceId)
 ```
 
-E obrigatoriamente fazer fetch subsequente em `GET /v3/subscriptions/{subscriptionId}/payments` para extrair a propriedade `invoiceUrl` do primeiro pagamento e usá-la como URL de Checkout.
+A API do Asaas **não aceita** `billingType: "UNDEFINED"` em assinaturas. Use `"BOLETO"` como padrão.
+
+Após criar a assinatura, obrigatoriamente fazer fetch subsequente em `GET /v3/subscriptions/{subscriptionId}/payments?limit=1` para extrair a propriedade `invoiceUrl` do primeiro pagamento e usá-la como URL de Checkout. Se `invoiceUrl` não existir na resposta, montar fallback: `https://www.asaas.com/i/{paymentId}`.
 
 Não informar `endDate` ou limite de pagamentos quando a intenção for recorrência contínua sem fidelidade.
 

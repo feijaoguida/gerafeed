@@ -18,6 +18,10 @@ export default async function BackofficeCompanyDetailsPage({
             plan: true,
           },
         },
+        billingProfile: true,
+        invoices: {
+          orderBy: { createdAt: "desc" },
+        },
         members: {
           include: {
             user: {

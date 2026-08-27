@@ -1,7 +1,7 @@
 # Task 190. Manual Reconciliation & Recovery
 
 ## Status
-TODO
+DONE
 
 ## Objetivo
 

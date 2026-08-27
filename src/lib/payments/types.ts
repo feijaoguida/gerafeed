@@ -80,21 +80,31 @@ export interface CheckoutParams {
   amount?: number;
   cycle?: BillingCycle;
   customerId?: string;
+  billingType?: BillingType;
 }
 
 export type WebhookEventType =
+  | "PAYMENT_CREATED"
+  | "PAYMENT_UPDATED"
   | "PAYMENT_CONFIRMED"
   | "PAYMENT_RECEIVED"
   | "PAYMENT_OVERDUE"
   | "PAYMENT_DELETED"
+  | "PAYMENT_REFUNDED"
+  | "PAYMENT_PARTIALLY_REFUNDED"
+  | "PAYMENT_CREDIT_CARD_CAPTURE_REFUSED"
+  | "PAYMENT_CHARGEBACK_REQUESTED"
   | "SUBSCRIPTION_CREATED"
   | "SUBSCRIPTION_UPDATED"
+  | "SUBSCRIPTION_INACTIVATED"
   | "SUBSCRIPTION_DELETED"
   | "UNKNOWN";
 
 export interface WebhookEventResult {
   type: WebhookEventType;
   provider: PaymentProviderType;
+  providerEventId?: string;
+  paymentId?: string;
   subscriptionId?: string;
   customerId?: string;
   workspaceId?: string;

@@ -1,7 +1,7 @@
 # Task 188. Customer Billing Portal
 
 ## Status
-TODO
+DONE
 
 ## Objetivo
 

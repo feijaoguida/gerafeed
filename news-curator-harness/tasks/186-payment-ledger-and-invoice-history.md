@@ -1,7 +1,7 @@
 # Task 186. Payment Ledger & Invoice History
 
 ## Status
-TODO
+DONE
 
 ## Objetivo
 

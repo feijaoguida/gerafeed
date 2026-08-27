@@ -1,7 +1,7 @@
 # Task 184. Asaas Recurring Subscriptions
 
 ## Status
-TODO
+DONE
 
 ## Objetivo
 

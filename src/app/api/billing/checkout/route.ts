@@ -116,6 +116,15 @@ export async function POST(request: Request) {
       state: profile.state || undefined,
     });
 
+    if (!customerResult || !customerResult.customerId) {
+      return NextResponse.json(
+        {
+          error: "Não foi possível vincular ou criar os dados do cliente no gateway de pagamento.",
+        },
+        { status: 400 }
+      );
+    }
+
     // Create BillingCheckoutSession in DB
     const finalSuccessUrl = successUrl || "/settings/billing?checkout=success";
     const finalCancelUrl = cancelUrl || "/settings/billing?checkout=canceled";
@@ -151,6 +160,7 @@ export async function POST(request: Request) {
       customerId: customerResult.customerId,
       userEmail: profile.email,
       userName: profile.name,
+      billingType: billingMethod === "PIX" ? "PIX" : billingMethod === "CREDIT_CARD" ? "CREDIT_CARD" : "BOLETO",
       successUrl: `${finalSuccessUrl}&sessionId=${session.id}`,
       cancelUrl: `${finalCancelUrl}&sessionId=${session.id}`,
     });
@@ -167,6 +177,36 @@ export async function POST(request: Request) {
         providerCheckoutId: customerResult.customerId,
       },
     });
+
+    // If no subscription exists for workspace, create as INCOMPLETE pending webhook
+    const existingSub = await prisma.subscription.findUnique({
+      where: { workspaceId },
+    });
+    if (!existingSub) {
+      await prisma.subscription.create({
+        data: {
+          workspaceId,
+          planId: plan.id,
+          status: "INCOMPLETE",
+          billingCycle: cycle,
+          billingMethod,
+          amount: computedAmount,
+          annualDiscountPercentSnapshot: discountPercent,
+          providerCustomerId: customerResult.customerId,
+        },
+      });
+    } else {
+      await prisma.subscription.update({
+        where: { id: existingSub.id },
+        data: {
+          billingCycle: cycle,
+          billingMethod,
+          amount: computedAmount,
+          annualDiscountPercentSnapshot: discountPercent,
+          providerCustomerId: customerResult.customerId,
+        },
+      });
+    }
 
     return NextResponse.json({
       success: true,

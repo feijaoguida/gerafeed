@@ -106,6 +106,7 @@ export class BillingService {
   /**
    * Retrieves the active subscription and plan for a workspace.
    * If none exists, creates and assigns the default Free plan.
+   * Evaluates lifecycle status, grace period and period end access.
    */
   static async getWorkspaceSubscription(workspaceId: string = DEFAULT_WORKSPACE_ID) {
     let sub = await prisma.subscription.findUnique({
@@ -140,7 +141,126 @@ export class BillingService {
       });
     }
 
+    const now = new Date();
+
+    // 1. If subscription is CANCELED, EXPIRED or SUSPENDED
+    if (sub.status === "CANCELED" || sub.status === "EXPIRED" || sub.status === "SUSPENDED") {
+      // If access period ended, fallback to Free plan entitlements
+      if (!sub.validUntil || sub.validUntil <= now) {
+        const freePlan = await prisma.plan.findUnique({ where: { slug: "free" } });
+        if (freePlan && sub.planId !== freePlan.id) {
+          return {
+            ...sub,
+            plan: freePlan,
+          };
+        }
+      }
+    }
+
+    // 2. If subscription is PAST_DUE and grace period has ended
+    if (sub.status === "PAST_DUE") {
+      if (sub.gracePeriodEndsAt && sub.gracePeriodEndsAt < now) {
+        const freePlan = await prisma.plan.findUnique({ where: { slug: "free" } });
+        if (freePlan && sub.planId !== freePlan.id) {
+          return {
+            ...sub,
+            status: "SUSPENDED" as const,
+            plan: freePlan,
+          };
+        }
+      }
+    }
+
     return sub;
+  }
+
+  /**
+   * Cancels subscription at period end (without fidelity penalties).
+   */
+  static async cancelSubscription(workspaceId: string) {
+    const sub = await prisma.subscription.findUnique({
+      where: { workspaceId },
+      include: { plan: true },
+    });
+
+    if (!sub) {
+      throw new Error("Assinatura não encontrada para este workspace.");
+    }
+
+    const updated = await prisma.subscription.update({
+      where: { id: sub.id },
+      data: {
+        cancelAtPeriodEnd: true,
+        canceledAt: new Date(),
+        status: "CANCELED",
+      },
+      include: { plan: true },
+    });
+
+    return updated;
+  }
+
+  /**
+   * Reactivates a canceled subscription if period has not expired.
+   */
+  static async reactivateSubscription(workspaceId: string) {
+    const sub = await prisma.subscription.findUnique({
+      where: { workspaceId },
+      include: { plan: true },
+    });
+
+    if (!sub) {
+      throw new Error("Assinatura não encontrada para este workspace.");
+    }
+
+    const now = new Date();
+    if (sub.validUntil && sub.validUntil <= now) {
+      throw new Error("O período da assinatura expirou. Inicie uma nova contratação.");
+    }
+
+    const updated = await prisma.subscription.update({
+      where: { id: sub.id },
+      data: {
+        cancelAtPeriodEnd: false,
+        canceledAt: null,
+        status: "ACTIVE",
+      },
+      include: { plan: true },
+    });
+
+    return updated;
+  }
+
+  /**
+   * Schedules a plan change for the next billing cycle.
+   */
+  static async schedulePlanChange(workspaceId: string, targetPlanId: string) {
+    const sub = await prisma.subscription.findUnique({
+      where: { workspaceId },
+      include: { plan: true },
+    });
+
+    if (!sub) {
+      throw new Error("Assinatura não encontrada para este workspace.");
+    }
+
+    const targetPlan = await prisma.plan.findUnique({
+      where: { id: targetPlanId },
+    });
+
+    if (!targetPlan) {
+      throw new Error("Plano de destino não encontrado.");
+    }
+
+    const updated = await prisma.subscription.update({
+      where: { id: sub.id },
+      data: {
+        pendingPlanId: targetPlan.id,
+      },
+      include: { plan: true },
+    });
+
+    return updated;
   }
 
   /**

@@ -1,7 +1,7 @@
 # Task 187. Subscription Lifecycle & Access Control
 
 ## Status
-TODO
+DONE
 
 ## Objetivo
 

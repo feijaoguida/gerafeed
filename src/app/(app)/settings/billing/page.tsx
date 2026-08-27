@@ -2,9 +2,9 @@ import { Metadata } from "next";
 import { getAuthenticatedWorkspace, DEFAULT_WORKSPACE_ID } from "@/lib/workspace";
 import { BillingService } from "@/lib/billing";
 import { BillingProfileForm } from "@/components/settings/billing-profile-form";
-import { CreditCard, ArrowUpCircle, AlertCircle } from "lucide-react";
-import { formatCurrency, calculateAnnualPlanPrice } from "@/lib/pricing";
-import Link from "next/link";
+import { BillingInvoicesList } from "@/components/settings/billing-invoices-list";
+import { SubscriptionManagementCard } from "@/components/settings/subscription-management-card";
+import { CreditCard, AlertCircle } from "lucide-react";
 
 export const metadata: Metadata = {
   title: "Plano & Cobrança | GeraFeed",
@@ -21,16 +21,33 @@ export default async function BillingSettingsPage({
   const workspaceId = authData?.workspaceId || DEFAULT_WORKSPACE_ID;
 
   const subscription = await BillingService.getWorkspaceSubscription(workspaceId);
-  const plan = subscription.plan;
 
   const articlesCheck = await BillingService.checkLimit(workspaceId, "ARTICLES");
   const sourcesCheck = await BillingService.checkLimit(workspaceId, "SOURCES");
   const wpCheck = await BillingService.checkLimit(workspaceId, "WORDPRESS_SITES");
 
-  const planAny = plan as unknown as { price: number; monthlyPrice?: number | string; annualDiscountPercent?: number | string; name: string };
-  const monthlyPrice = planAny.monthlyPrice !== undefined ? Number(planAny.monthlyPrice) : plan.price;
-  const discountPercent = planAny.annualDiscountPercent !== undefined ? Number(planAny.annualDiscountPercent) : 0;
-  const annualCalculated = calculateAnnualPlanPrice(monthlyPrice, discountPercent);
+  const subAny = subscription as Record<string, unknown>;
+  const serializableSubscription = {
+    id: String(subAny.id || ""),
+    status: String(subAny.status || "ACTIVE"),
+    billingCycle: String(subAny.billingCycle || "MONTHLY"),
+    billingMethod: String(subAny.billingMethod || "CREDIT_CARD"),
+    amount: subAny.amount ? Number(subAny.amount) : null,
+    annualDiscountPercentSnapshot: subAny.annualDiscountPercentSnapshot ? Number(subAny.annualDiscountPercentSnapshot) : null,
+    validUntil: subAny.validUntil instanceof Date ? subAny.validUntil.toISOString() : null,
+    currentPeriodEnd: subAny.currentPeriodEnd instanceof Date ? subAny.currentPeriodEnd.toISOString() : null,
+    nextDueDate: subAny.nextDueDate instanceof Date ? subAny.nextDueDate.toISOString() : null,
+    cancelAtPeriodEnd: Boolean(subAny.cancelAtPeriodEnd),
+    canceledAt: subAny.canceledAt instanceof Date ? subAny.canceledAt.toISOString() : null,
+    plan: {
+      id: subscription.plan.id,
+      name: subscription.plan.name,
+      slug: subscription.plan.slug,
+      price: subscription.plan.price,
+      monthlyPrice: Number(subscription.plan.monthlyPrice || subscription.plan.price),
+      annualDiscountPercent: Number(subscription.plan.annualDiscountPercent || 0),
+    },
+  };
 
   return (
     <div className="p-6 max-w-5xl mx-auto space-y-8">
@@ -41,7 +58,7 @@ export default async function BillingSettingsPage({
           Plano & Cobrança
         </h1>
         <p className="text-xs sm:text-sm text-zinc-500 dark:text-zinc-400 mt-1">
-          Gerencie seu plano ativo, consumo mensal de IA e atualize os dados cadastrais de faturamento do seu Workspace.
+          Gerencie seu plano ativo, vigência, consumo de IA, faturas e dados de faturamento do Workspace.
         </p>
       </div>
 
@@ -72,44 +89,12 @@ export default async function BillingSettingsPage({
         </div>
       )}
 
-      {/* Plano Atual & Consumo */}
-      <div className="p-6 rounded-xl bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 space-y-6 shadow-sm">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-zinc-200 dark:border-zinc-800/80 pb-4">
-          <div className="space-y-1">
-            <span className="text-[10px] font-mono uppercase tracking-wider text-amber-600 dark:text-amber-400 font-bold">
-              Plano Ativo do Workspace
-            </span>
-            <div className="flex items-center gap-3">
-              <h2 className="text-2xl font-extrabold text-zinc-900 dark:text-white">{plan.name}</h2>
-              <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
-                {subscription.status}
-              </span>
-            </div>
-          </div>
+      {/* Subscription Card with Actions */}
+      <SubscriptionManagementCard subscription={serializableSubscription} />
 
-          <div className="text-left sm:text-right">
-            <div className="text-2xl font-bold text-zinc-900 dark:text-white">
-              {formatCurrency(monthlyPrice)} <span className="text-xs text-zinc-500 font-normal">/mês</span>
-            </div>
-            {monthlyPrice > 0 && (
-              <p className="text-[11px] text-zinc-500 dark:text-zinc-400">
-                Opção Anual: {formatCurrency(annualCalculated)}/ano ({discountPercent}% OFF)
-              </p>
-            )}
-          </div>
-        </div>
-
-        <div className="pt-2">
-          <Link
-            href="/settings/billing/upgrade"
-            className="inline-flex items-center gap-1.5 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-lg transition-colors shadow-sm"
-          >
-            <ArrowUpCircle className="w-4 h-4" />
-            Alterar Plano / Fazer Upgrade
-          </Link>
-        </div>
-
-        {/* Consumo */}
+      {/* Consumo & Limites */}
+      <div className="p-6 rounded-xl bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 space-y-4 shadow-sm">
+        <h2 className="text-base font-bold text-zinc-900 dark:text-white">Consumo de Recursos no Ciclo Vigente</h2>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
           <div className="p-4 rounded-lg bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 space-y-1.5">
             <span className="text-zinc-500 dark:text-zinc-400 font-medium">Artigos IA / Mês:</span>
@@ -142,6 +127,9 @@ export default async function BillingSettingsPage({
           </div>
         </div>
       </div>
+
+      {/* Histórico de Cobranças / Faturas */}
+      <BillingInvoicesList />
 
       {/* Formulário de Dados Cadastrais de Cobrança */}
       <BillingProfileForm />

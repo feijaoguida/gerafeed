@@ -1,7 +1,7 @@
 # Task 180. Plan Monthly & Annual Pricing
 
 ## Status
-TODO
+DONE
 
 ## Objetivo
 

@@ -113,10 +113,43 @@ export interface WorkspaceDetailData {
   createdAt: string;
   updatedAt: string;
   subscription?: {
+    id?: string;
     status?: string;
+    billingCycle?: string;
+    billingMethod?: string;
+    amount?: number | null;
+    asaasSubscriptionId?: string | null;
+    providerCustomerId?: string | null;
+    providerSubscriptionId?: string | null;
+    validUntil?: string | null;
+    currentPeriodEnd?: string | null;
+    nextDueDate?: string | null;
+    cancelAtPeriodEnd?: boolean;
+    canceledAt?: string | null;
     plan?: Plan;
     planId?: string;
   } | null;
+  billingProfile?: {
+    name?: string;
+    email?: string;
+    cpfCnpj?: string;
+    mobilePhone?: string | null;
+    providerCustomerId?: string | null;
+  } | null;
+  invoices?: Array<{
+    id: string;
+    provider: string;
+    providerPaymentId: string;
+    amount: number;
+    billingMethod: string;
+    status: string;
+    dueDate: string | null;
+    confirmedAt: string | null;
+    receivedAt: string | null;
+    invoiceUrl: string | null;
+    bankSlipUrl: string | null;
+    createdAt: string;
+  }>;
 
   members?: WorkspaceMember[];
   sources?: SourceItem[];
@@ -236,6 +269,42 @@ export function CompanyDetails({ initialWorkspace, availablePlans }: CompanyDeta
       setMessage({ type: "success", text: "Plano da empresa alterado com sucesso!" });
     } catch (err) {
       setMessage({ type: "error", text: err instanceof Error ? err.message : "Erro ao alterar plano." });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleReconcile = async () => {
+    if (!confirm("Deseja forçar a reconciliação desta empresa com a API do Asaas? O sistema irá consultar a assinatura e sincronizar cobranças e faturas.")) {
+      return;
+    }
+
+    setIsLoading(true);
+    setMessage(null);
+
+    try {
+      const res = await fetch(`/api/backoffice/companies/${workspace.id}/reconcile`, {
+        method: "POST",
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Erro na reconciliação.");
+
+      if (data.workspace) {
+        setWorkspace((prev) => ({
+          ...prev,
+          subscription: data.workspace.subscription,
+          invoices: data.workspace.invoices,
+        }));
+      }
+
+      const logsSummary = data.logs ? data.logs.join(" | ") : "";
+      setMessage({
+        type: "success",
+        text: `Reconciliação concluída com sucesso! ${logsSummary}`,
+      });
+    } catch (err) {
+      setMessage({ type: "error", text: err instanceof Error ? err.message : "Erro ao reconciliar." });
     } finally {
       setIsLoading(false);
     }
@@ -858,73 +927,229 @@ export function CompanyDetails({ initialWorkspace, availablePlans }: CompanyDeta
 
         {/* TAB 2: PLAN & BILLING */}
         {activeTab === "plan" && (
-          <div className="p-6 rounded-xl bg-zinc-950 border border-zinc-800 space-y-6 max-w-2xl">
-            <h3 className="text-base font-bold text-white flex items-center gap-2">
-              <Layers className="w-5 h-5 text-indigo-400" />
-              Plano, Assinatura & Créditos de Uso
-            </h3>
+          <div className="space-y-6">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              {/* Left Column: Plan & Limits */}
+              <div className="lg:col-span-2 p-6 rounded-xl bg-zinc-950 border border-zinc-800 space-y-6">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-base font-bold text-white flex items-center gap-2">
+                    <Layers className="w-5 h-5 text-indigo-400" />
+                    Plano & Assinatura Ativa
+                  </h3>
 
-            <div className="p-4 rounded-lg bg-zinc-900/60 border border-zinc-800 space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="text-xs text-zinc-400">Plano Atual da Empresa:</span>
-                <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 uppercase">
-                  {workspace.subscription?.status || "ACTIVE"}
-                </span>
+                  <button
+                    type="button"
+                    onClick={handleReconcile}
+                    disabled={isLoading}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 text-zinc-200 text-xs font-semibold disabled:opacity-50 transition"
+                  >
+                    <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? "animate-spin" : ""}`} />
+                    <span>Reconciliar Asaas</span>
+                  </button>
+                </div>
+
+                <div className="p-4 rounded-lg bg-zinc-900/60 border border-zinc-800 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-zinc-400">Status Local:</span>
+                    <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 uppercase font-bold">
+                      {workspace.subscription?.status || "ACTIVE"}
+                    </span>
+                  </div>
+                  <div className="text-lg font-bold text-amber-400">
+                    {currentPlan?.name || "Gratuito"}
+                  </div>
+                  <div className="grid grid-cols-2 gap-4 pt-2 text-xs text-zinc-300 border-t border-zinc-800/80">
+                    <div>
+                      <span className="text-zinc-500">Valor Mensal:</span> R${" "}
+                      {currentPlan ? (currentPlan.price / 100).toFixed(2) : "0,00"}
+                    </div>
+                    <div>
+                      <span className="text-zinc-500">Créditos de Artigos:</span>{" "}
+                      {stats.articlesProcessedThisMonth} /{" "}
+                      {stats.maxArticles === -1 ? "Ilimitado" : stats.maxArticles}
+                    </div>
+                    <div>
+                      <span className="text-zinc-500">Fontes Ativas:</span>{" "}
+                      {stats.activeSourcesCount} /{" "}
+                      {stats.maxSources === -1 ? "Ilimitado" : stats.maxSources}
+                    </div>
+                    <div>
+                      <span className="text-zinc-500">Artigos Restantes:</span>{" "}
+                      {stats.maxArticles === -1
+                        ? "Ilimitado"
+                        : Math.max(0, stats.maxArticles - stats.articlesProcessedThisMonth)}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Gateway Metadata */}
+                <div className="p-4 rounded-lg bg-zinc-900/40 border border-zinc-800/60 space-y-2 text-xs">
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-zinc-400">
+                    Integração Gateway (Asaas)
+                  </span>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-zinc-300 font-mono text-[11px]">
+                    <div>
+                      <span className="text-zinc-500 font-sans">Customer ID:</span>{" "}
+                      {workspace.subscription?.providerCustomerId || "—"}
+                    </div>
+                    <div>
+                      <span className="text-zinc-500 font-sans">Subscription ID:</span>{" "}
+                      {workspace.subscription?.asaasSubscriptionId || "—"}
+                    </div>
+                    <div>
+                      <span className="text-zinc-500 font-sans">Próx. Vencimento:</span>{" "}
+                      {workspace.subscription?.nextDueDate
+                        ? new Date(workspace.subscription.nextDueDate).toLocaleDateString("pt-BR")
+                        : "—"}
+                    </div>
+                    <div>
+                      <span className="text-zinc-500 font-sans">Vigência Período:</span>{" "}
+                      {workspace.subscription?.validUntil
+                        ? new Date(workspace.subscription.validUntil).toLocaleDateString("pt-BR")
+                        : "—"}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Change Plan */}
+                <div className="space-y-4 pt-2 border-t border-zinc-800/80">
+                  <div>
+                    <label className="block text-xs font-semibold text-zinc-200 mb-1">
+                      Alterar Plano da Empresa
+                    </label>
+                    <select
+                      value={selectedPlanId}
+                      onChange={(e) => setSelectedPlanId(e.target.value)}
+                      className="w-full px-3 py-2 rounded-lg bg-zinc-900 border border-zinc-800 text-xs text-white focus:outline-none focus:border-amber-500"
+                    >
+                      {availablePlans.map((p) => (
+                        <option key={p.id} value={p.id}>
+                          {p.name} — R$ {(p.price / 100).toFixed(2)}/mês (Artigos: {p.maxArticles}, Feeds:{" "}
+                          {p.maxSources})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <button
+                    onClick={handleChangePlan}
+                    disabled={isLoading}
+                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-amber-500 hover:bg-amber-400 text-zinc-950 font-semibold text-xs disabled:opacity-50 transition"
+                  >
+                    <Check className="w-4 h-4" />
+                    <span>{isLoading ? "Salvando..." : "Salvar Alteração de Plano"}</span>
+                  </button>
+                </div>
               </div>
-              <div className="text-lg font-bold text-amber-400">
-                {currentPlan?.name || "Gratuito"}
-              </div>
-              <div className="grid grid-cols-2 gap-4 pt-2 text-xs text-zinc-300 border-t border-zinc-800/80">
-                <div>
-                  <span className="text-zinc-500">Valor Mensal:</span> R${" "}
-                  {currentPlan ? (currentPlan.price / 100).toFixed(2) : "0,00"}
-                </div>
-                <div>
-                  <span className="text-zinc-500">Créditos de Artigos:</span>{" "}
-                  {stats.articlesProcessedThisMonth} /{" "}
-                  {stats.maxArticles === -1 ? "Ilimitado" : stats.maxArticles}
-                </div>
-                <div>
-                  <span className="text-zinc-500">Fontes Ativas:</span>{" "}
-                  {stats.activeSourcesCount} /{" "}
-                  {stats.maxSources === -1 ? "Ilimitado" : stats.maxSources}
-                </div>
-                <div>
-                  <span className="text-zinc-500">Artigos Restantes:</span>{" "}
-                  {stats.maxArticles === -1
-                    ? "Ilimitado"
-                    : Math.max(0, stats.maxArticles - stats.articlesProcessedThisMonth)}
-                </div>
+
+              {/* Right Column: Billing Profile Summary */}
+              <div className="p-6 rounded-xl bg-zinc-950 border border-zinc-800 space-y-4">
+                <h3 className="text-base font-bold text-white flex items-center gap-2">
+                  <ShieldCheck className="w-5 h-5 text-emerald-400" />
+                  Dados de Faturamento
+                </h3>
+
+                {workspace.billingProfile ? (
+                  <div className="space-y-2.5 text-xs text-zinc-300">
+                    <div>
+                      <span className="text-zinc-500 block text-[10px] uppercase">Razão Social / Nome:</span>
+                      <span className="font-semibold text-white">{workspace.billingProfile.name}</span>
+                    </div>
+                    <div>
+                      <span className="text-zinc-500 block text-[10px] uppercase">CPF / CNPJ:</span>
+                      <span className="font-mono text-zinc-200">{workspace.billingProfile.cpfCnpj}</span>
+                    </div>
+                    <div>
+                      <span className="text-zinc-500 block text-[10px] uppercase">E-mail:</span>
+                      <span className="text-zinc-200">{workspace.billingProfile.email}</span>
+                    </div>
+                    {workspace.billingProfile.mobilePhone && (
+                      <div>
+                        <span className="text-zinc-500 block text-[10px] uppercase">Telefone:</span>
+                        <span className="text-zinc-200">{workspace.billingProfile.mobilePhone}</span>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="p-4 text-center text-xs text-zinc-500 bg-zinc-900/50 rounded-lg border border-dashed border-zinc-800">
+                    Nenhum perfil de faturamento cadastrado.
+                  </div>
+                )}
               </div>
             </div>
 
-            <div className="space-y-4 pt-2">
-              <div>
-                <label className="block text-xs font-semibold text-zinc-200 mb-1">
-                  Alterar Plano da Empresa
-                </label>
-                <select
-                  value={selectedPlanId}
-                  onChange={(e) => setSelectedPlanId(e.target.value)}
-                  className="w-full px-3 py-2 rounded-lg bg-zinc-900 border border-zinc-800 text-xs text-white focus:outline-none focus:border-amber-500"
-                >
-                  {availablePlans.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.name} — R$ {(p.price / 100).toFixed(2)}/mês (Artigos: {p.maxArticles}, Feeds:{" "}
-                      {p.maxSources})
-                    </option>
-                  ))}
-                </select>
-              </div>
+            {/* Invoices History Table */}
+            <div className="p-6 rounded-xl bg-zinc-950 border border-zinc-800 space-y-4">
+              <h3 className="text-base font-bold text-white flex items-center gap-2">
+                <Zap className="w-5 h-5 text-amber-400" />
+                Histórico de Cobranças & Faturas ({workspace.invoices?.length || 0})
+              </h3>
 
-              <button
-                onClick={handleChangePlan}
-                disabled={isLoading}
-                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-amber-500 hover:bg-amber-400 text-zinc-950 font-semibold text-xs disabled:opacity-50 transition"
-              >
-                <Check className="w-4 h-4" />
-                <span>{isLoading ? "Salvando..." : "Salvar Alteração de Plano"}</span>
-              </button>
+              {!workspace.invoices || workspace.invoices.length === 0 ? (
+                <div className="py-6 text-center text-xs text-zinc-500 bg-zinc-900/50 rounded-lg border border-dashed border-zinc-800">
+                  Nenhuma fatura registrada para esta empresa.
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs border-collapse">
+                    <thead>
+                      <tr className="border-b border-zinc-800 text-zinc-400">
+                        <th className="py-2.5 font-medium">Data</th>
+                        <th className="py-2.5 font-medium">Vencimento</th>
+                        <th className="py-2.5 font-medium">Valor</th>
+                        <th className="py-2.5 font-medium">Método</th>
+                        <th className="py-2.5 font-medium">Status</th>
+                        <th className="py-2.5 font-medium">ID Cobrança Asaas</th>
+                        <th className="py-2.5 font-medium text-right">Comprovante</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-zinc-800/60 font-mono text-[11px]">
+                      {workspace.invoices.map((inv) => (
+                        <tr key={inv.id} className="hover:bg-zinc-900/30">
+                          <td className="py-2.5 text-zinc-300">
+                            {new Date(inv.createdAt).toLocaleDateString("pt-BR")}
+                          </td>
+                          <td className="py-2.5 text-zinc-400">
+                            {inv.dueDate ? new Date(inv.dueDate).toLocaleDateString("pt-BR") : "—"}
+                          </td>
+                          <td className="py-2.5 font-semibold text-white font-sans">
+                            R$ {Number(inv.amount).toFixed(2)}
+                          </td>
+                          <td className="py-2.5 text-zinc-300 font-sans">{inv.billingMethod}</td>
+                          <td className="py-2.5">
+                            <span
+                              className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                                inv.status === "CONFIRMED" || inv.status === "RECEIVED"
+                                  ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
+                                  : inv.status === "PENDING"
+                                  ? "bg-amber-500/10 text-amber-400 border border-amber-500/20"
+                                  : "bg-rose-500/10 text-rose-400 border border-rose-500/20"
+                              }`}
+                            >
+                              {inv.status}
+                            </span>
+                          </td>
+                          <td className="py-2.5 text-zinc-400">{inv.providerPaymentId}</td>
+                          <td className="py-2.5 text-right font-sans">
+                            {inv.invoiceUrl || inv.bankSlipUrl ? (
+                              <a
+                                href={inv.invoiceUrl || inv.bankSlipUrl || "#"}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-indigo-400 hover:underline text-xs"
+                              >
+                                Ver fatura ↗
+                              </a>
+                            ) : (
+                              <span className="text-zinc-600">—</span>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
           </div>
         )}
