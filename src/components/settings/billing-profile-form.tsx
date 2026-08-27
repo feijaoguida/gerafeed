@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useSearchParams } from "next/navigation";
+import Link from "next/link";
 import {
   UserCheck,
   Building2,
@@ -34,6 +36,12 @@ interface BillingProfileData {
 }
 
 export function BillingProfileForm() {
+  const searchParams = useSearchParams();
+  const redirectParam = searchParams.get("redirect");
+  const planIdParam = searchParams.get("planId");
+  const cycleParam = searchParams.get("cycle");
+  const planNameParam = searchParams.get("planName");
+
   const [profile, setProfile] = useState<BillingProfileData | null>(null);
   const [isEditingDoc, setIsEditingDoc] = useState(false);
 
@@ -156,19 +164,36 @@ export function BillingProfileForm() {
       </div>
 
       {message && (
-        <div
-          className={`p-4 rounded-xl text-xs flex items-center gap-2 border ${
-            message.type === "success"
-              ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-600 dark:text-emerald-300"
-              : "bg-rose-500/10 border-rose-500/20 text-rose-600 dark:text-rose-300"
-          }`}
-        >
-          {message.type === "success" ? (
-            <CheckCircle2 className="w-4 h-4 text-emerald-500" />
-          ) : (
-            <AlertCircle className="w-4 h-4 text-rose-500" />
+        <div className="space-y-3">
+          <div
+            className={`p-4 rounded-xl text-xs flex items-center gap-2 border ${
+              message.type === "success"
+                ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-600 dark:text-emerald-300"
+                : "bg-rose-500/10 border-rose-500/20 text-rose-600 dark:text-rose-300"
+            }`}
+          >
+            {message.type === "success" ? (
+              <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+            ) : (
+              <AlertCircle className="w-4 h-4 text-rose-500" />
+            )}
+            <span>{message.text}</span>
+          </div>
+
+          {message.type === "success" && redirectParam === "upgrade" && planIdParam && (
+            <div className="p-4 bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800 rounded-xl flex items-center justify-between">
+              <div>
+                <p className="text-sm font-bold text-indigo-900 dark:text-indigo-300">Pronto! Seus dados foram salvos.</p>
+                <p className="text-xs text-indigo-700 dark:text-indigo-400">Você já pode continuar a contratação.</p>
+              </div>
+              <Link
+                href={`/settings/billing/upgrade?planId=${planIdParam}&cycle=${cycleParam || "MONTHLY"}&autoCheckout=1`}
+                className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-lg text-xs transition-colors shadow-sm whitespace-nowrap"
+              >
+                Continuar Contratação {planNameParam ? `do Plano ${decodeURIComponent(planNameParam)}` : ""}
+              </Link>
+            </div>
           )}
-          <span>{message.text}</span>
         </div>
       )}
 

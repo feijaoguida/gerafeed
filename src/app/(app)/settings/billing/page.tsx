@@ -2,8 +2,9 @@ import { Metadata } from "next";
 import { getAuthenticatedWorkspace, DEFAULT_WORKSPACE_ID } from "@/lib/workspace";
 import { BillingService } from "@/lib/billing";
 import { BillingProfileForm } from "@/components/settings/billing-profile-form";
-import { CreditCard } from "lucide-react";
+import { CreditCard, ArrowUpCircle, AlertCircle } from "lucide-react";
 import { formatCurrency, calculateAnnualPlanPrice } from "@/lib/pricing";
+import Link from "next/link";
 
 export const metadata: Metadata = {
   title: "Plano & Cobrança | GeraFeed",
@@ -13,9 +14,9 @@ export const metadata: Metadata = {
 export default async function BillingSettingsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ checkout?: string; sessionId?: string }>;
+  searchParams: Promise<{ checkout?: string; sessionId?: string; redirect?: string; planName?: string; planId?: string; cycle?: string }>;
 }) {
-  const { checkout } = await searchParams;
+  const { checkout, redirect, planName } = await searchParams;
   const authData = await getAuthenticatedWorkspace();
   const workspaceId = authData?.workspaceId || DEFAULT_WORKSPACE_ID;
 
@@ -43,6 +44,15 @@ export default async function BillingSettingsPage({
           Gerencie seu plano ativo, consumo mensal de IA e atualize os dados cadastrais de faturamento do seu Workspace.
         </p>
       </div>
+
+      {redirect === "upgrade" && planName && (
+        <div className="p-4 rounded-xl text-xs bg-amber-500/10 border border-amber-500/20 text-amber-700 dark:text-amber-300 flex items-start gap-2">
+          <AlertCircle className="w-5 h-5 shrink-0 mt-0.5" />
+          <p className="font-medium">
+            Atenção: Preencha ou confirme seus dados de cobrança abaixo para continuar com a contratação do plano {decodeURIComponent(planName)}.
+          </p>
+        </div>
+      )}
 
       {/* Callback Status Banners */}
       {checkout === "success" && (
@@ -87,6 +97,16 @@ export default async function BillingSettingsPage({
               </p>
             )}
           </div>
+        </div>
+
+        <div className="pt-2">
+          <Link
+            href="/settings/billing/upgrade"
+            className="inline-flex items-center gap-1.5 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-lg transition-colors shadow-sm"
+          >
+            <ArrowUpCircle className="w-4 h-4" />
+            Alterar Plano / Fazer Upgrade
+          </Link>
         </div>
 
         {/* Consumo */}

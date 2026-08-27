@@ -311,10 +311,41 @@ export class AsaasGateway implements PaymentGateway {
       throw this.normalizeError(errorMsg);
     }
 
+    let invoiceUrl: string | undefined = undefined;
+    let paymentUrl: string | undefined = undefined;
+
+    try {
+      const subId = data.id as string;
+      if (subId) {
+        const paymentsRes = await fetch(`${this.baseUrl}/subscriptions/${subId}/payments?limit=1`, {
+          method: "GET",
+          headers: this.getHeaders(),
+        });
+        if (paymentsRes.ok) {
+          const paymentsData = await paymentsRes.json();
+          const firstPayment = paymentsData?.data?.[0];
+          if (firstPayment?.invoiceUrl) {
+            invoiceUrl = firstPayment.invoiceUrl;
+            paymentUrl = invoiceUrl;
+          } else if (firstPayment?.invoiceUrl === undefined && firstPayment?.bankSlipUrl) {
+            invoiceUrl = firstPayment.bankSlipUrl;
+            paymentUrl = invoiceUrl;
+          }
+        }
+      }
+    } catch {
+      // Ignora erro no fetch do payment e usa default da assinatura se houver
+    }
+
+    if (!paymentUrl) {
+       paymentUrl = (data.paymentLink as string) || undefined;
+    }
+
     return {
       subscriptionId: (data.id as string) || `sub_${Date.now()}`,
       status: data.status === "ACTIVE" ? "ACTIVE" : "PENDING",
-      paymentUrl: (data.paymentLink as string) || undefined,
+      paymentUrl,
+      invoiceUrl,
       nextDueDate: data.nextDueDate ? new Date(data.nextDueDate as string) : undefined,
       raw: data,
     };
@@ -328,13 +359,38 @@ export class AsaasGateway implements PaymentGateway {
       throw this.normalizeError("Asaas API Key não configurada.");
     }
 
+    if (params.customerId && params.amount !== undefined && params.planId && params.planName) {
+      // Prioritize creating a subscription to get the invoice URL
+      try {
+        const sub = await this.createSubscription({
+          workspaceId: params.workspaceId,
+          customerId: params.customerId,
+          planId: params.planId,
+          planSlug: params.planSlug,
+          planName: params.planName,
+          price: params.amount,
+          billingType: "UNDEFINED",
+          cycle: params.cycle || "MONTHLY",
+        });
+
+        if (sub.paymentUrl) {
+          return sub.paymentUrl;
+        }
+      } catch (error) {
+        throw this.normalizeError(`Falha ao criar assinatura para checkout: ${error instanceof Error ? error.message : String(error)}`);
+      }
+    }
+
+    // Fallback: create a payment link
     const res = await fetch(`${this.baseUrl}/paymentLinks`, {
       method: "POST",
       headers: this.getHeaders(),
       body: JSON.stringify({
-        name: `News Curator - Plano ${params.planSlug.toUpperCase()}`,
+        name: `News Curator - Plano ${params.planName || params.planSlug.toUpperCase()}`,
         billingType: "UNDEFINED",
         chargeType: "RECURRENT",
+        value: params.amount,
+        subscriptionCycle: params.cycle || "MONTHLY",
         externalReference: params.workspaceId,
         callback: {
           successUrl: params.successUrl || "/dashboard",
@@ -355,7 +411,12 @@ export class AsaasGateway implements PaymentGateway {
       throw this.normalizeError(errorMsg);
     }
 
-    return (data.url as string) || "";
+    const url = (data.url as string) || "";
+    if (!url) {
+      throw this.normalizeError("O gateway de pagamento não retornou a URL do checkout.");
+    }
+
+    return url;
   }
 
   /**

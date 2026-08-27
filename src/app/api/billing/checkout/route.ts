@@ -144,11 +144,20 @@ export async function POST(request: Request) {
     const checkoutUrl = await gateway.getCheckoutUrl({
       workspaceId,
       planSlug: plan.slug,
+      planId: plan.id,
+      planName: plan.name,
+      amount: computedAmount,
+      cycle,
+      customerId: customerResult.customerId,
       userEmail: profile.email,
       userName: profile.name,
       successUrl: `${finalSuccessUrl}&sessionId=${session.id}`,
       cancelUrl: `${finalCancelUrl}&sessionId=${session.id}`,
     });
+
+    if (!checkoutUrl) {
+      throw new Error("O gateway de pagamento não retornou a URL da fatura de checkout.");
+    }
 
     // Update CheckoutSession with checkoutUrl
     await dbCheckoutSession.update({

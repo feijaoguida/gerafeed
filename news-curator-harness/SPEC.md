@@ -1664,24 +1664,26 @@ expirationYear
 
 O GeraFeed também não deve receber esses dados em Route Handler próprio na arquitetura preferida.
 
-## 135. Hosted Checkout
+## 135. Hosted Checkout e URL da Fatura Asaas
 
-Para cartão, preferir Asaas Checkout hospedado.
+Para pagamento, devemos preferir sempre a fatura oficial do Asaas (`invoiceUrl`) atrelada à assinatura gerada, pois ela já suporta nativamente Pix (QR Code), Cartão de Crédito e Boleto com alta conversão e segurança.
 
 Fluxo:
 
 ```text
 GeraFeed
-→ cria Checkout
-→ recebe link
-→ redirect
-→ cliente paga no Asaas
-→ callback volta para GeraFeed
-→ GeraFeed mostra "processando/confirmando"
-→ Webhook confirma estado
+→ recebe intenção de upgrade (`/api/billing/checkout`)
+→ verifica se Dados Cadastrais estão completos (senão retorna `BILLING_PROFILE_REQUIRED`)
+→ garante que Customer existe no Asaas (`ensureCustomer`)
+→ cria Subscription no Asaas com `billingType = "UNDEFINED"` e valor exato
+→ obtém a primeira fatura (`invoiceUrl`) dessa assinatura recém-criada
+→ redireciona o cliente para a `invoiceUrl`
+→ cliente paga no Asaas (escolhe Pix, Cartão ou Boleto)
+→ Asaas dispara Webhook confirmando o pagamento
+→ Webhook no GeraFeed ativa a assinatura (`ACTIVE`)
 ```
 
-Callback não libera plano.
+Jamais realizar redirecionamento cego para `checkout=success` se o `checkoutUrl` falhar.
 
 ## 136. BillingCheckoutSession
 
@@ -1707,27 +1709,27 @@ updatedAt
 
 Não transformar CheckoutSession em Invoice.
 
-## 137. Boleto/Pix sem cartão
+## 137. Retorno do Checkout e Dados Cadastrais
 
-Para meios que não exigem coleta de cartão no GeraFeed, `AsaasProvider` pode criar Subscription diretamente quando o contrato da API permitir.
-
-O Customer deve estar sincronizado antes.
-
-A aplicação deve retornar ao usuário os dados/link da cobrança gerada, não dados internos sensíveis.
+- Se o usuário tentar iniciar um checkout sem os Dados Cadastrais completos, redirecionar para a página de `/settings/billing` com os parâmetros de intenção (`?redirect=upgrade&planId=...`).
+- Após preencher, o sistema deve fornecer uma via rápida para continuar o checkout (botão "Continuar Contratação").
+- O status de `checkout=success` só deve ser exibido se a URL da fatura for validada, oferecendo botão para "Abrir Fatura" pendente.
 
 ## 138. Asaas Subscription
 
-Criar assinatura recorrente com:
+Criar assinatura recorrente no Asaas via API (`POST /v3/subscriptions`) com:
 
 ```text
 customer
-billingType
-value
+billingType: "UNDEFINED" (permite todos os métodos)
+value: (valor exato, obrigatório)
 nextDueDate
 cycle
 description
 externalReference
 ```
+
+E obrigatoriamente fazer fetch subsequente em `GET /v3/subscriptions/{subscriptionId}/payments` para extrair a propriedade `invoiceUrl` do primeiro pagamento e usá-la como URL de Checkout.
 
 Não informar `endDate` ou limite de pagamentos quando a intenção for recorrência contínua sem fidelidade.
 

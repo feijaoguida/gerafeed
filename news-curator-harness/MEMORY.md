@@ -340,3 +340,7 @@ SuperAdmin nunca vê cartão/CVV.
 Retorno do navegador não é confirmação financeira.
 
 Webhook/reconciliation é a fonte financeira.
+
+## Asaas Hosted Checkout (invoiceUrl)
+
+A contratação de planos no Asaas deve ser feita gerando a assinatura (`POST /v3/subscriptions`) e, em seguida, capturando a `invoiceUrl` do primeiro pagamento (`GET /v3/subscriptions/{id}/payments`). Isso garante que o cliente seja direcionado à página oficial de pagamento do Asaas, que suporta Cartão de Crédito, Pix (QR Code/Copia e Cola) e Boleto de forma nativa e associada corretamente à assinatura gerada para aquele cliente. A tela de Upgrade deve tratar o redirecionamento com cuidado, e nunca enviar o cliente para a tela de "sucesso" se o `checkoutUrl` estiver ausente.

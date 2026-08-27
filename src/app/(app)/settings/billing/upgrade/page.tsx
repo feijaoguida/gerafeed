@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   ArrowLeft,
   Zap,
@@ -80,6 +80,7 @@ const PLAN_FEATURES: Record<string, string[]> = {
 
 export default function UpgradePlanPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [plans, setPlans] = useState<PlanData[]>([]);
   const [currentPlanSlug, setCurrentPlanSlug] = useState<string>("free");
   const [isLoading, setIsLoading] = useState(true);
@@ -125,11 +126,13 @@ export default function UpgradePlanPage() {
     };
   }, []);
 
-  const handleSelectPlan = async (plan: PlanData) => {
+  const handleSelectPlan = async (plan: PlanData, overrideCycle?: "MONTHLY" | "YEARLY") => {
     if (plan.slug === currentPlanSlug) return;
 
     setIsCheckingOut(plan.id);
     setErrorMessage(null);
+
+    const activeCycle = overrideCycle || cycle;
 
     try {
       const res = await fetch("/api/billing/checkout", {
@@ -137,7 +140,8 @@ export default function UpgradePlanPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           planId: plan.id,
-          cycle,
+          planName: plan.name,
+          cycle: activeCycle,
           successUrl: "/settings/billing?checkout=success",
           cancelUrl: "/settings/billing/upgrade?checkout=canceled",
         }),
@@ -150,7 +154,9 @@ export default function UpgradePlanPage() {
           setErrorMessage(
             "Preencha seus dados de cobrança antes de contratar um plano pago."
           );
-          setTimeout(() => router.push("/settings/billing"), 2000);
+          setTimeout(() => {
+             router.push(`/settings/billing?redirect=upgrade&planId=${plan.id}&cycle=${activeCycle}&planName=${encodeURIComponent(plan.name)}`);
+          }, 1500);
           return;
         }
         throw new Error(data.error || "Erro ao iniciar checkout.");
@@ -164,7 +170,7 @@ export default function UpgradePlanPage() {
       if (data.checkoutUrl) {
         window.location.assign(data.checkoutUrl);
       } else {
-        router.push("/settings/billing?checkout=success");
+        throw new Error("A URL de pagamento não foi retornada pelo gateway de pagamento.");
       }
     } catch (err) {
       setErrorMessage((err as Error).message);
@@ -172,6 +178,26 @@ export default function UpgradePlanPage() {
       setIsCheckingOut(null);
     }
   };
+
+  // Auto-checkout effect
+  useEffect(() => {
+    if (plans.length > 0 && searchParams.get("autoCheckout") === "1") {
+      const pId = searchParams.get("planId");
+      const pCycle = searchParams.get("cycle") as "MONTHLY" | "YEARLY" | null;
+      if (pId) {
+        const targetPlan = plans.find((p) => p.id === pId);
+        if (targetPlan) {
+          if (pCycle) {
+            setTimeout(() => setCycle(pCycle), 0);
+          }
+          // Limpa query params e auto dispara checkout
+          router.replace("/settings/billing/upgrade");
+          setTimeout(() => handleSelectPlan(targetPlan, pCycle || "MONTHLY"), 0);
+        }
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [plans, searchParams, router]);
 
   if (isLoading) {
     return (

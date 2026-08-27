@@ -75,6 +75,11 @@ export interface CheckoutParams {
   userName?: string;
   successUrl?: string;
   cancelUrl?: string;
+  planId?: string;
+  planName?: string;
+  amount?: number;
+  cycle?: BillingCycle;
+  customerId?: string;
 }
 
 export type WebhookEventType =

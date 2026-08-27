@@ -46,27 +46,28 @@ IN_PROGRESS
 
 ## Phase 21. Article Content Enrichment & Scraping
 - [x] 200-article-content-scraping-and-enrichment
+- [x] 201-multi-wordpress-editorial-review
+- [x] 202-fix-billing-checkout-flow
 
 ## In Progress
 - Nenhuma
 
 ## Completed (Current Phase)
 - [x] 201-multi-wordpress-editorial-review
+- [x] 202-fix-billing-checkout-flow
 
 ## Blocked
 - Nenhuma
 
 ## Last Evidence
-Task 201 concluída com sucesso:
-- Modificado o schema Prisma com `isDefault Boolean @default(false)` no modelo `WordPressSite` e `npx prisma db push` efetuado com sucesso.
-- O arquivo `src/lib/wordpress-sites.ts` e as rotas `/api/wordpress/sites` suportam exclusividade mútua no workspace para o campo `isDefault`.
-- A tela `src/app/(app)/settings/wordpress/page.tsx` foi atualizada para expor a seleção e visualização do site Padrão.
-- `ReviewArticlePage` e `AffiliateArticleEditor` agora suportam dropdowns para "Site WordPress Destino" e pré-selecionam o site padrão por default.
-- Os dropdowns de Categoria do WordPress agora filtram as categorias apenas do site destino selecionado.
-- Verificação técnica:
-  - `npx tsc --noEmit`: PASS
-  - `npm run lint`: PASS (0 erros bloqueantes)
-  - `npm run build`: PASS (Build de produção gerado com sucesso)
+Task 202 concluída com sucesso:
+- `CheckoutParams` no `types.ts` atualizado para receber plano e valor originais.
+- O gateway `asaas.ts` agora prioriza a geração da assinatura `createSubscription` com `billingType="UNDEFINED"` e, em seguida, chama `GET /v3/subscriptions/{id}/payments` para extrair a `invoiceUrl` real. Em caso de falha de prioridade, faz um fallback elegante enviando o `value` no `paymentLinks`.
+- A API `/api/billing/checkout` agora valida e impede redirecionamento vazio.
+- A UI de upgrade gerencia paramêtros em query, faz redirect contextual caso Dados Cadastrais não estejam preenchidos, e lida com o disparo automático pós-preenchimento.
+- A tela de Cobrança exibe alerta e botões apontando para o Upgrade contínuo.
+- TypeScript passa: `npx tsc --noEmit` (PASS).
+- Lint passa: `npm run lint` (PASS - 0 erros).
 
 ## Previous Evidence
 Task 200 concluída com sucesso:
