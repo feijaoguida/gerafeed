@@ -67,39 +67,32 @@ export class BillingService {
    */
   static async ensureDefaultFeatures() {
     for (const feat of SEED_FEATURES) {
-      await prisma.feature.upsert({
+      const existing = await prisma.feature.findUnique({
         where: { key: feat.key },
-        update: {
-          name: feat.name,
-          description: feat.description,
-          valueType: feat.valueType,
-          active: feat.active,
-        },
-        create: feat,
       });
+      if (!existing) {
+        await prisma.feature.create({
+          data: feat,
+        });
+      }
     }
   }
 
   /**
    * Ensures default plans and features exist in the database.
+   * Only creates default plans if they do not exist; never overwrites user customizations.
    */
   static async ensureDefaultPlans() {
     await this.ensureDefaultFeatures();
     for (const plan of SEED_PLANS) {
-      await prisma.plan.upsert({
+      const existing = await prisma.plan.findUnique({
         where: { slug: plan.slug },
-        update: {
-          name: plan.name,
-          price: plan.price,
-          monthlyPrice: plan.monthlyPrice,
-          annualDiscountPercent: plan.annualDiscountPercent,
-          maxArticles: plan.maxArticles,
-          maxDailyArticles: plan.maxDailyArticles,
-          maxSources: plan.maxSources,
-          maxWordPressSites: plan.maxWordPressSites,
-        },
-        create: plan,
       });
+      if (!existing) {
+        await prisma.plan.create({
+          data: plan,
+        });
+      }
     }
   }
 

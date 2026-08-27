@@ -14,10 +14,27 @@ import {
   AlertCircle,
 } from "lucide-react";
 
+interface FeatureItem {
+  id: string;
+  key: string;
+  name: string;
+  description?: string;
+  valueType?: string;
+}
+
+interface PlanFeatureItem {
+  id: string;
+  featureId: string;
+  enabled: boolean;
+  limit?: number | null;
+  feature: FeatureItem;
+}
+
 interface PlanData {
   id: string;
   name: string;
   slug: string;
+  description?: string | null;
   price: number;
   monthlyPrice: number | string;
   annualDiscountPercent: number | string;
@@ -27,6 +44,7 @@ interface PlanData {
   maxWordPressSites: number;
   highlight: boolean;
   active: boolean;
+  planFeatures?: PlanFeatureItem[];
 }
 
 interface SubscriptionData {
@@ -49,34 +67,78 @@ function calculateAnnualPrice(monthly: number, discountPercent: number): number 
   return Math.round((annualBase * (1 - discountPercent / 100)) * 100) / 100;
 }
 
-const PLAN_FEATURES: Record<string, string[]> = {
-  free: [
-    "Até 50 artigos IA/mês",
-    "5 artigos/dia",
-    "3 fontes RSS ativas",
-    "1 site WordPress",
-    "BYOK (Traga sua API Key)",
-    "Atribuição automática de fonte",
-  ],
-  starter: [
-    "Até 200 artigos IA/mês",
-    "20 artigos/dia",
-    "10 fontes RSS ativas",
-    "3 sites WordPress",
-    "Provedor IA: OpenAI",
-    "Suporte via e-mail",
-  ],
-  pro: [
-    "Até 1.000 artigos IA/mês",
-    "100 artigos/dia",
-    "30 fontes RSS ativas",
-    "10 sites WordPress",
-    "Módulo de Afiliados completo",
-    "Analytics de Afiliados",
-    "Provedores IA avançados (Gemini, Claude)",
-    "Suporte prioritário",
-  ],
-};
+function getPlanFeatureList(plan: PlanData): string[] {
+  const items: string[] = [];
+
+  // Articles per month
+  if (plan.maxArticles === -1) {
+    items.push("Artigos IA/mês ilimitados");
+  } else {
+    items.push(`Até ${plan.maxArticles.toLocaleString("pt-BR")} artigos IA/mês`);
+  }
+
+  // Daily limit
+  if (plan.maxDailyArticles === -1) {
+    items.push("Sem limite diário de artigos");
+  } else {
+    items.push(`${plan.maxDailyArticles} artigos/dia`);
+  }
+
+  // RSS Sources
+  if (plan.maxSources === -1) {
+    items.push("Fontes RSS ilimitadas");
+  } else {
+    items.push(`${plan.maxSources} fontes RSS ativas`);
+  }
+
+  // WordPress Sites
+  if (plan.maxWordPressSites === -1) {
+    items.push("Sites WordPress ilimitados");
+  } else {
+    items.push(`${plan.maxWordPressSites} site${plan.maxWordPressSites > 1 ? "s" : ""} WordPress`);
+  }
+
+  // Linked system features from database
+  if (Array.isArray(plan.planFeatures)) {
+    for (const pf of plan.planFeatures) {
+      if (pf.enabled && pf.feature) {
+        if (pf.feature.key === "affiliate_module") {
+          items.push("Módulo de Afiliados completo");
+        } else if (pf.feature.key === "affiliate_analytics") {
+          items.push("Analytics de Afiliados");
+        } else if (pf.feature.key === "ai_advanced_providers") {
+          items.push("Provedores IA avançados (Gemini, Claude)");
+        } else if (pf.feature.key === "ai_unlimited_niches") {
+          items.push("Nichos de Portal Ilimitados");
+        } else if (pf.feature.key === "ai_unlimited_styles") {
+          items.push("Estilos de Escrita Ilimitados");
+        } else if (pf.feature.key === "affiliate_max_products" && pf.limit) {
+          items.push(`Catálogo de até ${pf.limit} produtos afiliados`);
+        } else if (pf.feature.key === "affiliate_max_programs" && pf.limit) {
+          items.push(`Até ${pf.limit} programas de afiliados`);
+        } else {
+          items.push(pf.feature.name);
+        }
+      }
+    }
+  }
+
+  // Specific helpers
+  if (plan.slug === "free" || Number(plan.monthlyPrice) === 0) {
+    if (!items.some((i) => i.includes("BYOK"))) items.push("BYOK (Traga sua API Key)");
+    if (!items.some((i) => i.includes("Atribuição"))) items.push("Atribuição automática de fonte");
+  } else {
+    // Paid support tier
+    const isHighTier = plan.slug === "pro" || Number(plan.monthlyPrice) >= 90;
+    if (isHighTier) {
+      if (!items.some((i) => i.includes("Suporte"))) items.push("Suporte prioritário");
+    } else {
+      if (!items.some((i) => i.includes("Suporte"))) items.push("Suporte via e-mail");
+    }
+  }
+
+  return items;
+}
 
 export default function UpgradePlanPage() {
   const router = useRouter();
@@ -299,9 +361,9 @@ export default function UpgradePlanPage() {
             cycle === "YEARLY" && monthlyPrice > 0 ? "/ano" : "/mês";
 
           const isCurrent = plan.slug === currentPlanSlug;
-          const isHighlight = plan.highlight || plan.slug === "starter";
+          const isHighlight = Boolean(plan.highlight);
           const isPro = plan.slug === "pro";
-          const features = PLAN_FEATURES[plan.slug] || [];
+          const features = getPlanFeatureList(plan);
 
           return (
             <div

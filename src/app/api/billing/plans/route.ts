@@ -6,7 +6,14 @@ export async function GET() {
   try {
     await BillingService.ensureDefaultPlans();
     const plans = await prisma.plan.findMany({
-      orderBy: { price: "asc" },
+      orderBy: { monthlyPrice: "asc" },
+      include: {
+        planFeatures: {
+          include: {
+            feature: true,
+          },
+        },
+      },
     });
     return NextResponse.json(plans);
   } catch (error) {
