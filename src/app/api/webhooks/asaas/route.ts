@@ -93,10 +93,14 @@ export async function POST(request: Request) {
           const newValidUntil = new Date(baseDate);
           newValidUntil.setDate(newValidUntil.getDate() + daysToAdd);
 
+          const targetPlanId = subscription.pendingPlanId || subscription.planId;
+
           await prisma.subscription.update({
             where: { id: subscription.id },
             data: {
               status: "ACTIVE",
+              planId: targetPlanId,
+              pendingPlanId: null,
               validUntil: newValidUntil,
               currentPeriodEnd: newValidUntil,
               asaasSubscriptionId: subscriptionId || subscription.asaasSubscriptionId,
@@ -105,7 +109,7 @@ export async function POST(request: Request) {
             },
           });
 
-          console.log(`[Asaas Webhook] Subscription ${subscription.id} activated/renewed until ${newValidUntil.toISOString()} (+${daysToAdd} days).`);
+          console.log(`[Asaas Webhook] Subscription ${subscription.id} activated/renewed on plan ${targetPlanId} until ${newValidUntil.toISOString()} (+${daysToAdd} days).`);
         } else if (type === "PAYMENT_OVERDUE" || type === "PAYMENT_CHARGEBACK_REQUESTED") {
           await prisma.subscription.update({
             where: { id: subscription.id },

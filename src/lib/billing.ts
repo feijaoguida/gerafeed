@@ -257,6 +257,136 @@ export class BillingService {
   }
 
   /**
+   * Synchronizes a workspace subscription with Asaas gateway.
+   * Checks subscription status and payment status directly in Asaas API.
+   * If payment is CONFIRMED or RECEIVED, activates the subscription and updates planId immediately.
+   */
+  static async syncWorkspaceWithGateway(workspaceId: string) {
+    const sub = await prisma.subscription.findUnique({
+      where: { workspaceId },
+      include: { plan: true },
+    });
+
+    if (!sub || !sub.asaasSubscriptionId) {
+      return { synced: false, reason: "No Asaas subscription linked." };
+    }
+
+    try {
+      const { getPaymentGateway } = await import("@/lib/payments");
+      const gateway = getPaymentGateway("asaas") as unknown as {
+        getSubscription: (id: string) => Promise<Record<string, unknown> | null>;
+        getSubscriptionPayments: (id: string) => Promise<Array<Record<string, unknown>>>;
+      };
+
+      const [asaasSub, payments] = await Promise.all([
+        gateway.getSubscription(sub.asaasSubscriptionId),
+        gateway.getSubscriptionPayments(sub.asaasSubscriptionId),
+      ]);
+
+      let isPaid = false;
+      for (const p of payments) {
+        if (p.status === "CONFIRMED" || p.status === "RECEIVED") {
+          isPaid = true;
+          break;
+        }
+      }
+
+      if (isPaid || asaasSub?.status === "ACTIVE") {
+        const isYearly = sub.billingCycle === "YEARLY" || sub.plan?.periodicity === "YEARLY";
+        const daysToAdd = isYearly ? 365 : 30;
+
+        const now = new Date();
+        const baseDate = sub.validUntil && sub.validUntil > now ? sub.validUntil : now;
+        const newValidUntil = new Date(baseDate);
+        newValidUntil.setDate(newValidUntil.getDate() + daysToAdd);
+
+        let targetPlanId = sub.pendingPlanId;
+        if (!targetPlanId && sub.plan.slug === "free" && asaasSub) {
+          const descStr = typeof asaasSub.description === "string" ? asaasSub.description.replace("Assinatura News Curator - ", "").trim() : "";
+          const valNum = typeof asaasSub.value === "number" ? asaasSub.value : Number(asaasSub.value);
+          const matchedPlan = await prisma.plan.findFirst({
+            where: {
+              OR: [
+                ...(descStr ? [{ name: { contains: descStr, mode: "insensitive" as const } }] : []),
+                ...(valNum ? [{ price: valNum }, { monthlyPrice: valNum }] : []),
+              ],
+            },
+          });
+          if (matchedPlan) targetPlanId = matchedPlan.id;
+        }
+        if (!targetPlanId) targetPlanId = sub.planId;
+
+        const updated = await prisma.subscription.update({
+          where: { id: sub.id },
+          data: {
+            status: "ACTIVE",
+            planId: targetPlanId,
+            pendingPlanId: null,
+            validUntil: newValidUntil,
+            currentPeriodEnd: newValidUntil,
+            nextDueDate: asaasSub?.nextDueDate ? new Date(String(asaasSub.nextDueDate)) : undefined,
+          },
+          include: { plan: true },
+        });
+
+        // Also upsert invoice ledger
+        for (const p of payments) {
+          if (!p.id) continue;
+          const providerPaymentId = String(p.id);
+          const paymentValue = typeof p.value === "number" ? p.value : Number(p.value) || 0;
+          const billingMethod =
+            p.billingType === "PIX" ? "PIX" : p.billingType === "BOLETO" ? "BOLETO" : "CREDIT_CARD";
+
+          let invoiceStatus: "PENDING" | "CONFIRMED" | "RECEIVED" | "OVERDUE" | "REFUNDED" | "PARTIALLY_REFUNDED" | "CANCELED" | "FAILED" = "PENDING";
+          if (p.status === "CONFIRMED") invoiceStatus = "CONFIRMED";
+          else if (p.status === "RECEIVED") invoiceStatus = "RECEIVED";
+          else if (p.status === "OVERDUE") invoiceStatus = "OVERDUE";
+          else if (p.status === "REFUNDED") invoiceStatus = "REFUNDED";
+          else if (p.status === "DELETED") invoiceStatus = "CANCELED";
+
+          await prisma.invoice.upsert({
+            where: {
+              provider_providerPaymentId: { provider: "asaas", providerPaymentId },
+            },
+            update: {
+              status: invoiceStatus,
+              amount: paymentValue,
+              billingMethod,
+              subscriptionId: sub.id,
+              dueDate: p.dueDate ? new Date(String(p.dueDate)) : undefined,
+              confirmedAt: p.confirmedDate ? new Date(String(p.confirmedDate)) : undefined,
+              receivedAt: p.paymentDate ? new Date(String(p.paymentDate)) : undefined,
+              invoiceUrl: typeof p.invoiceUrl === "string" ? p.invoiceUrl : undefined,
+              bankSlipUrl: typeof p.bankSlipUrl === "string" ? p.bankSlipUrl : undefined,
+            },
+            create: {
+              workspaceId,
+              subscriptionId: sub.id,
+              provider: "asaas",
+              providerPaymentId,
+              amount: paymentValue,
+              billingMethod,
+              status: invoiceStatus,
+              dueDate: p.dueDate ? new Date(String(p.dueDate)) : null,
+              confirmedAt: p.confirmedDate ? new Date(String(p.confirmedDate)) : null,
+              receivedAt: p.paymentDate ? new Date(String(p.paymentDate)) : null,
+              invoiceUrl: typeof p.invoiceUrl === "string" ? p.invoiceUrl : null,
+              bankSlipUrl: typeof p.bankSlipUrl === "string" ? p.bankSlipUrl : null,
+            },
+          });
+        }
+
+        return { synced: true, activated: true, plan: updated.plan };
+      }
+
+      return { synced: true, activated: false, asaasStatus: asaasSub?.status };
+    } catch (err) {
+      console.warn("[BillingService] Error syncing with gateway:", err);
+      return { synced: false, error: (err as Error).message };
+    }
+  }
+
+  /**
    * Checks whether the workspace has reached its limit for articles (per month) or active sources.
    */
   static async checkLimit(

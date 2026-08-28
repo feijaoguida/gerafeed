@@ -20,6 +20,11 @@ export default async function BillingSettingsPage({
   const authData = await getAuthenticatedWorkspace();
   const workspaceId = authData?.workspaceId || DEFAULT_WORKSPACE_ID;
 
+  // If returning from checkout or checking status, sync directly with gateway
+  if (checkout === "success") {
+    await BillingService.syncWorkspaceWithGateway(workspaceId);
+  }
+
   const subscription = await BillingService.getWorkspaceSubscription(workspaceId);
 
   const articlesCheck = await BillingService.checkLimit(workspaceId, "ARTICLES");
@@ -73,14 +78,25 @@ export default async function BillingSettingsPage({
 
       {/* Callback Status Banners */}
       {checkout === "success" && (
-        <div className="p-4 rounded-xl text-xs bg-amber-500/10 border border-amber-500/20 text-amber-700 dark:text-amber-300 space-y-1">
-          <p className="font-bold flex items-center gap-1.5">
-            <span>⏳ Solicitação de pagamento realizada</span>
-          </p>
-          <p className="text-[11px] opacity-90">
-            A contratação foi registrada com sucesso. A assinatura do plano será ativada automaticamente assim que a confirmação financeira for recebida via Webhook/Notificação do gateway de pagamento (Asaas).
-          </p>
-        </div>
+        subscription.status === "ACTIVE" && subscription.plan.slug !== "free" ? (
+          <div className="p-4 rounded-xl text-xs bg-emerald-500/10 border border-emerald-500/20 text-emerald-700 dark:text-emerald-300 space-y-1">
+            <p className="font-bold flex items-center gap-1.5 text-sm">
+              <span>🎉 Pagamento confirmado com sucesso!</span>
+            </p>
+            <p className="text-xs opacity-90">
+              Seu <strong>{subscription.plan.name}</strong> foi ativado com sucesso. Todos os benefícios, limites e recursos já estão liberados para seu workspace.
+            </p>
+          </div>
+        ) : (
+          <div className="p-4 rounded-xl text-xs bg-amber-500/10 border border-amber-500/20 text-amber-700 dark:text-amber-300 space-y-1">
+            <p className="font-bold flex items-center gap-1.5">
+              <span>⏳ Solicitação de pagamento registrada</span>
+            </p>
+            <p className="text-[11px] opacity-90">
+              A cobrança foi gerada no Asaas. Se você realizou o pagamento via Pix ou Cartão, a liberação ocorre em instantes. Para boleto bancário, a ativação ocorre após a compensação.
+            </p>
+          </div>
+        )
       )}
 
       {checkout === "canceled" && (

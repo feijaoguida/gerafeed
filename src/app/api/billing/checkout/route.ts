@@ -149,21 +149,22 @@ export async function POST(request: Request) {
       },
     });
 
-    // Obtain hosted checkout URL from payment gateway
-    const checkoutUrl = await gateway.getCheckoutUrl({
+    // Obtain hosted checkout URL and subscription from payment gateway
+    const resolvedBillingType =
+      billingMethod === "PIX" ? "PIX" : billingMethod === "CREDIT_CARD" ? "CREDIT_CARD" : "BOLETO";
+
+    const subscriptionResult = await gateway.createSubscription({
       workspaceId,
-      planSlug: plan.slug,
-      planId: plan.id,
-      planName: plan.name,
-      amount: computedAmount,
-      cycle,
       customerId: customerResult.customerId,
-      userEmail: profile.email,
-      userName: profile.name,
-      billingType: billingMethod === "PIX" ? "PIX" : billingMethod === "CREDIT_CARD" ? "CREDIT_CARD" : "BOLETO",
-      successUrl: `${finalSuccessUrl}&sessionId=${session.id}`,
-      cancelUrl: `${finalCancelUrl}&sessionId=${session.id}`,
+      planId: plan.id,
+      planSlug: plan.slug,
+      planName: plan.name,
+      price: computedAmount,
+      billingType: resolvedBillingType,
+      cycle,
     });
+
+    const checkoutUrl = subscriptionResult.paymentUrl || subscriptionResult.invoiceUrl;
 
     if (!checkoutUrl) {
       throw new Error("O gateway de pagamento não retornou a URL da fatura de checkout.");
@@ -178,16 +179,20 @@ export async function POST(request: Request) {
       },
     });
 
-    // If no subscription exists for workspace, create as INCOMPLETE pending webhook
+    // Upsert subscription with pendingPlanId and asaasSubscriptionId
     const existingSub = await prisma.subscription.findUnique({
       where: { workspaceId },
     });
+
     if (!existingSub) {
       await prisma.subscription.create({
         data: {
           workspaceId,
           planId: plan.id,
+          pendingPlanId: plan.id,
           status: "INCOMPLETE",
+          asaasSubscriptionId: subscriptionResult.subscriptionId,
+          providerSubscriptionId: subscriptionResult.subscriptionId,
           billingCycle: cycle,
           billingMethod,
           amount: computedAmount,
@@ -199,6 +204,9 @@ export async function POST(request: Request) {
       await prisma.subscription.update({
         where: { id: existingSub.id },
         data: {
+          pendingPlanId: plan.id,
+          asaasSubscriptionId: subscriptionResult.subscriptionId,
+          providerSubscriptionId: subscriptionResult.subscriptionId,
           billingCycle: cycle,
           billingMethod,
           amount: computedAmount,
