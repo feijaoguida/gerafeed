@@ -55,6 +55,8 @@ export interface CreateSubscriptionParams {
   billingType?: BillingType;
   cycle?: BillingCycle;
   creditCardToken?: string;
+  successUrl?: string;
+  cancelUrl?: string;
 }
 
 export interface SubscriptionResult {

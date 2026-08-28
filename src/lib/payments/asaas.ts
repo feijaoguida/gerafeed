@@ -305,7 +305,7 @@ export class AsaasGateway implements PaymentGateway {
         ? params.billingType
         : "BOLETO";
 
-    const payload = {
+    const payload: Record<string, unknown> = {
       customer: params.customerId,
       billingType,
       value: params.price,
@@ -315,7 +315,14 @@ export class AsaasGateway implements PaymentGateway {
       externalReference: params.workspaceId,
     };
 
-    const res = await fetch(`${this.baseUrl}/subscriptions`, {
+    if (params.successUrl) {
+      payload.callback = {
+        successUrl: params.successUrl,
+        autoRedirect: true,
+      };
+    }
+
+    let res = await fetch(`${this.baseUrl}/subscriptions`, {
       method: "POST",
       headers: this.getHeaders(),
       body: JSON.stringify(payload),
@@ -325,6 +332,28 @@ export class AsaasGateway implements PaymentGateway {
     const contentType = res.headers.get("content-type");
     if (contentType && contentType.includes("application/json")) {
       data = await res.json();
+    }
+
+    // Fallback: If Asaas rejects due to callback domain mismatch, retry without callback
+    if (!res.ok && payload.callback) {
+      const errors = data?.errors as Array<{ code?: string; description?: string }> | undefined;
+      const isDomainError = errors?.some(
+        (e) => e.code === "invalid_object" && e.description?.toLowerCase().includes("domínio")
+      );
+      if (isDomainError) {
+        console.warn(
+          "[Asaas] Callback domain mismatch, retrying subscription creation without callback payload..."
+        );
+        delete payload.callback;
+        res = await fetch(`${this.baseUrl}/subscriptions`, {
+          method: "POST",
+          headers: this.getHeaders(),
+          body: JSON.stringify(payload),
+        });
+        if (contentType && contentType.includes("application/json")) {
+          data = await res.json();
+        }
+      }
     }
 
     if (!res.ok) {

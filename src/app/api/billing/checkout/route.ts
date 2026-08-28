@@ -153,6 +153,19 @@ export async function POST(request: Request) {
     const resolvedBillingType =
       billingMethod === "PIX" ? "PIX" : billingMethod === "CREDIT_CARD" ? "CREDIT_CARD" : "BOLETO";
 
+    const appBaseUrl =
+      process.env.NEXT_PUBLIC_APP_URL ||
+      process.env.APP_URL ||
+      (process.env.NODE_ENV === "production" ? "https://www.gerafeed.com.br" : "https://www.gerafeed.com.br");
+
+    const fullSuccessUrl = finalSuccessUrl.startsWith("http")
+      ? `${finalSuccessUrl}&sessionId=${session.id}`
+      : `${appBaseUrl}${finalSuccessUrl}&sessionId=${session.id}`;
+
+    const fullCancelUrl = finalCancelUrl.startsWith("http")
+      ? `${finalCancelUrl}&sessionId=${session.id}`
+      : `${appBaseUrl}${finalCancelUrl}&sessionId=${session.id}`;
+
     const subscriptionResult = await gateway.createSubscription({
       workspaceId,
       customerId: customerResult.customerId,
@@ -162,6 +175,8 @@ export async function POST(request: Request) {
       price: computedAmount,
       billingType: resolvedBillingType,
       cycle,
+      successUrl: fullSuccessUrl,
+      cancelUrl: fullCancelUrl,
     });
 
     const checkoutUrl = subscriptionResult.paymentUrl || subscriptionResult.invoiceUrl;
