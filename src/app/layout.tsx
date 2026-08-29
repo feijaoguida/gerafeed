@@ -19,9 +19,16 @@ export const metadata: Metadata = {
   title: "GeraFeed - Conteúdo que flui. Inteligência que publica.",
   description: "Curadoria inteligente de notícias RSS, reescrita assistida por IA e publicação automática no WordPress",
   icons: {
-    icon: "/brand/icon.png",
-    shortcut: "/brand/icon.png",
-    apple: "/brand/icon.png",
+    icon: [
+      { url: "/favicon.ico" },
+      { url: "/favicon-32x32.png", sizes: "32x32", type: "image/png" },
+      { url: "/icon.png", sizes: "32x32", type: "image/png" },
+      { url: "/brand/favicon-64.png", sizes: "64x64", type: "image/png" },
+    ],
+    shortcut: "/favicon.ico",
+    apple: [
+      { url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" },
+    ],
   },
 };
 
