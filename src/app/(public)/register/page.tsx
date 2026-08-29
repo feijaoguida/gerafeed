@@ -5,17 +5,22 @@ import Link from "next/link";
 import { signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import {
-  Rss,
   Clock,
   Sparkles,
   TrendingUp,
   Eye,
   EyeOff,
-  Loader2,
   AlertCircle,
   Check,
+  ArrowRight,
 } from "lucide-react";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { FormField } from "@/components/design-system/form-field";
+import { Heading1, Heading2, Text } from "@/components/design-system/typography";
+import { BrandDecoration } from "@/components/design-system/brand-decoration";
+import { Logo } from "@/components/brand/logo";
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -75,75 +80,65 @@ export default function RegisterPage() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col lg:flex-row bg-white dark:bg-zinc-950 transition-colors duration-200">
-      {/* Lado Esquerdo — Painel Institucional Azul */}
-      <div className="lg:w-[48%] bg-[#1E3EB3] p-8 sm:p-12 lg:p-16 flex flex-col justify-between relative overflow-hidden text-white selection:bg-emerald-400 selection:text-zinc-950">
-        {/* Background Subtle Dot Pattern */}
-        <div
-          className="absolute inset-0 opacity-15 pointer-events-none"
-          style={{
-            backgroundImage: "radial-gradient(circle, #ffffff 1px, transparent 1px)",
-            backgroundSize: "24px 24px",
-          }}
-        />
+    <div className="min-h-screen flex flex-col lg:flex-row bg-background text-foreground transition-colors duration-200">
+      {/* Lado Esquerdo — Painel Institucional GeraFeed */}
+      <div className="lg:w-[48%] bg-gradient-to-br from-[#0F172A] via-[#111F38] to-[#0A1224] p-8 sm:p-12 lg:p-16 flex flex-col justify-between relative overflow-hidden text-white selection:bg-primary selection:text-white">
+        <BrandDecoration variant="waves" />
+        <BrandDecoration variant="glow" />
 
         {/* Top Logo */}
         <div className="relative z-10">
-          <Link href="/" className="inline-flex items-center gap-2.5 group">
-            <div className="w-9 h-9 rounded-lg bg-[#00C06A] flex items-center justify-center shadow-md shadow-emerald-950/20">
-              <Rss className="w-5 h-5 text-white" />
-            </div>
-            <span className="text-xl font-bold tracking-tight text-white">
-              GeraFeed
-            </span>
-          </Link>
+          <Logo href="/" size="md" forceDark priority />
         </div>
 
         {/* Center Content */}
         <div className="my-12 lg:my-0 max-w-lg relative z-10">
-          <h1 className="text-3xl sm:text-4xl lg:text-[40px] font-bold leading-tight mb-10 text-white tracking-tight">
-            Seu blog trabalhando pelas suas redes sociais.
-          </h1>
+          <Heading1 className="text-3xl sm:text-4xl lg:text-[40px] text-white leading-tight mb-8">
+            Conteúdo que flui. <br />
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#38BDF8] via-[#818CF8] to-[#C084FC]">
+              Inteligência que publica.
+            </span>
+          </Heading1>
 
           <div className="space-y-6">
             <div className="flex items-start gap-4">
-              <div className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center shrink-0 mt-0.5 border border-white/10">
-                <Clock className="w-5 h-5 text-white" />
+              <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center shrink-0 mt-0.5 border border-white/10 shadow-xs">
+                <Clock className="w-5 h-5 text-[#38BDF8]" />
               </div>
               <div>
-                <h3 className="font-semibold text-white text-base">
-                  Publique no piloto automático
+                <h3 className="font-heading font-semibold text-white text-base">
+                  Automação com Controle Editorial
                 </h3>
-                <p className="text-sm text-blue-100/80 leading-relaxed mt-0.5">
-                  Conecte seu blog e deixe a IA gerar posts prontos para redes sociais.
+                <p className="text-sm text-slate-300 leading-relaxed mt-0.5">
+                  Publique com agilidade mantendo a curadoria humana como padrão.
                 </p>
               </div>
             </div>
 
             <div className="flex items-start gap-4">
-              <div className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center shrink-0 mt-0.5 border border-white/10">
-                <Sparkles className="w-5 h-5 text-white" />
+              <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center shrink-0 mt-0.5 border border-white/10 shadow-xs">
+                <Sparkles className="w-5 h-5 text-[#C084FC]" />
               </div>
               <div>
-                <h3 className="font-semibold text-white text-base">
-                  IA que entende seu nicho
+                <h3 className="font-heading font-semibold text-white text-base">
+                  Reescrita IA Completa
                 </h3>
-                <p className="text-sm text-blue-100/80 leading-relaxed mt-0.5">
-                  Conteúdo adaptado ao seu tom de voz e público-alvo.
+                <p className="text-sm text-slate-300 leading-relaxed mt-0.5">
+                  Captura scraping do texto integral e gera matérias originais e completas.
                 </p>
               </div>
             </div>
 
             <div className="flex items-start gap-4">
-              <div className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center shrink-0 mt-0.5 border border-white/10">
-                <TrendingUp className="w-5 h-5 text-white" />
+              <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center shrink-0 mt-0.5 border border-white/10 shadow-xs">
+                <TrendingUp className="w-5 h-5 text-[#00C2A8]" />
               </div>
               <div>
-                <h3 className="font-semibold text-white text-base">
-                  Mais alcance com menos esforço
+                <h3 className="font-heading font-semibold text-white text-base">
+                  Escalabilidade Multi-WordPress
                 </h3>
-                <p className="text-sm text-blue-100/80 leading-relaxed mt-0.5">
-                  Transforme cada artigo em uma semana inteira de conteúdo.
+                <p className="text-sm text-slate-300 leading-relaxed mt-0.5">
+                  Conecte múltiplos portais e distribua notícias por categorias e destinos.
                 </p>
               </div>
             </div>
@@ -152,143 +147,120 @@ export default function RegisterPage() {
 
         {/* Bottom Testimonial */}
         <div className="relative z-10 pt-8 border-t border-white/10 text-sm">
-          <p className="text-blue-100/90 italic">
-            &ldquo;Economizo 10 horas por semana desde que comecei a usar o GeraFeed.&rdquo;
+          <p className="text-slate-300 italic">
+            &ldquo;A melhor ferramenta para operação de portais de notícias e afiliados.&rdquo;
           </p>
-          <p className="text-xs text-blue-200/80 mt-1 font-medium">
-            — Marina Costa, criadora de conteúdo
+          <p className="text-xs text-blue-300/80 mt-1 font-medium font-heading">
+            — Equipe Editorial Web
           </p>
         </div>
       </div>
 
       {/* Lado Direito — Formulário de Cadastro */}
-      <div className="flex-1 flex flex-col justify-between p-6 sm:p-12 lg:p-20 bg-white dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 transition-colors duration-200">
+      <div className="flex-1 flex flex-col justify-between p-6 sm:p-12 lg:p-20 bg-background transition-colors duration-200">
         <div className="flex justify-end">
           <ThemeToggle />
         </div>
 
-        <div className="w-full max-w-[420px] mx-auto space-y-7 my-auto">
+        <div className="w-full max-w-[420px] mx-auto space-y-6 my-auto">
           <div>
-            <h2 className="text-2xl sm:text-3xl font-bold text-zinc-900 dark:text-white tracking-tight">
-              Comece grátis hoje
-            </h2>
-            <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-1.5 leading-relaxed">
-              Crie sua conta e gere seus primeiros posts em minutos.
-            </p>
+            <Heading2 className="text-2xl sm:text-3xl font-bold tracking-tight">
+              Crie sua conta no GeraFeed
+            </Heading2>
+            <Text variant="muted" className="mt-1.5 leading-relaxed">
+              Comece a transformar feeds de notícias em artigos de alta autoridade.
+            </Text>
 
             {/* Badges de Confiança */}
-            <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 mt-4 text-xs font-semibold text-zinc-600 dark:text-zinc-400">
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 mt-3 text-xs font-medium text-muted-foreground">
               <div className="flex items-center gap-1">
-                <Check className="w-3.5 h-3.5 text-[#00C06A] stroke-[3]" />
-                <span>7 dias grátis</span>
+                <Check className="w-3.5 h-3.5 text-[#00C2A8]" />
+                <span>Configuração rápida</span>
               </div>
               <div className="flex items-center gap-1">
-                <Check className="w-3.5 h-3.5 text-[#00C06A] stroke-[3]" />
-                <span>Sem cartão de crédito</span>
+                <Check className="w-3.5 h-3.5 text-[#00C2A8]" />
+                <span>Integração WordPress</span>
               </div>
               <div className="flex items-center gap-1">
-                <Check className="w-3.5 h-3.5 text-[#00C06A] stroke-[3]" />
-                <span>Cancele quando quiser</span>
+                <Check className="w-3.5 h-3.5 text-[#00C2A8]" />
+                <span>Sem taxa de adesão</span>
               </div>
             </div>
           </div>
 
           {error && (
-            <div className="p-3.5 rounded-xl bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-300 text-sm flex items-center gap-2.5">
-              <AlertCircle className="w-4 h-4 shrink-0 text-red-500 dark:text-red-400" />
+            <div className="p-3.5 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-600 dark:text-rose-400 text-sm flex items-center gap-2.5">
+              <AlertCircle className="w-4 h-4 shrink-0 text-rose-500" />
               <span>{error}</span>
             </div>
           )}
 
           <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <label
-                htmlFor="name"
-                className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider mb-2"
-              >
-                Nome completo
-              </label>
-              <input
-                id="name"
+            <FormField label="Nome completo" required>
+              <Input
                 type="text"
                 required
                 autoComplete="name"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                placeholder="Seu nome"
-                className="w-full px-4 py-3 rounded-xl bg-zinc-50/50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white text-sm placeholder:text-zinc-400 dark:placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-[#00C06A]/30 focus:border-[#00C06A] transition"
+                placeholder="Seu nome completo"
               />
-            </div>
+            </FormField>
 
-            <div>
-              <label
-                htmlFor="email"
-                className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider mb-2"
-              >
-                E-mail
-              </label>
-              <input
-                id="email"
+            <FormField label="E-mail profissional" required>
+              <Input
                 type="email"
                 required
                 autoComplete="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="voce@exemplo.com"
-                className="w-full px-4 py-3 rounded-xl bg-zinc-50/50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white text-sm placeholder:text-zinc-400 dark:placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-[#00C06A]/30 focus:border-[#00C06A] transition"
+                placeholder="voce@empresa.com"
               />
-            </div>
+            </FormField>
 
-            <div>
-              <label
-                htmlFor="password"
-                className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider mb-2"
-              >
-                Senha
-              </label>
-
+            <FormField label="Senha" required>
               <div className="relative">
-                <input
-                  id="password"
+                <Input
                   type={showPassword ? "text" : "password"}
                   required
                   autoComplete="new-password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder="Crie uma senha segura"
-                  className="w-full px-4 py-3 pr-11 rounded-xl bg-zinc-50/50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white text-sm placeholder:text-zinc-400 dark:placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-[#00C06A]/30 focus:border-[#00C06A] transition"
+                  placeholder="Mínimo de 6 caracteres"
+                  trailingIcon={
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                      aria-label="Alternar visualização da senha"
+                    >
+                      {showPassword ? (
+                        <EyeOff className="w-4 h-4" />
+                      ) : (
+                        <Eye className="w-4 h-4" />
+                      )}
+                    </button>
+                  }
                 />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 transition"
-                  aria-label="Alternar visualização da senha"
-                >
-                  {showPassword ? (
-                    <EyeOff className="w-4 h-4" />
-                  ) : (
-                    <Eye className="w-4 h-4" />
-                  )}
-                </button>
               </div>
-            </div>
+            </FormField>
 
             <div className="pt-1">
-              <label className="flex items-start gap-3 cursor-pointer text-xs text-zinc-600 dark:text-zinc-400 leading-normal select-none">
+              <label className="flex items-start gap-2.5 cursor-pointer text-xs text-muted-foreground leading-relaxed select-none">
                 <input
                   type="checkbox"
                   required
                   checked={agreeTerms}
                   onChange={(e) => setAgreeTerms(e.target.checked)}
-                  className="mt-0.5 w-4 h-4 rounded border-zinc-300 dark:border-zinc-700 text-[#00C06A] focus:ring-[#00C06A] accent-[#00C06A] cursor-pointer"
+                  className="mt-0.5 h-4 w-4 rounded border-border text-primary focus:ring-primary accent-primary cursor-pointer"
                 />
                 <span>
                   Concordo com os{" "}
-                  <a href="#termos" className="font-semibold text-[#1E3EB3] dark:text-indigo-400 hover:underline">
+                  <a href="#termos" className="font-semibold text-primary hover:underline">
                     Termos de Uso
                   </a>{" "}
                   e a{" "}
-                  <a href="#privacidade" className="font-semibold text-[#1E3EB3] dark:text-indigo-400 hover:underline">
+                  <a href="#privacidade" className="font-semibold text-primary hover:underline">
                     Política de Privacidade
                   </a>
                   .
@@ -296,35 +268,31 @@ export default function RegisterPage() {
               </label>
             </div>
 
-            <button
+            <Button
               type="submit"
-              disabled={isLoading}
-              className="w-full py-3.5 px-4 rounded-xl font-semibold text-white bg-[#00C06A] hover:bg-[#00AB5E] transition shadow-md shadow-emerald-600/20 active:scale-[0.99] disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center gap-2 mt-2"
+              variant="gradient"
+              size="lg"
+              className="w-full mt-2"
+              isLoading={isLoading}
+              trailingIcon={!isLoading && <ArrowRight className="w-4 h-4" />}
             >
-              {isLoading ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  <span>Criando conta...</span>
-                </>
-              ) : (
-                "Criar minha conta grátis"
-              )}
-            </button>
+              Criar Conta e Começar
+            </Button>
           </form>
 
-          <p className="text-center text-sm text-zinc-500 dark:text-zinc-400 pt-2">
+          <p className="text-center text-sm text-muted-foreground pt-1">
             Já tem uma conta?{" "}
             <Link
               href="/login"
-              className="font-bold text-[#1E3EB3] dark:text-indigo-400 hover:underline transition"
+              className="font-semibold text-primary hover:underline transition-colors"
             >
-              Entrar
+              Fazer login
             </Link>
           </p>
         </div>
 
-        <div className="text-center text-xs text-zinc-400 dark:text-zinc-600">
-          © {new Date().getFullYear()} GeraFeed. Todos os direitos reservados.
+        <div className="text-center text-xs text-muted-foreground">
+          © {new Date().getFullYear()} GeraFeed. Inteligência que publica.
         </div>
       </div>
     </div>

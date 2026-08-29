@@ -20,9 +20,9 @@ export default async function BackofficeLayout({
   }
 
   return (
-    <div className="min-h-screen bg-zinc-950 text-zinc-100 antialiased flex flex-col lg:flex-row">
+    <div className="min-h-screen bg-background text-foreground antialiased flex flex-col lg:flex-row">
       <BackofficeSidebar userEmail={session.user.email} />
-      <div className="flex-1 flex flex-col min-w-0 overflow-y-auto bg-zinc-900/40">
+      <div className="flex-1 flex flex-col min-w-0 overflow-y-auto bg-surface-muted/30">
         {children}
       </div>
     </div>

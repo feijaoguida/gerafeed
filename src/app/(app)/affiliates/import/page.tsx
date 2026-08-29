@@ -1,4 +1,6 @@
 import { AffiliateImporter } from "@/components/affiliate/affiliate-importer";
+import { PageHeader } from "@/components/design-system/page-header";
+import { Link2 } from "lucide-react";
 
 export const metadata = {
   title: "Importar Produto de Afiliado | GeraFeed",
@@ -7,15 +9,12 @@ export const metadata = {
 
 export default function AffiliateImportPage() {
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight text-foreground">
-          Importar Produto de Afiliado
-        </h1>
-        <p className="text-sm text-muted-foreground">
-          Cole links de afiliados do Mercado Livre para extrair metadados, revisar dados e salvar no catálogo do seu workspace.
-        </p>
-      </div>
+    <div className="p-6 md:p-8 max-w-7xl mx-auto w-full space-y-6">
+      <PageHeader
+        title="Importar Produto de Afiliado"
+        description="Cole links de afiliados do Mercado Livre para extrair metadados, revisar dados e salvar no catálogo do seu workspace."
+        icon={<Link2 className="w-5 h-5" />}
+      />
 
       <AffiliateImporter />
     </div>

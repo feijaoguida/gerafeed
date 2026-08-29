@@ -5,8 +5,6 @@ import {
   Globe,
   Plus,
   Save,
-  CheckCircle2,
-  AlertCircle,
   RefreshCw,
   FolderSync,
   ShieldCheck,
@@ -19,6 +17,16 @@ import {
   Check,
   X,
 } from "lucide-react";
+
+import { PageHeader } from "@/components/design-system/page-header";
+import { Card, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { FormField } from "@/components/design-system/form-field";
+import { Input } from "@/components/ui/input";
+import { Alert } from "@/components/ui/alert";
+import { EmptyState } from "@/components/ui/empty-state";
+import { Skeleton } from "@/components/ui/skeleton";
 
 interface WordPressSiteItem {
   id: string;
@@ -139,7 +147,7 @@ export default function SettingsWordPressPage() {
       setSelectedSiteId(id);
     } catch (err) {
       console.error(err);
-      setErrorMessage("Erro ao abrir configurações do site.");
+      setErrorMessage(err instanceof Error ? err.message : "Erro ao carregar site.");
     } finally {
       setIsLoading(false);
     }
@@ -147,79 +155,34 @@ export default function SettingsWordPressPage() {
 
   useEffect(() => {
     let ignore = false;
-    fetchSites()
-      .then((data) => {
-        if (!ignore) setSites(data);
-      })
-      .catch((err) => {
+    async function init() {
+      try {
+        const loadedSites = await fetchSites();
         if (!ignore) {
-          console.error(err);
-          setErrorMessage("Não foi possível carregar a lista de sites WordPress.");
+          setSites(loadedSites);
         }
-      })
-      .finally(() => {
+      } catch (err) {
+        if (!ignore) {
+          setErrorMessage("Erro ao conectar à API de sites.");
+          console.error(err);
+        }
+      } finally {
         if (!ignore) setIsLoading(false);
-      });
-
+      }
+    }
+    init();
     return () => {
       ignore = true;
     };
   }, [fetchSites]);
 
-  // Handle Save Site
-  const handleSaveSite = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!selectedSiteId) return;
-
-    setIsSaving(true);
-    setErrorMessage(null);
-    setSuccessMessage(null);
-
-    try {
-      const payload: {
-        name: string;
-        url: string;
-        username: string;
-        defaultPromptType: string | null;
-        active: boolean;
-        isDefault: boolean;
-        applicationPassword?: string;
-      } = {
-        name,
-        url,
-        username,
-        defaultPromptType: defaultPromptType.trim() || null,
-        active,
-        isDefault,
-      };
-
-      if (applicationPassword.trim()) {
-        payload.applicationPassword = applicationPassword.trim();
-      }
-
-      const res = await fetch(`/api/wordpress/sites/${selectedSiteId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Erro ao salvar alterações.");
-
-      setSuccessMessage("Site WordPress atualizado com sucesso!");
-      setApplicationPassword("");
-      await loadSiteDetails(selectedSiteId);
-      await fetchSites();
-    } catch (err) {
-      setErrorMessage(err instanceof Error ? err.message : "Erro ao salvar alterações.");
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
-  // Handle Create Site
   const handleCreateSite = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!newSiteName.trim() || !newSiteUrl.trim() || !newSiteUsername.trim() || !newSitePassword.trim()) {
+      setErrorMessage("Por favor, preencha todos os campos obrigatórios.");
+      return;
+    }
+
     setIsSaving(true);
     setErrorMessage(null);
     setSuccessMessage(null);
@@ -229,20 +192,19 @@ export default function SettingsWordPressPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          name: newSiteName,
-          url: newSiteUrl,
-          username: newSiteUsername,
-          applicationPassword: newSitePassword,
+          name: newSiteName.trim(),
+          url: newSiteUrl.trim(),
+          username: newSiteUsername.trim(),
+          applicationPassword: newSitePassword.trim(),
           defaultPromptType: newSitePromptType.trim() || null,
-          active: true,
           isDefault: newSiteIsDefault,
         }),
       });
 
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Erro ao criar site.");
+      if (!res.ok) throw new Error(data.error || "Erro ao adicionar site.");
 
-      setSuccessMessage("Site WordPress adicionado com sucesso!");
+      setSuccessMessage("Site WordPress cadastrado com sucesso!");
       setIsCreatingSite(false);
       setNewSiteName("");
       setNewSiteUrl("");
@@ -253,7 +215,7 @@ export default function SettingsWordPressPage() {
 
       await refreshSites();
       if (data.site?.id) {
-        await loadSiteDetails(data.site.id);
+        loadSiteDetails(data.site.id);
       }
     } catch (err) {
       setErrorMessage(err instanceof Error ? err.message : "Erro ao criar site.");
@@ -262,18 +224,105 @@ export default function SettingsWordPressPage() {
     }
   };
 
-  // Handle Delete Site
-  const handleDeleteSite = async (id: string) => {
-    if (!confirm("Tem certeza que deseja remover esta configuração de WordPress?")) return;
+  const handleSaveSite = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedSiteId) return;
 
+    setIsSaving(true);
+    setErrorMessage(null);
+    setSuccessMessage(null);
+
+    try {
+      const bodyPayload: Record<string, unknown> = {
+        name: name.trim(),
+        url: url.trim(),
+        username: username.trim(),
+        defaultPromptType: defaultPromptType.trim() || null,
+        active,
+        isDefault,
+      };
+
+      if (applicationPassword.trim()) {
+        bodyPayload.applicationPassword = applicationPassword.trim();
+      }
+
+      const res = await fetch(`/api/wordpress/sites/${selectedSiteId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(bodyPayload),
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Erro ao salvar configurações do site.");
+
+      setSuccessMessage("Configurações atualizadas com sucesso!");
+      setApplicationPassword("");
+      await refreshSites();
+      loadSiteDetails(selectedSiteId);
+    } catch (err) {
+      setErrorMessage(err instanceof Error ? err.message : "Erro ao salvar.");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleTestConnection = async () => {
+    if (!selectedSiteId) return;
+    setIsTesting(true);
+    setErrorMessage(null);
+    setSuccessMessage(null);
+
+    try {
+      const res = await fetch(`/api/wordpress/sites/${selectedSiteId}/test`, {
+        method: "POST",
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Falha na conexão com o site WordPress.");
+
+      setSuccessMessage(`Conexão validada com sucesso! Site: ${data.siteName || url}`);
+    } catch (err) {
+      setErrorMessage(err instanceof Error ? err.message : "Erro ao testar comunicação.");
+    } finally {
+      setIsTesting(false);
+    }
+  };
+
+  const handleSyncCategories = async () => {
+    if (!selectedSiteId) return;
+    setIsSyncing(true);
+    setErrorMessage(null);
+    setSuccessMessage(null);
+
+    try {
+      const res = await fetch(`/api/wordpress/sites/${selectedSiteId}/categories/sync`, {
+        method: "POST",
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Erro ao sincronizar categorias.");
+
+      setSuccessMessage(data.message || "Categorias sincronizadas com sucesso!");
+      setCategoryCount(data.count || 0);
+    } catch (err) {
+      setErrorMessage(err instanceof Error ? err.message : "Erro ao sincronizar categorias.");
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
+  const handleDeleteSite = async (id: string) => {
+    if (!confirm("Tem certeza de que deseja excluir este site? Suas configurações de associação serão perdidas.")) return;
     setIsDeleting(true);
     setErrorMessage(null);
     setSuccessMessage(null);
 
     try {
-      const res = await fetch(`/api/wordpress/sites/${id}`, { method: "DELETE" });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Erro ao remover site.");
+      const res = await fetch(`/api/wordpress/sites/${id}`, {
+        method: "DELETE",
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || "Erro ao excluir site.");
+      }
 
       setSuccessMessage("Site WordPress removido com sucesso.");
       if (selectedSiteId === id) {
@@ -282,121 +331,83 @@ export default function SettingsWordPressPage() {
       }
       await refreshSites();
     } catch (err) {
-      setErrorMessage(err instanceof Error ? err.message : "Erro ao remover site.");
+      setErrorMessage(err instanceof Error ? err.message : "Erro ao excluir site.");
     } finally {
       setIsDeleting(false);
     }
   };
 
-  // Handle Test Connection
-  const handleTestConnection = async () => {
+  const handleToggleFeedAssignment = async (sourceId: string, isAssigned: boolean) => {
     if (!selectedSiteId) return;
-    setIsTesting(true);
-    setErrorMessage(null);
-    setSuccessMessage(null);
-
     try {
-      const res = await fetch(`/api/wordpress/sites/${selectedSiteId}/test`, { method: "POST" });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Falha na conexão com o WordPress.");
-
-      setSuccessMessage(`Conexão bem-sucedida! Autenticado como: ${data.user?.name || data.user?.slug || "Usuário WP"}`);
-    } catch (err) {
-      setErrorMessage(err instanceof Error ? err.message : "Erro ao testar conexão.");
-    } finally {
-      setIsTesting(false);
-    }
-  };
-
-  // Handle Sync Categories
-  const handleSyncCategories = async () => {
-    if (!selectedSiteId) return;
-    setIsSyncing(true);
-    setErrorMessage(null);
-    setSuccessMessage(null);
-
-    try {
-      const res = await fetch(`/api/wordpress/sites/${selectedSiteId}/categories/sync`, { method: "POST" });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Erro ao sincronizar categorias.");
-
-      setSuccessMessage(`${data.syncedCount || 0} categoria(s) sincronizadas com sucesso!`);
-      await loadSiteDetails(selectedSiteId);
-    } catch (err) {
-      setErrorMessage(err instanceof Error ? err.message : "Erro ao sincronizar categorias.");
-    } finally {
-      setIsSyncing(false);
-    }
-  };
-
-  // Handle Assign / Unassign Feed
-  const handleToggleFeedAssignment = async (sourceId: string, currentlyAssigned: boolean) => {
-    if (!selectedSiteId) return;
-    setErrorMessage(null);
-
-    try {
-      if (currentlyAssigned) {
-        // Unassign
-        const res = await fetch(`/api/wordpress/sites/${selectedSiteId}/sources?sourceId=${sourceId}`, {
+      if (isAssigned) {
+        await fetch(`/api/wordpress/sites/${selectedSiteId}/sources`, {
           method: "DELETE",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ sourceId }),
         });
-        if (!res.ok) throw new Error("Erro ao desassociar feed.");
       } else {
-        // Assign
-        const res = await fetch(`/api/wordpress/sites/${selectedSiteId}/sources`, {
+        await fetch(`/api/wordpress/sites/${selectedSiteId}/sources`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ sourceId, active: true }),
+          body: JSON.stringify({ sourceId }),
         });
-        if (!res.ok) throw new Error("Erro ao associar feed.");
       }
       await loadSiteDetails(selectedSiteId);
     } catch (err) {
-      setErrorMessage(err instanceof Error ? err.message : "Erro ao alterar vínculo do feed.");
+      console.error(err);
+      setErrorMessage("Erro ao atualizar associação de feed.");
     }
   };
 
-  // Handle Update Assignment Override
   const handleUpdateFeedOverride = async (sourceId: string, promptTypeOverride: string) => {
     if (!selectedSiteId) return;
     try {
-      const res = await fetch(`/api/wordpress/sites/${selectedSiteId}/sources`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sourceId, promptTypeOverride: promptTypeOverride.trim() || null }),
-      });
-      if (!res.ok) throw new Error("Erro ao salvar override.");
-      setSuccessMessage("Override de prompt salvo com sucesso!");
-      await loadSiteDetails(selectedSiteId);
-    } catch (err) {
-      setErrorMessage(err instanceof Error ? err.message : "Erro ao atualizar override.");
-    }
-  };
-
-  // Handle Quick Create Feed & Assign
-  const handleQuickCreateFeed = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!selectedSiteId) return;
-    setIsSaving(true);
-    setErrorMessage(null);
-
-    try {
-      const res = await fetch(`/api/wordpress/sites/${selectedSiteId}/sources`, {
+      await fetch(`/api/wordpress/sites/${selectedSiteId}/sources`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          newSource: {
-            name: newFeedName,
-            rssUrl: newFeedUrl,
-            creditName: newFeedCredit,
-            defaultPromptType: newFeedPrompt.trim() || null,
-          },
-          active: true,
+          sourceId,
+          promptTypeOverride: promptTypeOverride.trim() || null,
+        }),
+      });
+      await loadSiteDetails(selectedSiteId);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleQuickCreateFeed = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newFeedName.trim() || !newFeedUrl.trim() || !selectedSiteId) return;
+
+    setIsSaving(true);
+    setErrorMessage(null);
+    setSuccessMessage(null);
+
+    try {
+      const srcRes = await fetch("/api/sources", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: newFeedName.trim(),
+          rssUrl: newFeedUrl.trim(),
+          creditName: newFeedCredit.trim() || null,
+          defaultPromptType: newFeedPrompt.trim() || null,
         }),
       });
 
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Erro ao criar e associar feed.");
+      const srcData = await srcRes.json();
+      if (!srcRes.ok) throw new Error(srcData.error || "Erro ao criar nova fonte.");
+
+      await fetch(`/api/wordpress/sites/${selectedSiteId}/sources`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          sourceId: srcData.id,
+          promptTypeOverride: newFeedPrompt.trim() || null,
+        }),
+      });
 
       setSuccessMessage("Novo Feed criado e associado ao site com sucesso!");
       setIsAddingNewFeed(false);
@@ -415,175 +426,151 @@ export default function SettingsWordPressPage() {
 
   if (isLoading && sites.length === 0) {
     return (
-      <div className="p-8 text-xs text-zinc-500 animate-pulse flex items-center justify-center">
-        Carregando destinos WordPress...
+      <div className="p-6 sm:p-8 max-w-5xl mx-auto space-y-6">
+        <Skeleton className="h-10 w-64" />
+        <Skeleton className="h-20 w-full rounded-xl" />
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <Skeleton className="h-44 rounded-xl" />
+          <Skeleton className="h-44 rounded-xl" />
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="p-6 sm:p-8 max-w-5xl mx-auto space-y-8 transition-colors duration-200">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-2">
-            <Globe className="w-5 h-5 text-sky-500 dark:text-sky-400" />
-            <h1 className="text-xl font-bold text-zinc-900 dark:white tracking-tight">
-              Destinos WordPress (Multi-Site)
-            </h1>
-          </div>
-          <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
-            Gerencie múltiplos portais WordPress, associe feeds RSS e defina regras editoriais por destino.
-          </p>
-        </div>
-
-        {!selectedSiteId && (
-          <button
-            onClick={() => setIsCreatingSite(true)}
-            className="inline-flex items-center gap-2 px-4 py-2 bg-sky-600 hover:bg-sky-500 text-white rounded-lg text-xs font-semibold shadow-sm transition"
-          >
-            <Plus className="w-4 h-4" />
-            Novo Destino WordPress
-          </button>
-        )}
-      </div>
+    <div className="p-6 sm:p-8 max-w-5xl mx-auto space-y-6">
+      {/* Header com PageHeader */}
+      <PageHeader
+        title="Destinos WordPress (Multi-Site)"
+        description="Gerencie múltiplos portais WordPress, associe feeds RSS e defina regras editoriais por destino."
+        icon={<Globe className="w-5 h-5 text-primary" />}
+        actions={
+          !selectedSiteId ? (
+            <Button
+              variant="gradient"
+              size="sm"
+              onClick={() => setIsCreatingSite(true)}
+              leadingIcon={<Plus className="w-4 h-4" />}
+            >
+              Novo Destino WordPress
+            </Button>
+          ) : undefined
+        }
+      />
 
       {/* Global Alerts */}
       {errorMessage && (
-        <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/20 text-red-600 dark:text-red-400 text-xs flex items-center gap-3">
-          <AlertCircle className="w-4 h-4 shrink-0" />
-          <span className="flex-1">{errorMessage}</span>
-          <button onClick={() => setErrorMessage(null)} className="hover:text-red-300">
-            <X className="w-4 h-4" />
-          </button>
-        </div>
+        <Alert variant="destructive" onClose={() => setErrorMessage(null)}>
+          {errorMessage}
+        </Alert>
       )}
 
       {successMessage && (
-        <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-xs flex items-center gap-3">
-          <CheckCircle2 className="w-4 h-4 shrink-0" />
-          <span className="flex-1">{successMessage}</span>
-          <button onClick={() => setSuccessMessage(null)} className="hover:text-emerald-300">
-            <X className="w-4 h-4" />
-          </button>
-        </div>
+        <Alert variant="success" onClose={() => setSuccessMessage(null)}>
+          {successMessage}
+        </Alert>
       )}
 
       {/* Modal: Novo Site WordPress */}
       {isCreatingSite && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl w-full max-w-lg p-6 shadow-2xl space-y-6">
-            <div className="flex items-center justify-between border-b border-zinc-100 dark:border-zinc-800 pb-4">
-              <h2 className="text-base font-bold text-zinc-900 dark:text-white">Adicionar Novo Site WordPress</h2>
-              <button onClick={() => setIsCreatingSite(false)} className="text-zinc-400 hover:text-zinc-600 dark:hover:text-white">
+          <Card className="w-full max-w-lg p-6 shadow-2xl space-y-6 bg-surface border-border">
+            <CardHeader className="p-0 border-b border-border pb-4 flex flex-row items-center justify-between">
+              <CardTitle className="text-base font-bold">Adicionar Novo Site WordPress</CardTitle>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setIsCreatingSite(false)}
+              >
                 <X className="w-5 h-5" />
-              </button>
-            </div>
+              </Button>
+            </CardHeader>
 
             <form onSubmit={handleCreateSite} className="space-y-4">
-              <div>
-                <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1">
-                  Nome do Destino *
-                </label>
-                <input
+              <FormField label="Nome do Destino" required>
+                <Input
                   type="text"
                   placeholder="Ex: Portal de Humor, Tech News"
                   value={newSiteName}
                   onChange={(e) => setNewSiteName(e.target.value)}
                   required
-                  className="w-full px-3 py-2 text-xs rounded-lg border border-zinc-300 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800/60 text-zinc-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-sky-500"
                 />
-              </div>
+              </FormField>
 
-              <div>
-                <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1">
-                  URL Base do WordPress *
-                </label>
-                <input
+              <FormField label="URL Base do WordPress" required>
+                <Input
                   type="url"
                   placeholder="https://exemplo.com.br"
                   value={newSiteUrl}
                   onChange={(e) => setNewSiteUrl(e.target.value)}
                   required
-                  className="w-full px-3 py-2 text-xs rounded-lg border border-zinc-300 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800/60 text-zinc-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-sky-500"
                 />
-              </div>
+              </FormField>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1">
-                    Usuário REST API *
-                  </label>
-                  <input
+                <FormField label="Usuário REST API" required>
+                  <Input
                     type="text"
                     placeholder="Ex: admin_api"
                     value={newSiteUsername}
                     onChange={(e) => setNewSiteUsername(e.target.value)}
                     required
-                    className="w-full px-3 py-2 text-xs rounded-lg border border-zinc-300 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800/60 text-zinc-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-sky-500"
                   />
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1">
-                    Application Password *
-                  </label>
-                  <input
+                </FormField>
+
+                <FormField label="Application Password" required>
+                  <Input
                     type="password"
                     placeholder="xxxx xxxx xxxx xxxx"
                     value={newSitePassword}
                     onChange={(e) => setNewSitePassword(e.target.value)}
                     required
-                    className="w-full px-3 py-2 text-xs rounded-lg border border-zinc-300 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800/60 text-zinc-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-sky-500"
                   />
-                </div>
+                </FormField>
               </div>
 
-              <div>
-                <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1">
-                  Prompt Padrão do Site (Opcional)
-                </label>
-                <input
+              <FormField label="Prompt Padrão do Site (Opcional)">
+                <Input
                   type="text"
                   placeholder="Ex: Humorístico, Informativo, Crítico"
                   value={newSitePromptType}
                   onChange={(e) => setNewSitePromptType(e.target.value)}
-                  className="w-full px-3 py-2 text-xs rounded-lg border border-zinc-300 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800/60 text-zinc-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-sky-500"
                 />
-              </div>
+              </FormField>
 
               <div className="flex items-center gap-3 pt-2">
-                <label className="relative inline-flex items-center cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={newSiteIsDefault}
-                    onChange={(e) => setNewSiteIsDefault(e.target.checked)}
-                    className="sr-only peer"
-                  />
-                  <div className="w-9 h-5 bg-zinc-300 dark:bg-zinc-700 peer-focus:outline-hidden rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-zinc-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-sky-600"></div>
-                </label>
-                <span className="text-xs font-semibold text-zinc-700 dark:text-zinc-300">
+                <input
+                  type="checkbox"
+                  id="newSiteIsDefault"
+                  checked={newSiteIsDefault}
+                  onChange={(e) => setNewSiteIsDefault(e.target.checked)}
+                  className="accent-primary h-4 w-4 rounded"
+                />
+                <label htmlFor="newSiteIsDefault" className="font-heading text-xs font-semibold text-foreground cursor-pointer">
                   Definir como Destino Padrão
-                </span>
+                </label>
               </div>
 
-              <div className="flex justify-end gap-3 pt-4 border-t border-zinc-100 dark:border-zinc-800">
-                <button
+              <CardFooter className="p-0 flex justify-end gap-3 pt-4 border-t border-border">
+                <Button
                   type="button"
+                  variant="outline"
+                  size="sm"
                   onClick={() => setIsCreatingSite(false)}
-                  className="px-4 py-2 text-xs font-semibold text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white"
                 >
                   Cancelar
-                </button>
-                <button
+                </Button>
+                <Button
                   type="submit"
-                  disabled={isSaving}
-                  className="px-4 py-2 bg-sky-600 hover:bg-sky-500 text-white rounded-lg text-xs font-semibold shadow-sm transition disabled:opacity-50"
+                  variant="gradient"
+                  size="sm"
+                  isLoading={isSaving}
                 >
-                  {isSaving ? "Salvando..." : "Criar Destino"}
-                </button>
-              </div>
+                  Criar Destino
+                </Button>
+              </CardFooter>
             </form>
-          </div>
+          </Card>
         </div>
       )}
 
@@ -591,101 +578,95 @@ export default function SettingsWordPressPage() {
       {!selectedSiteId ? (
         <div className="space-y-4">
           {sites.length === 0 ? (
-            <div className="p-12 text-center rounded-2xl bg-white dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 space-y-4">
-              <Globe className="w-10 h-10 text-zinc-400 mx-auto" />
-              <div>
-                <p className="text-sm font-semibold text-zinc-900 dark:text-white">Nenhum site WordPress configurado</p>
-                <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
-                  Adicione seu primeiro destino WordPress para começar a publicar notícias personalizadas por portal.
-                </p>
-              </div>
-              <button
-                onClick={() => setIsCreatingSite(true)}
-                className="inline-flex items-center gap-2 px-4 py-2 bg-sky-600 hover:bg-sky-500 text-white rounded-lg text-xs font-semibold transition"
-              >
-                <Plus className="w-4 h-4" />
-                Criar Primeiro Site
-              </button>
-            </div>
+            <EmptyState
+              title="Nenhum site WordPress configurado"
+              description="Adicione seu primeiro destino WordPress para começar a publicar notícias personalizadas por portal."
+              action={
+                <Button
+                  variant="gradient"
+                  onClick={() => setIsCreatingSite(true)}
+                  leadingIcon={<Plus className="w-4 h-4" />}
+                >
+                  Criar Primeiro Site
+                </Button>
+              }
+            />
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {sites.map((site) => (
-                <div
+                <Card
                   key={site.id}
-                  className="p-5 rounded-2xl bg-white dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700 transition flex flex-col justify-between space-y-4 shadow-sm dark:shadow-none"
+                  className="p-5 shadow-xs hover:border-primary/40 transition-colors flex flex-col justify-between space-y-4"
                 >
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
                         <span
-                          className={`w-2.5 h-2.5 rounded-full ${site.active ? "bg-emerald-500" : "bg-zinc-400"}`}
+                          className={`w-2.5 h-2.5 rounded-full ${site.active ? "bg-[#00C2A8]" : "bg-muted-foreground/40"}`}
                         />
-                        <h3 className="text-sm font-bold text-zinc-900 dark:text-white">{site.name}</h3>
+                        <h3 className="font-heading text-sm font-bold text-foreground">{site.name}</h3>
                         {site.isDefault && (
-                          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-sky-100 dark:bg-sky-500/20 text-sky-600 dark:text-sky-400 uppercase tracking-wider ml-1">
+                          <Badge variant="purple" size="sm">
                             Padrão
-                          </span>
+                          </Badge>
                         )}
                       </div>
-                      <span
-                        className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${
-                          site.active
-                            ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20"
-                            : "bg-zinc-500/10 text-zinc-500 dark:text-zinc-400 border border-zinc-500/20"
-                        }`}
-                      >
+                      <Badge variant={site.active ? "success" : "secondary"} size="sm">
                         {site.active ? "Ativo" : "Inativo"}
-                      </span>
+                      </Badge>
                     </div>
 
                     <a
                       href={site.url}
                       target="_blank"
                       rel="noreferrer"
-                      className="text-xs text-sky-600 dark:text-sky-400 hover:underline flex items-center gap-1"
+                      className="text-xs text-primary hover:underline flex items-center gap-1 font-medium"
                     >
                       {site.url}
                       <ExternalLink className="w-3 h-3" />
                     </a>
 
-                    <div className="flex flex-wrap items-center gap-3 pt-2 text-[11px] text-zinc-500 dark:text-zinc-400">
-                      <span>Usuário: <strong className="text-zinc-700 dark:text-zinc-300">{site.username}</strong></span>
+                    <div className="flex flex-wrap items-center gap-3 pt-2 text-[11px] text-muted-foreground">
+                      <span>Usuário: <strong className="text-foreground">{site.username}</strong></span>
                       <span>•</span>
                       <span>
                         Prompt:{" "}
-                        <strong className="text-zinc-700 dark:text-zinc-300">
+                        <strong className="text-foreground">
                           {site.defaultPromptType || "Padrão Workspace"}
                         </strong>
                       </span>
                     </div>
                   </div>
 
-                  <div className="flex items-center justify-between pt-3 border-t border-zinc-100 dark:border-zinc-800">
-                    <div className="flex items-center gap-1 text-[11px] text-zinc-400">
-                      <ShieldCheck className={`w-3.5 h-3.5 ${site.hasPassword ? "text-emerald-500" : "text-amber-500"}`} />
+                  <div className="flex items-center justify-between pt-3 border-t border-border">
+                    <div className="flex items-center gap-1 text-[11px] text-muted-foreground">
+                      <ShieldCheck className={`w-3.5 h-3.5 ${site.hasPassword ? "text-[#00C2A8]" : "text-amber-500"}`} />
                       {site.hasPassword ? "Credenciais OK" : "Senha Pendente"}
                     </div>
 
                     <div className="flex items-center gap-2">
-                      <button
+                      <Button
+                        variant="ghost"
+                        size="icon"
                         onClick={() => handleDeleteSite(site.id)}
                         disabled={isDeleting}
-                        className="p-1.5 text-zinc-400 hover:text-red-500 rounded-md hover:bg-zinc-100 dark:hover:bg-zinc-800 transition"
                         title="Excluir site"
+                        className="text-muted-foreground hover:text-rose-500"
                       >
                         <Trash2 className="w-4 h-4" />
-                      </button>
+                      </Button>
 
-                      <button
+                      <Button
+                        variant="secondary"
+                        size="sm"
                         onClick={() => loadSiteDetails(site.id)}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-800 dark:text-zinc-200 rounded-lg text-xs font-semibold transition"
+                        leadingIcon={<Edit3 className="w-3.5 h-3.5" />}
                       >
-                        <Edit3 className="w-3.5 h-3.5" />
                         Gerenciar
-                      </button>
+                      </Button>
                     </div>
                   </div>
-                </div>
+                </Card>
               ))}
             </div>
           )}
@@ -693,265 +674,240 @@ export default function SettingsWordPressPage() {
       ) : (
         /* Site Details / Manage View */
         <div className="space-y-6">
-          {/* Back button */}
-          <button
+          <Button
+            variant="ghost"
+            size="sm"
             onClick={() => {
               setSelectedSiteId(null);
               setSiteDetails(null);
             }}
-            className="inline-flex items-center gap-2 text-xs font-semibold text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white"
+            leadingIcon={<ArrowLeft className="w-4 h-4" />}
           >
-            <ArrowLeft className="w-4 h-4" />
             Voltar para lista de sites
-          </button>
+          </Button>
 
           {/* Section 1: Dados Básicos & Conexão */}
-          <div className="p-6 rounded-2xl bg-white dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 shadow-sm dark:shadow-none space-y-6">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-zinc-100 dark:border-zinc-800 pb-4">
+          <Card className="p-6 shadow-xs space-y-6">
+            <CardHeader className="p-0 border-b border-border pb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div>
-                <h2 className="text-base font-bold text-zinc-900 dark:text-white flex items-center gap-2">
-                  <Globe className="w-4 h-4 text-sky-500" />
+                <CardTitle className="text-base font-bold flex items-center gap-2">
+                  <Globe className="w-4 h-4 text-primary" />
                   Configuração: {siteDetails?.name}
-                </h2>
-                <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
+                </CardTitle>
+                <p className="font-sans text-xs text-muted-foreground mt-0.5">
                   Atualize as credenciais e teste a comunicação direta com a REST API.
                 </p>
               </div>
 
               <div className="flex items-center gap-2">
-                <button
+                <Button
                   type="button"
+                  variant="outline"
+                  size="sm"
                   onClick={handleTestConnection}
-                  disabled={isTesting}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-800 dark:text-zinc-200 rounded-lg text-xs font-semibold transition disabled:opacity-50"
+                  isLoading={isTesting}
+                  leadingIcon={<RefreshCw className="w-3.5 h-3.5" />}
                 >
-                  <RefreshCw className={`w-3.5 h-3.5 ${isTesting ? "animate-spin" : ""}`} />
-                  {isTesting ? "Testando..." : "Testar Conexão"}
-                </button>
+                  Testar Conexão
+                </Button>
 
-                <button
+                <Button
                   type="button"
+                  variant="outline"
+                  size="sm"
                   onClick={handleSyncCategories}
-                  disabled={isSyncing}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-800 dark:text-zinc-200 rounded-lg text-xs font-semibold transition disabled:opacity-50"
+                  isLoading={isSyncing}
+                  leadingIcon={<FolderSync className="w-3.5 h-3.5" />}
                 >
-                  <FolderSync className={`w-3.5 h-3.5 ${isSyncing ? "animate-spin" : ""}`} />
-                  {isSyncing ? "Sincronizando..." : `Sincronizar Categorias (${categoryCount})`}
-                </button>
+                  Sincronizar Categorias ({categoryCount})
+                </Button>
               </div>
-            </div>
+            </CardHeader>
 
             <form onSubmit={handleSaveSite} className="space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1">
-                    Nome do Site / Portal
-                  </label>
-                  <input
+                <FormField label="Nome do Site / Portal" required>
+                  <Input
                     type="text"
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                     required
-                    className="w-full px-3 py-2 text-xs rounded-lg border border-zinc-300 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800/60 text-zinc-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-sky-500"
                   />
-                </div>
+                </FormField>
 
-                <div>
-                  <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1">
-                    URL do WordPress
-                  </label>
-                  <input
+                <FormField label="URL do WordPress" required>
+                  <Input
                     type="url"
                     value={url}
                     onChange={(e) => setUrl(e.target.value)}
                     required
-                    className="w-full px-3 py-2 text-xs rounded-lg border border-zinc-300 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800/60 text-zinc-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-sky-500"
                   />
-                </div>
+                </FormField>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1">
-                    Usuário REST API
-                  </label>
-                  <input
+                <FormField label="Usuário REST API" required>
+                  <Input
                     type="text"
                     value={username}
                     onChange={(e) => setUsername(e.target.value)}
                     required
-                    className="w-full px-3 py-2 text-xs rounded-lg border border-zinc-300 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800/60 text-zinc-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-sky-500"
                   />
-                </div>
+                </FormField>
 
-                <div>
-                  <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1">
-                    Application Password
-                  </label>
-                  <input
+                <FormField label="Application Password">
+                  <Input
                     type="password"
                     placeholder={siteDetails?.hasPassword ? "•••••••• (Configurada — preencha para alterar)" : "Digite a nova senha"}
                     value={applicationPassword}
                     onChange={(e) => setApplicationPassword(e.target.value)}
-                    className="w-full px-3 py-2 text-xs rounded-lg border border-zinc-300 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800/60 text-zinc-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-sky-500"
                   />
-                </div>
+                </FormField>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-center pt-2">
-                <div>
-                  <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1 flex items-center gap-1.5">
-                    <Sparkles className="w-3.5 h-3.5 text-amber-500" />
-                    Prompt Padrão deste Site
-                  </label>
-                  <input
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 items-center pt-2">
+                <FormField label="Prompt Padrão deste Site">
+                  <Input
                     type="text"
                     placeholder="Ex: Humorístico, Informativo (opcional)"
                     value={defaultPromptType}
                     onChange={(e) => setDefaultPromptType(e.target.value)}
-                    className="w-full px-3 py-2 text-xs rounded-lg border border-zinc-300 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800/60 text-zinc-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-sky-500"
+                    leadingIcon={<Sparkles className="w-3.5 h-3.5 text-amber-500" />}
                   />
-                </div>
+                </FormField>
 
-                <div className="flex items-center gap-3 pt-4 sm:pt-6">
-                  <label className="relative inline-flex items-center cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={active}
-                      onChange={(e) => setActive(e.target.checked)}
-                      className="sr-only peer"
-                    />
-                    <div className="w-9 h-5 bg-zinc-300 dark:bg-zinc-700 peer-focus:outline-hidden rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-zinc-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-sky-600"></div>
-                  </label>
-                  <span className="text-xs font-semibold text-zinc-700 dark:text-zinc-300">
+                <div className="flex items-center gap-2 pt-4">
+                  <input
+                    type="checkbox"
+                    id="siteActive"
+                    checked={active}
+                    onChange={(e) => setActive(e.target.checked)}
+                    className="accent-primary h-4 w-4 rounded"
+                  />
+                  <label htmlFor="siteActive" className="font-heading text-xs font-semibold text-foreground cursor-pointer">
                     Destino Ativo para Curadoria
-                  </span>
-                </div>
-
-                <div className="flex items-center gap-3 pt-4 sm:pt-6">
-                  <label className="relative inline-flex items-center cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={isDefault}
-                      onChange={(e) => setIsDefault(e.target.checked)}
-                      className="sr-only peer"
-                    />
-                    <div className="w-9 h-5 bg-zinc-300 dark:bg-zinc-700 peer-focus:outline-hidden rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-zinc-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-sky-600"></div>
                   </label>
-                  <span className="text-xs font-semibold text-zinc-700 dark:text-zinc-300">
+                </div>
+
+                <div className="flex items-center gap-2 pt-4">
+                  <input
+                    type="checkbox"
+                    id="siteIsDefault"
+                    checked={isDefault}
+                    onChange={(e) => setIsDefault(e.target.checked)}
+                    className="accent-primary h-4 w-4 rounded"
+                  />
+                  <label htmlFor="siteIsDefault" className="font-heading text-xs font-semibold text-foreground cursor-pointer">
                     Definir como Padrão
-                  </span>
+                  </label>
                 </div>
               </div>
 
-              <div className="flex justify-end pt-4 border-t border-zinc-100 dark:border-zinc-800">
-                <button
+              <CardFooter className="p-0 flex justify-end pt-4 border-t border-border">
+                <Button
                   type="submit"
-                  disabled={isSaving}
-                  className="inline-flex items-center gap-2 px-4 py-2 bg-sky-600 hover:bg-sky-500 text-white rounded-lg text-xs font-semibold shadow-sm transition disabled:opacity-50"
+                  variant="gradient"
+                  isLoading={isSaving}
+                  leadingIcon={<Save className="w-4 h-4" />}
                 >
-                  <Save className="w-4 h-4" />
-                  {isSaving ? "Salvando..." : "Salvar Configurações"}
-                </button>
-              </div>
+                  Salvar Configurações
+                </Button>
+              </CardFooter>
             </form>
-          </div>
+          </Card>
 
           {/* Section 2: Feeds Associados */}
-          <div className="p-6 rounded-2xl bg-white dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 shadow-sm dark:shadow-none space-y-6">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-zinc-100 dark:border-zinc-800 pb-4">
+          <Card className="p-6 shadow-xs space-y-6">
+            <CardHeader className="p-0 border-b border-border pb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div>
-                <h2 className="text-base font-bold text-zinc-900 dark:text-white flex items-center gap-2">
-                  <Rss className="w-4 h-4 text-orange-500" />
+                <CardTitle className="text-base font-bold flex items-center gap-2">
+                  <Rss className="w-4 h-4 text-amber-500" />
                   Feeds RSS Associados a este Destino
-                </h2>
-                <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
+                </CardTitle>
+                <p className="font-sans text-xs text-muted-foreground mt-0.5">
                   Associe quais fontes alimentam este portal WordPress e configure overrides editoriais.
                 </p>
               </div>
 
-              <button
+              <Button
                 type="button"
+                variant="outline"
+                size="sm"
                 onClick={() => setIsAddingNewFeed(!isAddingNewFeed)}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-orange-600 hover:bg-orange-500 text-white rounded-lg text-xs font-semibold transition"
+                leadingIcon={<Plus className="w-3.5 h-3.5 text-primary" />}
               >
-                <Plus className="w-3.5 h-3.5" />
                 Novo Feed
-              </button>
-            </div>
+              </Button>
+            </CardHeader>
 
             {/* Quick Create Feed Form */}
             {isAddingNewFeed && (
-              <form onSubmit={handleQuickCreateFeed} className="p-4 rounded-xl bg-zinc-50 dark:bg-zinc-800/40 border border-orange-500/20 space-y-4">
-                <h3 className="text-xs font-bold text-zinc-900 dark:text-white">Cadastrar e Vincular Novo Feed</h3>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 mb-1">Nome do Feed *</label>
-                    <input
-                      type="text"
-                      placeholder="Ex: Canaltech"
-                      value={newFeedName}
-                      onChange={(e) => setNewFeedName(e.target.value)}
-                      required
-                      className="w-full px-3 py-1.5 text-xs rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white"
-                    />
+              <Card className="p-4 border-primary/30 bg-surface-muted/50 space-y-4">
+                <h3 className="font-heading text-xs font-bold text-foreground">Cadastrar e Vincular Novo Feed</h3>
+                <form onSubmit={handleQuickCreateFeed} className="space-y-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <FormField label="Nome do Feed" required>
+                      <Input
+                        type="text"
+                        placeholder="Ex: Canaltech"
+                        value={newFeedName}
+                        onChange={(e) => setNewFeedName(e.target.value)}
+                        required
+                      />
+                    </FormField>
+                    <FormField label="URL RSS" required>
+                      <Input
+                        type="url"
+                        placeholder="https://exemplo.com/rss"
+                        value={newFeedUrl}
+                        onChange={(e) => setNewFeedUrl(e.target.value)}
+                        required
+                      />
+                    </FormField>
                   </div>
-                  <div>
-                    <label className="block text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 mb-1">URL RSS *</label>
-                    <input
-                      type="url"
-                      placeholder="https://exemplo.com/rss"
-                      value={newFeedUrl}
-                      onChange={(e) => setNewFeedUrl(e.target.value)}
-                      required
-                      className="w-full px-3 py-1.5 text-xs rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white"
-                    />
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <FormField label="Nome de Crédito">
+                      <Input
+                        type="text"
+                        placeholder="Ex: Canaltech News"
+                        value={newFeedCredit}
+                        onChange={(e) => setNewFeedCredit(e.target.value)}
+                      />
+                    </FormField>
+                    <FormField label="Prompt Padrão do Feed">
+                      <Input
+                        type="text"
+                        placeholder="Ex: Informativo"
+                        value={newFeedPrompt}
+                        onChange={(e) => setNewFeedPrompt(e.target.value)}
+                      />
+                    </FormField>
                   </div>
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 mb-1">Nome de Crédito</label>
-                    <input
-                      type="text"
-                      placeholder="Ex: Canaltech News"
-                      value={newFeedCredit}
-                      onChange={(e) => setNewFeedCredit(e.target.value)}
-                      className="w-full px-3 py-1.5 text-xs rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white"
-                    />
+                  <div className="flex justify-end gap-2 pt-2">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setIsAddingNewFeed(false)}
+                    >
+                      Cancelar
+                    </Button>
+                    <Button
+                      type="submit"
+                      variant="gradient"
+                      size="sm"
+                      isLoading={isSaving}
+                    >
+                      Salvar e Associar
+                    </Button>
                   </div>
-                  <div>
-                    <label className="block text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 mb-1">Prompt Padrão do Feed</label>
-                    <input
-                      type="text"
-                      placeholder="Ex: Informativo"
-                      value={newFeedPrompt}
-                      onChange={(e) => setNewFeedPrompt(e.target.value)}
-                      className="w-full px-3 py-1.5 text-xs rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white"
-                    />
-                  </div>
-                </div>
-                <div className="flex justify-end gap-2 pt-2">
-                  <button
-                    type="button"
-                    onClick={() => setIsAddingNewFeed(false)}
-                    className="px-3 py-1.5 text-xs font-semibold text-zinc-500 hover:text-zinc-700 dark:hover:text-white"
-                  >
-                    Cancelar
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={isSaving}
-                    className="px-3 py-1.5 bg-orange-600 hover:bg-orange-500 text-white rounded-lg text-xs font-semibold transition disabled:opacity-50"
-                  >
-                    Salvar e Associar
-                  </button>
-                </div>
-              </form>
+                </form>
+              </Card>
             )}
 
             {/* List of all workspace sources with association toggles */}
             {allSources.length === 0 ? (
-              <p className="text-xs text-zinc-500 py-4 text-center">Nenhuma fonte RSS cadastrada no Workspace.</p>
+              <p className="text-xs text-muted-foreground py-4 text-center">Nenhuma fonte RSS cadastrada no Workspace.</p>
             ) : (
               <div className="space-y-3">
                 {allSources.map((source) => {
@@ -961,10 +917,10 @@ export default function SettingsWordPressPage() {
                   return (
                     <div
                       key={source.id}
-                      className={`p-4 rounded-xl border transition flex flex-col sm:flex-row sm:items-center justify-between gap-4 ${
+                      className={`p-4 rounded-xl border transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-4 ${
                         isAssigned
-                          ? "bg-sky-500/5 dark:bg-sky-500/10 border-sky-500/30"
-                          : "bg-zinc-50 dark:bg-zinc-800/30 border-zinc-200 dark:border-zinc-800 opacity-70"
+                          ? "bg-primary/5 border-primary/40 shadow-xs"
+                          : "bg-surface-muted/30 border-border opacity-70"
                       }`}
                     >
                       <div className="flex items-center gap-3">
@@ -973,29 +929,29 @@ export default function SettingsWordPressPage() {
                           onClick={() => handleToggleFeedAssignment(source.id, isAssigned)}
                           className={`w-5 h-5 rounded-md flex items-center justify-center transition border ${
                             isAssigned
-                              ? "bg-sky-600 border-sky-600 text-white"
-                              : "border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-transparent"
+                              ? "bg-primary border-primary text-primary-foreground"
+                              : "border-border bg-surface text-transparent"
                           }`}
                         >
                           <Check className="w-3.5 h-3.5" />
                         </button>
 
                         <div>
-                          <p className="text-xs font-bold text-zinc-900 dark:text-white">{source.name}</p>
-                          <p className="text-[11px] text-zinc-500 dark:text-zinc-400 truncate max-w-sm sm:max-w-md">{source.rssUrl}</p>
+                          <p className="font-heading text-xs font-bold text-foreground">{source.name}</p>
+                          <p className="font-mono text-[11px] text-muted-foreground truncate max-w-sm sm:max-w-md">{source.rssUrl}</p>
                         </div>
                       </div>
 
                       {isAssigned && (
                         <div className="flex items-center gap-3">
                           <div className="flex items-center gap-2">
-                            <label className="text-[11px] text-zinc-500 dark:text-zinc-400">Override Prompt:</label>
-                            <input
+                            <label className="text-[11px] text-muted-foreground font-medium">Override Prompt:</label>
+                            <Input
                               type="text"
-                              placeholder={source.defaultPromptType ? `Padrão Feed: ${source.defaultPromptType}` : "Sem override"}
+                              placeholder={source.defaultPromptType ? `Padrão: ${source.defaultPromptType}` : "Sem override"}
                               defaultValue={assignment?.promptTypeOverride || ""}
                               onBlur={(e) => handleUpdateFeedOverride(source.id, e.target.value)}
-                              className="px-2.5 py-1 text-xs rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white w-36 focus:ring-1 focus:ring-sky-500"
+                              className="h-8 w-40 text-xs"
                             />
                           </div>
                         </div>
@@ -1005,7 +961,7 @@ export default function SettingsWordPressPage() {
                 })}
               </div>
             )}
-          </div>
+          </Card>
         </div>
       )}
     </div>

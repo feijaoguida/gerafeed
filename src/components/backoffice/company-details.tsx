@@ -11,11 +11,9 @@ import {
   Sparkles,
   Users,
   Settings,
-  CheckCircle2,
   Check,
   X,
   ShieldCheck,
-  AlertCircle,
   Plus,
   Search,
   Edit2,
@@ -24,6 +22,10 @@ import {
   RefreshCw,
   Zap,
 } from "lucide-react";
+
+import { PageHeader } from "@/components/design-system/page-header";
+import { Badge } from "@/components/ui/badge";
+import { Alert } from "@/components/ui/alert";
 
 export interface Plan {
   id: string;
@@ -735,74 +737,44 @@ export function CompanyDetails({ initialWorkspace, availablePlans }: CompanyDeta
 
   return (
     <div className="space-y-6">
-      {/* Back link & Title Bar */}
-      <div className="flex flex-col gap-4">
-        <Link
-          href="/backoffice/companies"
-          className="inline-flex items-center gap-1.5 text-xs text-zinc-400 hover:text-amber-400 transition w-fit"
-        >
-          <ArrowLeft className="w-4 h-4" />
-          <span>Voltar para Lista de Empresas</span>
-        </Link>
-
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-zinc-800 pb-5">
-          <div className="flex items-center gap-3">
-            <div className="p-3 bg-sky-500/10 text-sky-400 rounded-xl border border-sky-500/20">
-              <Building2 className="w-6 h-6" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2.5">
-                <h1 className="text-2xl font-bold tracking-tight text-white">{workspace.name}</h1>
-                <span
-                  className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium border ${
-                    workspace.active
-                      ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
-                      : "bg-rose-500/10 text-rose-400 border-rose-500/20"
-                  }`}
-                >
-                  {workspace.active ? "Empresa Ativa" : "Empresa Inativa"}
-                </span>
-              </div>
-              <p className="text-xs font-mono text-zinc-400 mt-0.5">
-                slug: <span className="text-zinc-300">{workspace.slug}</span> • id:{" "}
-                <span className="text-zinc-500">{workspace.id}</span>
-              </p>
-            </div>
-          </div>
-
+      {/* PageHeader */}
+      <PageHeader
+        title={workspace.name}
+        description={`slug: ${workspace.slug} • id: ${workspace.id}`}
+        icon={<Building2 className="w-5 h-5 text-primary" />}
+        badge={
           <div className="flex items-center gap-2">
-            <span className="px-3 py-1.5 rounded-lg bg-indigo-500/10 text-indigo-300 border border-indigo-500/20 text-xs font-medium">
+            <Badge variant={workspace.active ? "success" : "danger"} size="sm">
+              {workspace.active ? "Empresa Ativa" : "Empresa Inativa"}
+            </Badge>
+            <Badge variant="purple" size="sm">
               Plano: {currentPlan?.name || "Gratuito"}
-            </span>
+            </Badge>
           </div>
-        </div>
-      </div>
+        }
+        actions={
+          <Link
+            href="/backoffice/companies"
+            className="inline-flex items-center gap-1.5 text-xs text-primary hover:underline font-medium"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            <span>Voltar para Lista de Empresas</span>
+          </Link>
+        }
+      />
 
       {/* Global Alerts */}
       {message && (
-        <div
-          className={`p-4 rounded-xl text-xs flex items-center justify-between border ${
-            message.type === "success"
-              ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-300"
-              : "bg-rose-500/10 border-rose-500/20 text-rose-300"
-          }`}
+        <Alert
+          variant={message.type === "success" ? "success" : "destructive"}
+          onClose={() => setMessage(null)}
         >
-          <div className="flex items-center gap-2">
-            {message.type === "success" ? (
-              <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-            ) : (
-              <AlertCircle className="w-4 h-4 text-rose-400" />
-            )}
-            <span>{message.text}</span>
-          </div>
-          <button onClick={() => setMessage(null)} className="text-zinc-500 hover:text-zinc-300">
-            <X className="w-4 h-4" />
-          </button>
-        </div>
+          {message.text}
+        </Alert>
       )}
 
       {/* Navigation Tabs */}
-      <div className="flex items-center gap-2 border-b border-zinc-800 overflow-x-auto pb-px">
+      <div className="flex items-center gap-2 border-b border-border overflow-x-auto pb-px">
         {[
           { key: "overview", label: "Visão Geral", icon: Building2 },
           { key: "plan", label: "Plano & Cobrança", icon: Layers },
@@ -825,10 +797,10 @@ export function CompanyDetails({ initialWorkspace, availablePlans }: CompanyDeta
                   tab.key as "overview" | "plan" | "feeds" | "wordpress" | "ai" | "settings"
                 )
               }
-              className={`inline-flex items-center gap-2 px-4 py-2.5 text-xs font-semibold border-b-2 transition whitespace-nowrap ${
+              className={`inline-flex items-center gap-2 px-4 py-2.5 text-xs font-semibold border-b-2 transition-all whitespace-nowrap rounded-t-lg ${
                 isSelected
-                  ? "border-amber-500 text-amber-400 bg-zinc-900/50"
-                  : "border-transparent text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900/20"
+                  ? "border-primary text-primary bg-primary/5 font-bold"
+                  : "border-transparent text-muted-foreground hover:text-foreground hover:bg-surface-muted/50"
               }`}
             >
               <Icon className="w-4 h-4" />
@@ -843,7 +815,7 @@ export function CompanyDetails({ initialWorkspace, availablePlans }: CompanyDeta
         {/* TAB 1: OVERVIEW */}
         {activeTab === "overview" && (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="p-5 rounded-xl bg-zinc-950 border border-zinc-800 space-y-3">
+            <div className="p-5 rounded-xl bg-surface border border-border shadow-xs space-y-3">
               <div className="flex items-center justify-between text-xs text-zinc-400">
                 <span>Consumo de Artigos (Mês)</span>
                 <Sparkles className="w-4 h-4 text-amber-400" />
@@ -873,7 +845,7 @@ export function CompanyDetails({ initialWorkspace, availablePlans }: CompanyDeta
               )}
             </div>
 
-            <div className="p-5 rounded-xl bg-zinc-950 border border-zinc-800 space-y-3">
+            <div className="p-5 rounded-xl bg-surface border border-border shadow-xs space-y-3">
               <div className="flex items-center justify-between text-xs text-zinc-400">
                 <span>Fontes RSS Ativas</span>
                 <Rss className="w-4 h-4 text-amber-500" />
@@ -889,7 +861,7 @@ export function CompanyDetails({ initialWorkspace, availablePlans }: CompanyDeta
               </p>
             </div>
 
-            <div className="p-5 rounded-xl bg-zinc-950 border border-zinc-800 space-y-3">
+            <div className="p-5 rounded-xl bg-surface border border-border shadow-xs space-y-3">
               <div className="flex items-center justify-between text-xs text-zinc-400">
                 <span>Destinos WordPress</span>
                 <Globe className="w-4 h-4 text-sky-400" />
@@ -899,7 +871,7 @@ export function CompanyDetails({ initialWorkspace, availablePlans }: CompanyDeta
             </div>
 
             {/* Team Members */}
-            <div className="md:col-span-3 p-5 rounded-xl bg-zinc-950 border border-zinc-800 space-y-4">
+            <div className="md:col-span-3 p-5 rounded-xl bg-surface border border-border shadow-xs space-y-4">
               <h3 className="text-sm font-bold text-white flex items-center gap-2">
                 <Users className="w-4 h-4 text-indigo-400" />
                 Membros da Empresa ({workspace.members?.length || 0})
@@ -930,7 +902,7 @@ export function CompanyDetails({ initialWorkspace, availablePlans }: CompanyDeta
           <div className="space-y-6">
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               {/* Left Column: Plan & Limits */}
-              <div className="lg:col-span-2 p-6 rounded-xl bg-zinc-950 border border-zinc-800 space-y-6">
+              <div className="lg:col-span-2 p-6 rounded-xl bg-surface border border-border shadow-xs space-y-6">
                 <div className="flex items-center justify-between">
                   <h3 className="text-base font-bold text-white flex items-center gap-2">
                     <Layers className="w-5 h-5 text-indigo-400" />
@@ -1043,7 +1015,7 @@ export function CompanyDetails({ initialWorkspace, availablePlans }: CompanyDeta
               </div>
 
               {/* Right Column: Billing Profile Summary */}
-              <div className="p-6 rounded-xl bg-zinc-950 border border-zinc-800 space-y-4">
+              <div className="p-6 rounded-xl bg-surface border border-border shadow-xs space-y-4">
                 <h3 className="text-base font-bold text-white flex items-center gap-2">
                   <ShieldCheck className="w-5 h-5 text-emerald-400" />
                   Dados de Faturamento
@@ -1079,7 +1051,7 @@ export function CompanyDetails({ initialWorkspace, availablePlans }: CompanyDeta
             </div>
 
             {/* Invoices History Table */}
-            <div className="p-6 rounded-xl bg-zinc-950 border border-zinc-800 space-y-4">
+            <div className="p-6 rounded-xl bg-surface border border-border shadow-xs space-y-4">
               <h3 className="text-base font-bold text-white flex items-center gap-2">
                 <Zap className="w-5 h-5 text-amber-400" />
                 Histórico de Cobranças & Faturas ({workspace.invoices?.length || 0})
@@ -1157,7 +1129,7 @@ export function CompanyDetails({ initialWorkspace, availablePlans }: CompanyDeta
 
         {/* TAB 3: FEEDS */}
         {activeTab === "feeds" && (
-          <div className="p-6 rounded-xl bg-zinc-950 border border-zinc-800 space-y-4">
+          <div className="p-6 rounded-xl bg-surface border border-border shadow-xs space-y-4">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <h3 className="text-base font-bold text-white flex items-center gap-2">
                 <Rss className="w-5 h-5 text-amber-500" />
@@ -1278,7 +1250,7 @@ export function CompanyDetails({ initialWorkspace, availablePlans }: CompanyDeta
 
         {/* TAB 4: WORDPRESS */}
         {activeTab === "wordpress" && (
-          <div className="p-6 rounded-xl bg-zinc-950 border border-zinc-800 space-y-4">
+          <div className="p-6 rounded-xl bg-surface border border-border shadow-xs space-y-4">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <h3 className="text-base font-bold text-white flex items-center gap-2">
                 <Globe className="w-5 h-5 text-sky-400" />
@@ -1409,7 +1381,7 @@ export function CompanyDetails({ initialWorkspace, availablePlans }: CompanyDeta
         {activeTab === "ai" && (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* AI Provider Config */}
-            <div className="p-6 rounded-xl bg-zinc-950 border border-zinc-800 space-y-4">
+            <div className="p-6 rounded-xl bg-surface border border-border shadow-xs space-y-4">
               <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
                 <h3 className="text-base font-bold text-white flex items-center gap-2">
                   <Sparkles className="w-5 h-5 text-amber-400" />
@@ -1500,7 +1472,7 @@ export function CompanyDetails({ initialWorkspace, availablePlans }: CompanyDeta
             </div>
 
             {/* Prompt Editorial Settings */}
-            <div className="p-6 rounded-xl bg-zinc-950 border border-zinc-800 space-y-4">
+            <div className="p-6 rounded-xl bg-surface border border-border shadow-xs space-y-4">
               <div className="border-b border-zinc-800 pb-3">
                 <h3 className="text-base font-bold text-white flex items-center gap-2">
                   <Sparkles className="w-5 h-5 text-indigo-400" />
@@ -1607,7 +1579,7 @@ export function CompanyDetails({ initialWorkspace, availablePlans }: CompanyDeta
 
         {/* TAB 6: SETTINGS */}
         {activeTab === "settings" && (
-          <div className="p-6 rounded-xl bg-zinc-950 border border-zinc-800 space-y-5 max-w-lg">
+          <div className="p-6 rounded-xl bg-surface border border-border shadow-xs space-y-5 max-w-lg">
             <h3 className="text-base font-bold text-white flex items-center gap-2">
               <Settings className="w-5 h-5 text-purple-400" />
               Configurações do Workspace
@@ -1670,7 +1642,7 @@ export function CompanyDetails({ initialWorkspace, availablePlans }: CompanyDeta
       {/* MODAL: CREATE / EDIT FEED */}
       {isFeedModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-          <div className="w-full max-w-lg rounded-2xl bg-zinc-950 border border-zinc-800 p-6 space-y-5 shadow-2xl">
+          <div className="w-full max-w-lg rounded-2xl bg-surface border border-border shadow-xs p-6 space-y-5 shadow-2xl">
             <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
               <h3 className="text-base font-bold text-white flex items-center gap-2">
                 <Rss className="w-5 h-5 text-amber-500" />
@@ -1810,7 +1782,7 @@ export function CompanyDetails({ initialWorkspace, availablePlans }: CompanyDeta
       {/* MODAL: CREATE / EDIT WORDPRESS SITE */}
       {isWpModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-          <div className="w-full max-w-lg rounded-2xl bg-zinc-950 border border-zinc-800 p-6 space-y-5 shadow-2xl">
+          <div className="w-full max-w-lg rounded-2xl bg-surface border border-border shadow-xs p-6 space-y-5 shadow-2xl">
             <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
               <h3 className="text-base font-bold text-white flex items-center gap-2">
                 <Globe className="w-5 h-5 text-sky-400" />

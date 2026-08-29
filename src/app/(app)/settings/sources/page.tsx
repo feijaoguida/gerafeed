@@ -1,7 +1,17 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Rss, Plus, Trash2, CheckCircle2, AlertCircle, Edit2, Save, X } from "lucide-react";
+import { Rss, Plus, Trash2, Edit2, Save, X } from "lucide-react";
+
+import { PageHeader } from "@/components/design-system/page-header";
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { FormField } from "@/components/design-system/form-field";
+import { Input } from "@/components/ui/input";
+import { Alert } from "@/components/ui/alert";
+import { EmptyState } from "@/components/ui/empty-state";
+import { Skeleton } from "@/components/ui/skeleton";
 
 interface Source {
   id: string;
@@ -190,238 +200,238 @@ export default function SettingsSourcesPage() {
   };
 
   return (
-    <div className="p-6 sm:p-8 max-w-5xl mx-auto space-y-8 transition-colors duration-200">
-      <div>
-        <h1 className="text-xl font-bold text-zinc-900 dark:text-white flex items-center gap-2">
-          <Rss className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
-          Configurações de Fontes RSS
-        </h1>
-        <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
-          Cadastre, ative ou remova fontes de notícias alimentadas por feeds RSS/Atom e configure o nome comercial para créditos.
-        </p>
-      </div>
+    <div className="p-6 sm:p-8 max-w-5xl mx-auto space-y-6">
+      {/* Header com PageHeader */}
+      <PageHeader
+        title="Configurações de Fontes RSS"
+        description="Cadastre, ative ou remova fontes de notícias alimentadas por feeds RSS/Atom e configure o nome comercial para créditos."
+        icon={<Rss className="w-5 h-5 text-amber-500" />}
+      />
 
       {/* Alerts */}
       {errorMessage && (
-        <div className="p-4 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-600 dark:text-rose-300 text-xs flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <AlertCircle className="w-4 h-4 text-rose-500 dark:text-rose-400 shrink-0" />
-            <span>{errorMessage}</span>
-          </div>
-          <button onClick={() => setErrorMessage(null)} className="text-rose-500 hover:underline">
-            Fechar
-          </button>
-        </div>
+        <Alert variant="destructive" onClose={() => setErrorMessage(null)}>
+          {errorMessage}
+        </Alert>
       )}
 
       {successMessage && (
-        <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-700 dark:text-emerald-300 text-xs flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <CheckCircle2 className="w-4 h-4 text-emerald-500 dark:text-emerald-400 shrink-0" />
-            <span>{successMessage}</span>
-          </div>
-          <button onClick={() => setSuccessMessage(null)} className="text-emerald-600 hover:underline">
-            Fechar
-          </button>
-        </div>
+        <Alert variant="success" onClose={() => setSuccessMessage(null)}>
+          {successMessage}
+        </Alert>
       )}
 
       {/* Form Add Source */}
-      <form onSubmit={handleAddSource} className="p-6 rounded-xl bg-white dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 space-y-4 shadow-sm dark:shadow-none">
-        <h2 className="text-sm font-semibold text-zinc-900 dark:text-zinc-200">Cadastrar Nova Fonte RSS</h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <div>
-            <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">Nome da Fonte *</label>
-            <input
-              type="text"
-              placeholder="Ex: TechCrunch, G1..."
-              value={newSourceName}
-              onChange={(e) => setNewSourceName(e.target.value)}
-              required
-              className="w-full px-3 py-2 rounded-lg bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-xs text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-zinc-600 focus:outline-none focus:border-indigo-500"
-            />
-          </div>
+      <form onSubmit={handleAddSource}>
+        <Card className="p-6 space-y-4 shadow-xs">
+          <CardHeader className="p-0 border-b border-border pb-3">
+            <CardTitle className="text-sm font-semibold">
+              Cadastrar Nova Fonte RSS
+            </CardTitle>
+          </CardHeader>
 
-          <div>
-            <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">
-              Fonte / Crédito <span className="text-[10px] text-zinc-400 dark:text-zinc-500">(Opcional)</span>
-            </label>
-            <input
-              type="text"
-              placeholder="Ex: TechCrunch Brasil..."
-              value={newCreditName}
-              onChange={(e) => setNewCreditName(e.target.value)}
-              className="w-full px-3 py-2 rounded-lg bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-xs text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-zinc-600 focus:outline-none focus:border-indigo-500"
-            />
-          </div>
+          <CardContent className="p-0 space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              <FormField label="Nome da Fonte" required>
+                <Input
+                  type="text"
+                  placeholder="Ex: TechCrunch, G1..."
+                  value={newSourceName}
+                  onChange={(e) => setNewSourceName(e.target.value)}
+                  required
+                />
+              </FormField>
 
-          <div>
-            <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">URL do Feed RSS *</label>
-            <input
-              type="url"
-              placeholder="https://exemplo.com/feed.xml"
-              value={newSourceUrl}
-              onChange={(e) => setNewSourceUrl(e.target.value)}
-              required
-              className="w-full px-3 py-2 rounded-lg bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-xs text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-zinc-600 focus:outline-none focus:border-indigo-500"
-            />
-          </div>
+              <FormField label="Fonte / Crédito (Opcional)">
+                <Input
+                  type="text"
+                  placeholder="Ex: TechCrunch Brasil..."
+                  value={newCreditName}
+                  onChange={(e) => setNewCreditName(e.target.value)}
+                />
+              </FormField>
 
-          <div>
-            <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">
-              Prompt Padrão <span className="text-[10px] text-zinc-400 dark:text-zinc-500">(Opcional)</span>
-            </label>
-            <input
-              type="text"
-              placeholder="Ex: Informativo, Humorístico..."
-              value={newDefaultPromptType}
-              onChange={(e) => setNewDefaultPromptType(e.target.value)}
-              className="w-full px-3 py-2 rounded-lg bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-xs text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-zinc-600 focus:outline-none focus:border-indigo-500"
-            />
-          </div>
-        </div>
+              <FormField label="URL do Feed RSS" required>
+                <Input
+                  type="url"
+                  placeholder="https://exemplo.com/feed.xml"
+                  value={newSourceUrl}
+                  onChange={(e) => setNewSourceUrl(e.target.value)}
+                  required
+                />
+              </FormField>
 
-        <button
-          type="submit"
-          disabled={isAddingSource}
-          className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-semibold bg-indigo-600 hover:bg-indigo-500 text-white transition shadow-sm shadow-indigo-600/20 disabled:opacity-50"
-        >
-          <Plus className="w-4 h-4" />
-          {isAddingSource ? "Adicionando..." : "Adicionar Fonte"}
-        </button>
+              <FormField label="Prompt Padrão (Opcional)">
+                <Input
+                  type="text"
+                  placeholder="Ex: Informativo, Humorístico..."
+                  value={newDefaultPromptType}
+                  onChange={(e) => setNewDefaultPromptType(e.target.value)}
+                />
+              </FormField>
+            </div>
+
+            <div className="pt-2">
+              <Button
+                type="submit"
+                variant="gradient"
+                size="sm"
+                isLoading={isAddingSource}
+                leadingIcon={<Plus className="w-4 h-4" />}
+              >
+                Adicionar Fonte
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
       </form>
 
       {/* Sources List */}
-      <div className="p-6 rounded-xl bg-white dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 space-y-4 shadow-sm dark:shadow-none">
-        <h2 className="text-sm font-semibold text-zinc-900 dark:text-zinc-200">Fontes Cadastradas</h2>
+      <Card className="p-6 space-y-4 shadow-xs">
+        <CardHeader className="p-0 border-b border-border pb-3 flex flex-row items-center justify-between">
+          <CardTitle className="text-sm font-semibold">
+            Fontes Cadastradas ({sources.length})
+          </CardTitle>
+        </CardHeader>
 
-        {isLoading ? (
-          <p className="text-xs text-zinc-400 dark:text-zinc-500 py-4 animate-pulse">Carregando fontes...</p>
-        ) : sources.length === 0 ? (
-          <p className="text-xs text-zinc-500 py-4">Nenhuma fonte cadastrada no banco de dados.</p>
-        ) : (
-          <div className="space-y-3">
-            {sources.map((src) => (
-              <div
-                key={src.id}
-                className="p-4 rounded-lg bg-zinc-50/80 dark:bg-zinc-950/60 border border-zinc-200 dark:border-zinc-800/60 flex flex-col justify-between gap-3 text-xs"
-              >
-                {editingId === src.id ? (
-                  /* Inline Editing Form */
-                  <div className="space-y-3">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-                      <div>
-                        <label className="block text-[11px] text-zinc-600 dark:text-zinc-400 mb-1">Nome</label>
-                        <input
-                          type="text"
-                          value={editName}
-                          onChange={(e) => setEditName(e.target.value)}
-                          className="w-full px-2.5 py-1.5 rounded bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 text-zinc-900 dark:text-white text-xs"
-                        />
+        <CardContent className="p-0">
+          {isLoading ? (
+            <div className="space-y-3 py-2">
+              {[...Array(3)].map((_, i) => (
+                <Skeleton key={i} className="h-16 rounded-xl" />
+              ))}
+            </div>
+          ) : sources.length === 0 ? (
+            <EmptyState
+              title="Nenhuma fonte RSS cadastrada"
+              description="Cadastre seu primeiro feed RSS para que o sistema comece a curar matérias automaticamente."
+              icon={<Rss className="w-8 h-8 text-muted-foreground" />}
+            />
+          ) : (
+            <div className="space-y-3">
+              {sources.map((src) => (
+                <Card
+                  key={src.id}
+                  className="p-4 shadow-xs hover:border-primary/40 transition-colors flex flex-col justify-between gap-3 text-xs"
+                >
+                  {editingId === src.id ? (
+                    /* Inline Editing Form */
+                    <div className="space-y-3">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                        <FormField label="Nome" required>
+                          <Input
+                            type="text"
+                            value={editName}
+                            onChange={(e) => setEditName(e.target.value)}
+                          />
+                        </FormField>
+
+                        <FormField label="Nome de Crédito">
+                          <Input
+                            type="text"
+                            value={editCreditName}
+                            onChange={(e) => setEditCreditName(e.target.value)}
+                            placeholder="Exibe nos créditos..."
+                          />
+                        </FormField>
+
+                        <FormField label="URL RSS" required>
+                          <Input
+                            type="url"
+                            value={editRssUrl}
+                            onChange={(e) => setEditRssUrl(e.target.value)}
+                          />
+                        </FormField>
+
+                        <FormField label="Prompt Padrão">
+                          <Input
+                            type="text"
+                            value={editDefaultPromptType}
+                            onChange={(e) => setEditDefaultPromptType(e.target.value)}
+                            placeholder="Ex: Informativo..."
+                          />
+                        </FormField>
                       </div>
-                      <div>
-                        <label className="block text-[11px] text-zinc-600 dark:text-zinc-400 mb-1">Nome de Crédito</label>
-                        <input
-                          type="text"
-                          value={editCreditName}
-                          onChange={(e) => setEditCreditName(e.target.value)}
-                          placeholder="Exibe nos créditos..."
-                          className="w-full px-2.5 py-1.5 rounded bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 text-zinc-900 dark:text-white text-xs"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-[11px] text-zinc-600 dark:text-zinc-400 mb-1">URL RSS</label>
-                        <input
-                          type="url"
-                          value={editRssUrl}
-                          onChange={(e) => setEditRssUrl(e.target.value)}
-                          className="w-full px-2.5 py-1.5 rounded bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 text-zinc-900 dark:text-white text-xs"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-[11px] text-zinc-600 dark:text-zinc-400 mb-1">Prompt Padrão</label>
-                        <input
-                          type="text"
-                          value={editDefaultPromptType}
-                          onChange={(e) => setEditDefaultPromptType(e.target.value)}
-                          placeholder="Ex: Informativo..."
-                          className="w-full px-2.5 py-1.5 rounded bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 text-zinc-900 dark:text-white text-xs"
-                        />
+
+                      <div className="flex items-center gap-2 pt-1">
+                        <Button
+                          type="button"
+                          variant="gradient"
+                          size="sm"
+                          onClick={() => handleSaveEdit(src.id)}
+                          isLoading={isSavingEdit}
+                          leadingIcon={<Save className="w-3.5 h-3.5" />}
+                        >
+                          Salvar
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={cancelEdit}
+                          leadingIcon={<X className="w-3.5 h-3.5" />}
+                        >
+                          Cancelar
+                        </Button>
                       </div>
                     </div>
-                    <div className="flex items-center gap-2 pt-1">
-                      <button
-                        onClick={() => handleSaveEdit(src.id)}
-                        disabled={isSavingEdit}
-                        className="inline-flex items-center gap-1 px-3 py-1 rounded bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold"
-                      >
-                        <Save className="w-3.5 h-3.5" />
-                        Salvar
-                      </button>
-                      <button
-                        onClick={cancelEdit}
-                        className="inline-flex items-center gap-1 px-3 py-1 rounded bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 text-xs"
-                      >
-                        <X className="w-3.5 h-3.5" />
-                        Cancelar
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  /* Display View */
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                    <div className="space-y-0.5 min-w-0">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <p className="font-semibold text-zinc-900 dark:text-white">{src.name}</p>
-                        {src.creditName && (
-                          <span className="px-2 py-0.5 rounded bg-indigo-50 dark:bg-indigo-500/10 border border-indigo-200 dark:border-indigo-500/20 text-indigo-700 dark:text-indigo-300 text-[10px]">
-                            Crédito: {src.creditName}
-                          </span>
-                        )}
-                        {src.defaultPromptType && (
-                          <span className="px-2 py-0.5 rounded bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20 text-amber-700 dark:text-amber-300 text-[10px]">
-                            Prompt: {src.defaultPromptType}
-                          </span>
-                        )}
+                  ) : (
+                    /* Display View */
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                      <div className="space-y-1 min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p className="font-heading font-semibold text-foreground">{src.name}</p>
+                          {src.creditName && (
+                            <Badge variant="outline" size="sm">
+                              Crédito: {src.creditName}
+                            </Badge>
+                          )}
+                          {src.defaultPromptType && (
+                            <Badge variant="purple" size="sm">
+                              Prompt: {src.defaultPromptType}
+                            </Badge>
+                          )}
+                        </div>
+                        <p className="font-mono text-[11px] text-muted-foreground truncate">{src.rssUrl}</p>
                       </div>
-                      <p className="text-zinc-500 dark:text-zinc-400 font-mono text-[11px] truncate">{src.rssUrl}</p>
+
+                      <div className="flex items-center gap-2 shrink-0">
+                        <Button
+                          variant={src.active ? "secondary" : "outline"}
+                          size="sm"
+                          onClick={() => handleToggleActive(src.id, src.active)}
+                          className={src.active ? "text-[#00C2A8] font-bold" : "text-muted-foreground"}
+                        >
+                          {src.active ? "Ativa" : "Inativa"}
+                        </Button>
+
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => startEdit(src)}
+                          title="Editar Fonte"
+                        >
+                          <Edit2 className="w-4 h-4" />
+                        </Button>
+
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleDelete(src.id)}
+                          title="Excluir Fonte"
+                          className="text-muted-foreground hover:text-rose-500"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </div>
                     </div>
-
-                    <div className="flex items-center gap-2 shrink-0">
-                      <button
-                        onClick={() => handleToggleActive(src.id, src.active)}
-                        className={`px-3 py-1 rounded text-[10px] font-bold uppercase border transition ${
-                          src.active
-                            ? "bg-emerald-50 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-500/30"
-                            : "bg-zinc-100 dark:bg-zinc-800 text-zinc-500 border-zinc-200 dark:border-zinc-700"
-                        }`}
-                      >
-                        {src.active ? "Ativa" : "Inativa"}
-                      </button>
-
-                      <button
-                        onClick={() => startEdit(src)}
-                        className="p-1.5 rounded bg-white hover:bg-zinc-100 dark:bg-zinc-900 dark:hover:bg-zinc-800 text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white border border-zinc-200 dark:border-zinc-800 shadow-sm dark:shadow-none transition"
-                        title="Editar Fonte"
-                      >
-                        <Edit2 className="w-4 h-4" />
-                      </button>
-
-                      <button
-                        onClick={() => handleDelete(src.id)}
-                        className="p-1.5 rounded bg-white hover:bg-rose-50 dark:bg-zinc-900 dark:hover:bg-rose-500/20 text-zinc-600 hover:text-rose-600 dark:text-zinc-400 dark:hover:text-rose-400 border border-zinc-200 dark:border-zinc-800 shadow-sm dark:shadow-none transition"
-                        title="Excluir Fonte"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
+                  )}
+                </Card>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }

@@ -15,6 +15,11 @@ import {
   Layers,
 } from "lucide-react";
 
+import { PageHeader } from "@/components/design-system/page-header";
+import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+
 export default async function PublishingCenterPage() {
   const session = await auth();
   const workspaceId =
@@ -32,201 +37,210 @@ export default async function PublishingCenterPage() {
 
   return (
     <div className="p-6 md:p-8 max-w-7xl mx-auto space-y-8">
-      {/* Header */}
-      <div className="border-b border-slate-200 dark:border-zinc-800 pb-5">
-        <div className="flex items-center gap-3">
-          <div className="p-2.5 bg-indigo-600/10 dark:bg-indigo-600/20 text-indigo-600 dark:text-indigo-400 rounded-xl border border-indigo-500/20">
-            <Send className="w-6 h-6" />
-          </div>
-          <div>
-            <h1 className="text-2xl font-bold text-slate-900 dark:text-white tracking-tight">
-              Central de Publicação & Monetização
-            </h1>
-            <p className="text-sm text-slate-500 dark:text-zinc-400 mt-1">
-              Escolha a modalidade de publicação para produzir, enriquecer com IA e distribuir seu conteúdo no WordPress.
-            </p>
-          </div>
-        </div>
-      </div>
+      {/* Header com PageHeader */}
+      <PageHeader
+        title="Central de Publicação & Monetização"
+        description="Escolha a modalidade de publicação para produzir, enriquecer com IA e distribuir seu conteúdo no WordPress."
+        icon={<Send className="w-5 h-5" />}
+      />
 
       {/* Two Publishing Flows Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Flow 1: RSS & News Curation */}
-        <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-slate-200 dark:border-zinc-800 p-6 md:p-8 flex flex-col justify-between shadow-sm hover:shadow-md transition-shadow relative overflow-hidden group">
-          <div className="space-y-6">
+        <Card className="flex flex-col justify-between shadow-xs hover:border-primary/40 transition-colors">
+          <CardHeader className="space-y-4">
             <div className="flex items-center justify-between">
               <div className="p-3 bg-amber-500/10 text-amber-600 dark:text-amber-400 rounded-xl border border-amber-500/20">
                 <Newspaper className="w-6 h-6" />
               </div>
-              <span className="text-xs font-semibold px-2.5 py-1 bg-amber-50 dark:bg-amber-950/50 text-amber-700 dark:text-amber-300 rounded-full border border-amber-200 dark:border-amber-800">
+              <Badge variant="warning">
                 Curadoria & Notícias
-              </span>
+              </Badge>
             </div>
 
-            <div className="space-y-2">
-              <h2 className="text-xl font-bold text-slate-900 dark:text-white">
+            <div className="space-y-1.5">
+              <CardTitle className="text-xl">
                 Notícias & Curadoria RSS
-              </h2>
-              <p className="text-xs text-slate-600 dark:text-zinc-300 leading-relaxed">
+              </CardTitle>
+              <CardDescription className="text-xs leading-relaxed">
                 Importe e processe notícias das suas fontes RSS cadastradas, aplique reescrita jornalística via IA, insira produtos de afiliados recomendados e publique instantaneamente nos portais WordPress.
-              </p>
+              </CardDescription>
             </div>
+          </CardHeader>
 
+          <CardContent className="space-y-4">
             {/* Workflow steps */}
-            <div className="space-y-2.5 pt-2 border-t border-slate-100 dark:border-zinc-800">
-              <h4 className="text-[11px] font-bold text-slate-400 dark:text-zinc-500 uppercase tracking-wider">
+            <div className="space-y-2.5 pt-2 border-t border-border">
+              <h4 className="text-[11px] font-heading font-bold text-muted-foreground uppercase tracking-wider">
                 Etapas do Fluxo
               </h4>
-              <ul className="space-y-2 text-xs text-slate-600 dark:text-zinc-400">
+              <ul className="space-y-2 text-xs text-foreground/90 font-medium">
                 <li className="flex items-center gap-2">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
+                  <CheckCircle2 className="w-4 h-4 text-[#00C2A8] shrink-0" />
                   <span>1. Coleta automática e seleção de artigos pendentes</span>
                 </li>
                 <li className="flex items-center gap-2">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
-                  <span>2. Processamento por IA com diretrizes de nicho e tom</span>
+                  <CheckCircle2 className="w-4 h-4 text-[#00C2A8] shrink-0" />
+                  <span>2. Processamento por IA com scraping do texto original</span>
                 </li>
                 <li className="flex items-center gap-2">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
+                  <CheckCircle2 className="w-4 h-4 text-[#00C2A8] shrink-0" />
                   <span>3. Inserção de produtos afiliados recomendados (opcional)</span>
                 </li>
                 <li className="flex items-center gap-2">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
+                  <CheckCircle2 className="w-4 h-4 text-[#00C2A8] shrink-0" />
                   <span>4. Revisão editorial humana e envio para o WordPress</span>
                 </li>
               </ul>
             </div>
-          </div>
+          </CardContent>
 
-          <div className="pt-8 mt-6 border-t border-slate-100 dark:border-zinc-800 flex items-center justify-between gap-4">
-            <Link
-              href="/articles"
-              className="w-full inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl text-xs font-semibold text-white bg-amber-600 hover:bg-amber-700 shadow-sm transition-colors"
-            >
-              <Rss className="w-4 h-4" />
-              Iniciar Publicação de Notícias
-              <ArrowRight className="w-4 h-4 ml-1" />
+          <CardFooter className="pt-4 border-t border-border">
+            <Link href="/articles" className="w-full">
+              <Button
+                variant="gradient"
+                size="lg"
+                className="w-full"
+                leadingIcon={<Rss className="w-4 h-4" />}
+                trailingIcon={<ArrowRight className="w-4 h-4" />}
+              >
+                Iniciar Publicação de Notícias
+              </Button>
             </Link>
-          </div>
-        </div>
+          </CardFooter>
+        </Card>
 
         {/* Flow 2: Affiliate Commercial Content */}
-        <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-slate-200 dark:border-zinc-800 p-6 md:p-8 flex flex-col justify-between shadow-sm hover:shadow-md transition-shadow relative overflow-hidden group">
-          <div className="space-y-6">
+        <Card className="flex flex-col justify-between shadow-xs hover:border-primary/40 transition-colors">
+          <CardHeader className="space-y-4">
             <div className="flex items-center justify-between">
-              <div className="p-3 bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 rounded-xl border border-indigo-500/20">
+              <div className="p-3 bg-primary/10 text-primary rounded-xl border border-primary/20">
                 <ShoppingBag className="w-6 h-6" />
               </div>
               {hasAffiliateModule ? (
-                <span className="text-xs font-semibold px-2.5 py-1 bg-indigo-50 dark:bg-indigo-950/50 text-indigo-700 dark:text-indigo-300 rounded-full border border-indigo-200 dark:border-indigo-800 flex items-center gap-1">
-                  <Sparkles className="w-3 h-3 text-indigo-500" />
+                <Badge variant="purple" className="flex items-center gap-1">
+                  <Sparkles className="w-3 h-3 text-[#7C3AED]" />
                   Alta Conversão
-                </span>
+                </Badge>
               ) : (
-                <span className="text-xs font-semibold px-2.5 py-1 bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 rounded-full border border-zinc-200 dark:border-zinc-700 flex items-center gap-1">
-                  <Lock className="w-3 h-3 text-zinc-400" />
+                <Badge variant="warning" className="flex items-center gap-1">
+                  <Lock className="w-3 h-3" />
                   Plano Pro
-                </span>
+                </Badge>
               )}
             </div>
 
-            <div className="space-y-2">
-              <h2 className="text-xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
+            <div className="space-y-1.5">
+              <CardTitle className="text-xl">
                 Conteúdo Comercial de Afiliados
-              </h2>
-              <p className="text-xs text-slate-600 dark:text-zinc-300 leading-relaxed">
+              </CardTitle>
+              <CardDescription className="text-xs leading-relaxed">
                 Produza reviews estruturados, comparativos entre modelos, guias de compra e seleções dos melhores produtos ancorados em preços reais, fichas técnicas e opiniões do catálogo.
-              </p>
+              </CardDescription>
             </div>
+          </CardHeader>
 
+          <CardContent className="space-y-4">
             {/* Workflow steps */}
-            <div className="space-y-2.5 pt-2 border-t border-slate-100 dark:border-zinc-800">
-              <h4 className="text-[11px] font-bold text-slate-400 dark:text-zinc-500 uppercase tracking-wider">
+            <div className="space-y-2.5 pt-2 border-t border-border">
+              <h4 className="text-[11px] font-heading font-bold text-muted-foreground uppercase tracking-wider">
                 Etapas do Fluxo
               </h4>
-              <ul className="space-y-2 text-xs text-slate-600 dark:text-zinc-400">
+              <ul className="space-y-2 text-xs text-foreground/90 font-medium">
                 <li className="flex items-center gap-2">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
+                  <CheckCircle2 className="w-4 h-4 text-[#00C2A8] shrink-0" />
                   <span>1. Seleção do formato (Review, Comparativo, Guia de Compra)</span>
                 </li>
                 <li className="flex items-center gap-2">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
+                  <CheckCircle2 className="w-4 h-4 text-[#00C2A8] shrink-0" />
                   <span>2. Escolha dos produtos do catálogo do Mercado Livre</span>
                 </li>
                 <li className="flex items-center gap-2">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
+                  <CheckCircle2 className="w-4 h-4 text-[#00C2A8] shrink-0" />
                   <span>3. Geração canônica com grounding técnico e de fontes externas</span>
                 </li>
                 <li className="flex items-center gap-2">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
+                  <CheckCircle2 className="w-4 h-4 text-[#00C2A8] shrink-0" />
                   <span>4. Renderização com links de afiliados seguros e disclosure</span>
                 </li>
               </ul>
             </div>
-          </div>
+          </CardContent>
 
-          <div className="pt-8 mt-6 border-t border-slate-100 dark:border-zinc-800 flex items-center justify-between gap-4">
+          <CardFooter className="pt-4 border-t border-border">
             {hasAffiliateModule ? (
-              <Link
-                href="/publishing/affiliate"
-                className="w-full inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700 shadow-sm transition-colors"
-              >
-                <Sparkles className="w-4 h-4" />
-                Criar Conteúdo de Afiliado
-                <ArrowRight className="w-4 h-4 ml-1" />
+              <Link href="/publishing/affiliate" className="w-full">
+                <Button
+                  variant="gradient"
+                  size="lg"
+                  className="w-full"
+                  leadingIcon={<Sparkles className="w-4 h-4" />}
+                  trailingIcon={<ArrowRight className="w-4 h-4" />}
+                >
+                  Criar Conteúdo de Afiliado
+                </Button>
               </Link>
             ) : (
-              <Link
-                href="/settings/billing/upgrade"
-                className="w-full inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl text-xs font-semibold text-slate-700 dark:text-zinc-300 bg-slate-100 hover:bg-slate-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 transition-colors"
-              >
-                <Lock className="w-4 h-4 text-amber-500" />
-                Upgrade para Habilitar Módulo de Afiliados
+              <Link href="/settings/billing/upgrade" className="w-full">
+                <Button
+                  variant="secondary"
+                  size="lg"
+                  className="w-full"
+                  leadingIcon={<Lock className="w-4 h-4 text-amber-500" />}
+                >
+                  Upgrade para Módulo de Afiliados
+                </Button>
               </Link>
             )}
-          </div>
-        </div>
+          </CardFooter>
+        </Card>
       </div>
 
       {/* Quick Access Strip */}
-      <div className="bg-slate-100/70 dark:bg-zinc-900/60 rounded-xl p-5 border border-slate-200 dark:border-zinc-800 flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div className="flex items-center gap-2 text-xs text-slate-600 dark:text-zinc-400">
-          <Layers className="w-4 h-4 text-indigo-500" />
+      <Card className="p-5 border border-border flex flex-col md:flex-row md:items-center justify-between gap-4 bg-surface-muted/30">
+        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+          <Layers className="w-4 h-4 text-primary" />
           <span>Configurações Rápidas de Destino e Fontes:</span>
         </div>
 
         <div className="flex flex-wrap items-center gap-3">
-          <Link
-            href="/settings/sources"
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-700 dark:text-zinc-300 bg-white dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 rounded-lg hover:bg-slate-50 dark:hover:bg-zinc-700 transition-colors"
-          >
-            <Rss className="w-3.5 h-3.5 text-amber-500" />
-            Feeds RSS
+          <Link href="/settings/sources">
+            <Button
+              variant="outline"
+              size="sm"
+              leadingIcon={<Rss className="w-3.5 h-3.5 text-amber-500" />}
+            >
+              Feeds RSS
+            </Button>
           </Link>
-          <Link
-            href="/settings/wordpress"
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-700 dark:text-zinc-300 bg-white dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 rounded-lg hover:bg-slate-50 dark:hover:bg-zinc-700 transition-colors"
-          >
-            <Globe className="w-3.5 h-3.5 text-blue-500" />
-            Destinos WordPress
+
+          <Link href="/settings/wordpress">
+            <Button
+              variant="outline"
+              size="sm"
+              leadingIcon={<Globe className="w-3.5 h-3.5 text-primary" />}
+            >
+              Destinos WordPress
+            </Button>
           </Link>
-          <Link
-            href={hasAffiliateModule ? "/affiliates/products" : "/settings/billing/upgrade"}
-            className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg shadow-sm transition-colors ${
-              hasAffiliateModule 
-                ? "text-slate-700 dark:text-zinc-300 bg-white dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 hover:bg-slate-50 dark:hover:bg-zinc-700" 
-                : "text-slate-400 dark:text-slate-500 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700/50"
-            }`}
-          >
-            {hasAffiliateModule ? (
-              <Tag className="w-3.5 h-3.5 text-emerald-500" />
-            ) : (
-              <Lock className="w-3.5 h-3.5 text-amber-500" />
-            )}
-            Catálogo de Produtos
+
+          <Link href={hasAffiliateModule ? "/affiliates/products" : "/settings/billing/upgrade"}>
+            <Button
+              variant="outline"
+              size="sm"
+              leadingIcon={
+                hasAffiliateModule ? (
+                  <Tag className="w-3.5 h-3.5 text-[#00C2A8]" />
+                ) : (
+                  <Lock className="w-3.5 h-3.5 text-amber-500" />
+                )
+              }
+            >
+              Catálogo de Produtos
+            </Button>
           </Link>
         </div>
-      </div>
+      </Card>
     </div>
   );
 }

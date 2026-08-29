@@ -12,6 +12,12 @@ import {
 } from "lucide-react";
 import { CommercialArticleType } from "@/lib/affiliate/types";
 
+import { PageHeader } from "@/components/design-system/page-header";
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
+
 interface EffectiveTemplate {
   id?: string;
   type: CommercialArticleType;
@@ -132,27 +138,23 @@ export function PromptTemplateManager() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-zinc-900 border border-zinc-800 p-6 rounded-2xl">
-        <div>
-          <div className="flex items-center gap-2 text-emerald-400 font-semibold text-xs mb-1">
-            <ShieldCheck className="w-4 h-4" />
-            Governança Global de Prompts Ativa
-          </div>
-          <h1 className="text-2xl font-black tracking-tight text-white flex items-center gap-2">
-            <Sparkles className="w-6 h-6 text-amber-400" />
-            Formatos Comerciais & Prompts de IA
-          </h1>
-          <p className="text-xs text-zinc-400 mt-1 max-w-2xl leading-relaxed">
-            Consulte os 7 modelos de conteúdo e diretrizes de IA disponíveis para seu workspace. Os prompts são padronizados globalmente para garantir conformidade de SEO, formato canônico e alta conversão em vendas de afiliados.
-          </p>
-        </div>
-      </div>
+      {/* Header com PageHeader */}
+      <PageHeader
+        title="Formatos Comerciais & Prompts de IA"
+        description="Consulte os 7 modelos de conteúdo e diretrizes de IA disponíveis para seu workspace. Os prompts são padronizados globalmente para garantir conformidade de SEO e alta conversão."
+        icon={<Sparkles className="w-5 h-5 text-primary" />}
+        badge={
+          <Badge variant="success" size="sm" className="flex items-center gap-1">
+            <ShieldCheck className="w-3.5 h-3.5" />
+            Governança Global Ativa
+          </Badge>
+        }
+      />
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         {/* Left Column: Types Navigation */}
         <div className="lg:col-span-4 space-y-2">
-          <h2 className="text-xs font-bold uppercase tracking-wider text-zinc-400 px-1 mb-2">
+          <h2 className="text-xs font-heading font-bold uppercase tracking-wider text-muted-foreground px-1 mb-2">
             Formatos Disponíveis ({typesList.length})
           </h2>
           {typesList.map((type) => {
@@ -167,24 +169,24 @@ export function PromptTemplateManager() {
                 onClick={() => handleSelectType(type)}
                 className={`w-full text-left p-4 rounded-xl border transition-all ${
                   isSelected
-                    ? "bg-amber-500/10 border-amber-500/30 text-white shadow-sm ring-1 ring-amber-500/20"
-                    : "bg-zinc-900/60 border-zinc-800 hover:border-zinc-700 text-zinc-300 hover:text-white"
+                    ? "bg-primary/10 border-primary shadow-xs ring-1 ring-primary/20 text-foreground"
+                    : "bg-surface border-border hover:border-muted-foreground/30 text-foreground/80 hover:text-foreground"
                 }`}
               >
                 <div className="flex items-center justify-between gap-2 mb-1">
-                  <span className="text-xs font-bold">{meta.title}</span>
+                  <span className="font-heading text-xs font-bold text-foreground">{meta.title}</span>
                   <div className="flex items-center gap-1.5">
                     {tData && (
-                      <span className="text-[10px] font-mono font-semibold px-2 py-0.5 rounded bg-zinc-800 text-zinc-300 border border-zinc-700">
+                      <Badge variant="outline" size="sm" className="font-mono text-[10px]">
                         v{tData.version}
-                      </span>
+                      </Badge>
                     )}
-                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                    <Badge variant="purple" size="sm">
                       Global
-                    </span>
+                    </Badge>
                   </div>
                 </div>
-                <p className="text-[11px] text-zinc-400 line-clamp-2 leading-relaxed">
+                <p className="font-sans text-[11px] text-muted-foreground line-clamp-2 leading-relaxed">
                   {meta.desc}
                 </p>
               </button>
@@ -195,117 +197,120 @@ export function PromptTemplateManager() {
         {/* Right Column: Template Detail (Read-Only) */}
         <div className="lg:col-span-8 space-y-5">
           {loading ? (
-            <div className="p-12 text-center text-zinc-500 text-sm bg-zinc-900 border border-zinc-800 rounded-2xl">
-              Carregando template...
-            </div>
+            <Card className="p-12 text-center shadow-xs">
+              <Skeleton className="h-48 w-full rounded-xl" />
+            </Card>
           ) : activeTemplate ? (
-            <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 space-y-6">
+            <Card className="p-6 space-y-6 shadow-xs">
               {/* Header Info */}
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-5 border-b border-zinc-800">
+              <CardHeader className="p-0 border-b border-border pb-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
                   <div className="flex items-center gap-2 mb-1">
-                    <span className="text-[10px] font-mono uppercase px-2.5 py-0.5 rounded bg-amber-500/10 text-amber-300 border border-amber-500/20 font-bold">
+                    <Badge variant="purple" size="sm" className="font-mono">
                       {activeTemplate.type}
-                    </span>
-                    <span className="text-xs font-bold text-zinc-400 font-mono">
+                    </Badge>
+                    <span className="text-xs font-mono text-muted-foreground">
                       Versão Global v{activeTemplate.version}
                     </span>
                   </div>
-                  <h3 className="text-lg font-bold text-white">
+                  <CardTitle className="text-lg font-bold">
                     {activeTemplate.name}
-                  </h3>
+                  </CardTitle>
                   {activeTemplate.description && (
-                    <p className="text-xs text-zinc-400 mt-1">
+                    <p className="text-xs text-muted-foreground mt-1">
                       {activeTemplate.description}
                     </p>
                   )}
                 </div>
 
                 <div className="flex items-center gap-2">
-                  <button
+                  <Button
                     type="button"
+                    variant="outline"
+                    size="sm"
                     onClick={handleGeneratePreview}
-                    disabled={previewing}
-                    className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 rounded-xl text-xs font-semibold transition border border-zinc-700 shadow-sm"
+                    isLoading={previewing}
+                    leadingIcon={<Eye className="w-3.5 h-3.5 text-primary" />}
                   >
-                    <Eye className="w-3.5 h-3.5 text-amber-400" />
-                    {previewing ? "Calculando..." : "Testar Prévia"}
-                  </button>
+                    Testar Prévia
+                  </Button>
                 </div>
-              </div>
+              </CardHeader>
 
-              {/* Template Parameters & Constraints Info */}
-              <div className="p-4 bg-zinc-950 border border-zinc-800 rounded-xl space-y-3">
-                <h4 className="text-xs font-bold uppercase tracking-wider text-zinc-400 flex items-center gap-1.5">
-                  <Sliders className="w-3.5 h-3.5 text-amber-400" />
-                  Regras & Diretrizes do Formato
-                </h4>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
-                  <div className="p-2.5 bg-zinc-900/80 rounded-lg border border-zinc-800/80">
-                    <span className="text-[10px] text-zinc-500 block uppercase font-bold">Modo de Seleção</span>
-                    <span className="text-zinc-200 font-semibold">
-                      {selectedType === "PRODUCT_REVIEW"
-                        ? "1 Produto Único"
-                        : selectedType === "COMPARISON"
-                        ? "Exatamente 2 Produtos"
-                        : selectedType === "BUYING_GUIDE"
-                        ? "0 a 10 Produtos (Opcional)"
-                        : "2 a 10 Produtos"}
+              <CardContent className="p-0 space-y-6">
+                {/* Template Parameters & Constraints Info */}
+                <div className="p-4 bg-surface-muted/50 border border-border rounded-xl space-y-3">
+                  <h4 className="font-heading text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                    <Sliders className="w-3.5 h-3.5 text-primary" />
+                    Regras & Diretrizes do Formato
+                  </h4>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+                    <div className="p-2.5 bg-surface rounded-lg border border-border">
+                      <span className="text-[10px] text-muted-foreground block uppercase font-bold">Modo de Seleção</span>
+                      <span className="text-foreground font-semibold">
+                        {selectedType === "PRODUCT_REVIEW"
+                          ? "1 Produto Único"
+                          : selectedType === "COMPARISON"
+                          ? "Exatamente 2 Produtos"
+                          : selectedType === "BUYING_GUIDE"
+                          ? "0 a 10 Produtos (Opcional)"
+                          : "2 a 10 Produtos"}
+                      </span>
+                    </div>
+                    <div className="p-2.5 bg-surface rounded-lg border border-border">
+                      <span className="text-[10px] text-muted-foreground block uppercase font-bold">Categoria</span>
+                      <span className="text-foreground font-semibold">
+                        {selectedType === "BEST_PRODUCTS" || selectedType === "BUYING_GUIDE"
+                          ? "Obrigatória"
+                          : "Opcional / Automática"}
+                      </span>
+                    </div>
+                    <div className="p-2.5 bg-surface rounded-lg border border-border">
+                      <span className="text-[10px] text-muted-foreground block uppercase font-bold">Governança</span>
+                      <span className="text-[#00C2A8] font-semibold flex items-center gap-1">
+                        <CheckCircle2 className="w-3 h-3" />
+                        Global SuperAdmin
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* System Prompt View (Read-Only) */}
+                <div>
+                  <label className="block font-heading text-xs font-bold text-muted-foreground uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                    <Code2 className="w-3.5 h-3.5 text-primary" />
+                    System Prompt (Diretrizes de Persona e Output JSON)
+                  </label>
+                  <div className="bg-surface-muted/60 border border-border rounded-xl p-4 text-xs font-mono text-foreground max-h-48 overflow-y-auto whitespace-pre-wrap leading-relaxed">
+                    {activeTemplate.systemPrompt}
+                  </div>
+                </div>
+
+                {/* User Prompt View (Read-Only) */}
+                <div>
+                  <label className="block font-heading text-xs font-bold text-muted-foreground uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                    <FileText className="w-3.5 h-3.5 text-primary" />
+                    Template de Prompt do Usuário (Placeholders Globais)
+                  </label>
+                  <div className="bg-surface-muted/60 border border-border rounded-xl p-4 text-xs font-mono text-foreground max-h-60 overflow-y-auto whitespace-pre-wrap leading-relaxed">
+                    {activeTemplate.userPromptTemplate}
+                  </div>
+                </div>
+
+                {/* Preview Result Modal / Container */}
+                {renderedPreview && (
+                  <div className="p-4 bg-surface-muted/80 border border-primary/30 rounded-xl space-y-2">
+                    <span className="text-xs font-bold text-primary flex items-center gap-1.5">
+                      <Sparkles className="w-3.5 h-3.5" />
+                      Exemplo de Prompt Renderizado com Contexto Real de Teste:
                     </span>
+                    <div className="text-xs font-mono text-foreground whitespace-pre-wrap max-h-60 overflow-y-auto bg-surface p-3 rounded-lg border border-border">
+                      {renderedPreview}
+                    </div>
                   </div>
-                  <div className="p-2.5 bg-zinc-900/80 rounded-lg border border-zinc-800/80">
-                    <span className="text-[10px] text-zinc-500 block uppercase font-bold">Categoria</span>
-                    <span className="text-zinc-200 font-semibold">
-                      {selectedType === "BEST_PRODUCTS" || selectedType === "BUYING_GUIDE"
-                        ? "Obrigatória"
-                        : "Opcional / Automática"}
-                    </span>
-                  </div>
-                  <div className="p-2.5 bg-zinc-900/80 rounded-lg border border-zinc-800/80">
-                    <span className="text-[10px] text-zinc-500 block uppercase font-bold">Governança</span>
-                    <span className="text-emerald-400 font-semibold flex items-center gap-1">
-                      <CheckCircle2 className="w-3 h-3" />
-                      Global SuperAdmin
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              {/* System Prompt View (Read-Only) */}
-              <div>
-                <label className="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-                  <Code2 className="w-3.5 h-3.5 text-amber-400" />
-                  System Prompt (Diretrizes de Persona e Output JSON)
-                </label>
-                <div className="bg-zinc-950 border border-zinc-800 rounded-xl p-4 text-xs font-mono text-zinc-300 max-h-48 overflow-y-auto whitespace-pre-wrap leading-relaxed">
-                  {activeTemplate.systemPrompt}
-                </div>
-              </div>
-
-              {/* User Prompt View (Read-Only) */}
-              <div>
-                <label className="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-                  <FileText className="w-3.5 h-3.5 text-amber-400" />
-                  Template de Prompt do Usuário (Placeholders Globais)
-                </label>
-                <div className="bg-zinc-950 border border-zinc-800 rounded-xl p-4 text-xs font-mono text-zinc-300 max-h-60 overflow-y-auto whitespace-pre-wrap leading-relaxed">
-                  {activeTemplate.userPromptTemplate}
-                </div>
-              </div>
-
-              {/* Preview Result Modal / Container */}
-              {renderedPreview && (
-                <div className="p-4 bg-zinc-950 border border-amber-500/30 rounded-xl space-y-2">
-                  <span className="text-xs font-bold text-amber-300 flex items-center gap-1.5">
-                    <Sparkles className="w-3.5 h-3.5" />
-                    Exemplo de Prompt Renderizado com Contexto Real de Teste:
-                  </span>
-                  <div className="text-xs font-mono text-zinc-300 whitespace-pre-wrap max-h-60 overflow-y-auto bg-zinc-900/80 p-3 rounded-lg border border-zinc-800">
-                    {renderedPreview}
-                  </div>
-                </div>
-              )}
-            </div>
+                )}
+              </CardContent>
+            </Card>
           ) : null}
         </div>
       </div>

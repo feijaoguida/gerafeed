@@ -11,6 +11,14 @@ import {
   Trash2,
 } from "lucide-react";
 
+import { PageHeader } from "@/components/design-system/page-header";
+import { Card } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Select } from "@/components/ui/select";
+import { EmptyState } from "@/components/ui/empty-state";
+import { Skeleton } from "@/components/ui/skeleton";
+
 interface ProductOfferItem {
   id: string;
   affiliateUrl: string;
@@ -111,166 +119,173 @@ export function OfferList() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Ofertas de Afiliados</h1>
-          <p className="text-sm text-slate-500">
-            Monitore preços, status de estoque e rastreamento de links em todos os programas parceiros.
-          </p>
-        </div>
-        <div className="flex items-center gap-3">
-          <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            className="px-3 py-2 text-sm bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg dark:text-white"
-          >
-            <option value="">Todos os Status</option>
-            <option value="ACTIVE">Ativas</option>
-            <option value="PAUSED">Pausadas</option>
-            <option value="OUT_OF_STOCK">Sem Estoque</option>
-            <option value="ARCHIVED">Arquivadas</option>
-          </select>
-        </div>
-      </div>
+      {/* Header com PageHeader */}
+      <PageHeader
+        title="Ofertas de Afiliados"
+        description="Monitore preços, status de estoque e rastreamento de links em todos os programas parceiros."
+        icon={<Tag className="w-5 h-5" />}
+        actions={
+          <div className="w-48">
+            <Select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+            >
+              <option value="">Todos os Status</option>
+              <option value="ACTIVE">Ativas</option>
+              <option value="PAUSED">Pausadas</option>
+              <option value="OUT_OF_STOCK">Sem Estoque</option>
+              <option value="ARCHIVED">Arquivadas</option>
+            </Select>
+          </div>
+        }
+      />
 
       {loading ? (
-        <div className="py-20 text-center">
-          <RefreshCw className="w-8 h-8 animate-spin text-blue-600 mx-auto mb-3" />
-          <p className="text-sm text-slate-500">Carregando ofertas...</p>
+        <div className="space-y-3">
+          {[...Array(5)].map((_, i) => (
+            <Skeleton key={i} className="h-16 rounded-xl" />
+          ))}
         </div>
       ) : offers.length === 0 ? (
-        <div className="py-16 text-center bg-white dark:bg-slate-800 rounded-xl border border-dashed border-slate-300 dark:border-slate-700 p-8">
-          <Tag className="w-12 h-12 text-slate-400 mx-auto mb-3" />
-          <h3 className="text-base font-semibold text-slate-800 dark:text-slate-200">
-            Nenhuma oferta cadastrada
-          </h3>
-          <p className="text-sm text-slate-500 mt-1 mb-4">
-            Importe produtos ou vincule novas ofertas a partir do Catálogo de Produtos.
-          </p>
-          <Link
-            href="/affiliates/products"
-            className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg"
-          >
-            Ver Catálogo de Produtos
-          </Link>
-        </div>
+        <EmptyState
+          title="Nenhuma oferta cadastrada"
+          description="Importe produtos ou vincule novas ofertas a partir do Catálogo de Produtos."
+          action={
+            <Link href="/affiliates/products">
+              <Button variant="gradient" leadingIcon={<Package className="w-4 h-4" />}>
+                Ver Catálogo de Produtos
+              </Button>
+            </Link>
+          }
+        />
       ) : (
-        <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden shadow-sm">
-          <table className="w-full text-left text-xs">
-            <thead className="bg-slate-50 dark:bg-slate-900/50 text-slate-500 uppercase font-semibold border-b border-slate-200 dark:border-slate-700">
-              <tr>
-                <th className="px-4 py-3">Produto</th>
-                <th className="px-4 py-3">Programa</th>
-                <th className="px-4 py-3">Vendedor</th>
-                <th className="px-4 py-3">Preço Atual</th>
-                <th className="px-4 py-3">Tracking</th>
-                <th className="px-4 py-3">Status</th>
-                <th className="px-4 py-3">Última Atualização</th>
-                <th className="px-4 py-3 text-right">Ações</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100 dark:divide-slate-700/60">
-              {offers.map((offer) => (
-                <tr key={offer.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-900/30">
-                  <td className="px-4 py-3 font-medium text-slate-900 dark:text-white">
-                    <Link
-                      href={`/affiliates/products/${offer.product.id}`}
-                      className="flex items-center gap-2 hover:text-blue-600"
-                    >
-                      {offer.product.imageUrl ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img
-                          src={offer.product.imageUrl}
-                          alt={offer.product.name}
-                          className="w-8 h-8 object-contain rounded bg-slate-50 dark:bg-slate-900"
-                        />
-                      ) : (
-                        <div className="w-8 h-8 rounded bg-slate-100 flex items-center justify-center">
-                          <Package className="w-4 h-4 text-slate-400" />
-                        </div>
-                      )}
-                      <span className="line-clamp-1 max-w-[200px]">{offer.product.name}</span>
-                    </Link>
-                  </td>
-                  <td className="px-4 py-3 font-semibold text-slate-700 dark:text-slate-300">
-                    {offer.affiliateProgram?.name || "Mercado Livre"}
-                  </td>
-                  <td className="px-4 py-3 text-slate-600 dark:text-slate-300">{offer.seller || "--"}</td>
-                  <td className="px-4 py-3">
-                    <div className="font-bold text-slate-900 dark:text-white">
-                      {offer.price
-                        ? new Intl.NumberFormat("pt-BR", {
+        <Card className="overflow-hidden shadow-xs">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs">
+              <thead className="bg-surface-muted/50 text-muted-foreground uppercase font-heading font-semibold border-b border-border">
+                <tr>
+                  <th className="px-4 py-3">Produto</th>
+                  <th className="px-4 py-3">Programa</th>
+                  <th className="px-4 py-3">Vendedor</th>
+                  <th className="px-4 py-3">Preço Atual</th>
+                  <th className="px-4 py-3">Tracking</th>
+                  <th className="px-4 py-3">Status</th>
+                  <th className="px-4 py-3">Última Atualização</th>
+                  <th className="px-4 py-3 text-right">Ações</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border font-sans">
+                {offers.map((offer) => (
+                  <tr key={offer.id} className="hover:bg-surface-muted/40 transition-colors">
+                    <td className="px-4 py-3 font-medium text-foreground">
+                      <Link
+                        href={`/affiliates/products/${offer.product.id}`}
+                        className="flex items-center gap-2 hover:text-primary transition-colors"
+                      >
+                        {offer.product.imageUrl ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={offer.product.imageUrl}
+                            alt={offer.product.name}
+                            className="w-8 h-8 object-contain rounded-lg bg-surface-muted border border-border"
+                          />
+                        ) : (
+                          <div className="w-8 h-8 rounded-lg bg-surface-muted border border-border flex items-center justify-center">
+                            <Package className="w-4 h-4 text-muted-foreground" />
+                          </div>
+                        )}
+                        <span className="line-clamp-1 max-w-[200px]">{offer.product.name}</span>
+                      </Link>
+                    </td>
+                    <td className="px-4 py-3 font-semibold text-foreground">
+                      {offer.affiliateProgram?.name || "Mercado Livre"}
+                    </td>
+                    <td className="px-4 py-3 text-muted-foreground">{offer.seller || "--"}</td>
+                    <td className="px-4 py-3">
+                      <div className="font-heading font-bold text-foreground">
+                        {offer.price
+                          ? new Intl.NumberFormat("pt-BR", {
+                              style: "currency",
+                              currency: offer.currency,
+                            }).format(offer.price)
+                          : "--"}
+                      </div>
+                      {offer.oldPrice && offer.oldPrice > (offer.price || 0) && (
+                        <div className="text-[10px] line-through text-muted-foreground">
+                          {new Intl.NumberFormat("pt-BR", {
                             style: "currency",
                             currency: offer.currency,
-                          }).format(offer.price)
-                        : "--"}
-                    </div>
-                    {offer.oldPrice && offer.oldPrice > (offer.price || 0) && (
-                      <div className="text-[10px] line-through text-slate-400">
-                        {new Intl.NumberFormat("pt-BR", {
-                          style: "currency",
-                          currency: offer.currency,
-                        }).format(offer.oldPrice)}
+                          }).format(offer.oldPrice)}
+                        </div>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-muted-foreground font-mono text-[11px]">
+                      {offer.trackingLabel || "--"}
+                    </td>
+                    <td className="px-4 py-3">
+                      {offer.status === "ACTIVE" && (
+                        <Badge variant="success" size="sm">
+                          Ativa
+                        </Badge>
+                      )}
+                      {offer.status === "OUT_OF_STOCK" && (
+                        <Badge variant="danger" size="sm">
+                          Sem Estoque
+                        </Badge>
+                      )}
+                      {offer.status !== "ACTIVE" && offer.status !== "OUT_OF_STOCK" && (
+                        <Badge variant="secondary" size="sm">
+                          {offer.status}
+                        </Badge>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-muted-foreground">
+                      <div className="flex items-center gap-1">
+                        <Clock className="w-3 h-3 text-muted-foreground" />
+                        {offer.metadataLastFetchedAt
+                          ? new Date(offer.metadataLastFetchedAt).toLocaleDateString("pt-BR")
+                          : "Nunca"}
                       </div>
-                    )}
-                  </td>
-                  <td className="px-4 py-3 text-slate-500 font-mono text-[11px]">
-                    {offer.trackingLabel || "--"}
-                  </td>
-                  <td className="px-4 py-3">
-                    <span
-                      className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${
-                        offer.status === "ACTIVE"
-                          ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-300"
-                          : offer.status === "OUT_OF_STOCK"
-                          ? "bg-rose-100 text-rose-800 dark:bg-rose-900/50 dark:text-rose-300"
-                          : "bg-slate-100 text-slate-700 dark:bg-slate-700 dark:text-slate-300"
-                      }`}
-                    >
-                      {offer.status}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 text-slate-500 flex items-center gap-1">
-                    <Clock className="w-3 h-3 text-slate-400" />
-                    {offer.metadataLastFetchedAt
-                      ? new Date(offer.metadataLastFetchedAt).toLocaleDateString("pt-BR")
-                      : "Nunca"}
-                  </td>
-                  <td className="px-4 py-3 text-right">
-                    <div className="flex items-center justify-end gap-1.5">
-                      <button
-                        onClick={() => handleRefresh(offer.id)}
-                        disabled={refreshingId === offer.id}
-                        title="Atualizar preço agora"
-                        className="p-1.5 text-slate-500 hover:text-blue-600 hover:bg-slate-100 dark:hover:bg-slate-700 rounded"
-                      >
-                        <RefreshCw
-                          className={`w-3.5 h-3.5 ${refreshingId === offer.id ? "animate-spin text-blue-600" : ""}`}
-                        />
-                      </button>
-                      <a
-                        href={offer.affiliateUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        title="Abrir link"
-                        className="p-1.5 text-slate-500 hover:text-blue-600 hover:bg-slate-100 dark:hover:bg-slate-700 rounded"
-                      >
-                        <ExternalLink className="w-3.5 h-3.5" />
-                      </a>
-                      <button
-                        onClick={() => handleDelete(offer.id)}
-                        title="Excluir oferta"
-                        className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-slate-100 dark:hover:bg-slate-700 rounded"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      <div className="flex items-center justify-end gap-1">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleRefresh(offer.id)}
+                          disabled={refreshingId === offer.id}
+                          title="Atualizar preço agora"
+                        >
+                          <RefreshCw
+                            className={`w-3.5 h-3.5 ${refreshingId === offer.id ? "animate-spin text-primary" : ""}`}
+                          />
+                        </Button>
+                        <a
+                          href={offer.affiliateUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          title="Abrir link de afiliado"
+                          className="p-2 text-muted-foreground hover:text-primary transition-colors"
+                        >
+                          <ExternalLink className="w-3.5 h-3.5" />
+                        </a>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleDelete(offer.id)}
+                          title="Excluir oferta"
+                          className="text-muted-foreground hover:text-rose-500"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </Button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </Card>
       )}
     </div>
   );

@@ -9,8 +9,6 @@ import {
   X,
   Sparkles,
   Zap,
-  CheckCircle2,
-  AlertCircle,
   TrendingDown,
 } from "lucide-react";
 import {
@@ -19,6 +17,14 @@ import {
   formatCurrency,
   validatePlanPricing,
 } from "@/lib/pricing";
+
+import { PageHeader } from "@/components/design-system/page-header";
+import { Card, CardHeader, CardTitle, CardContent, CardFooter } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { FormField } from "@/components/design-system/form-field";
+import { Input } from "@/components/ui/input";
+import { Alert } from "@/components/ui/alert";
 
 interface Feature {
   id: string;
@@ -139,15 +145,57 @@ export function PlanManager({ initialPlans, initialFeatures }: PlanManagerProps)
         limit: existing?.limit !== undefined ? existing.limit : (f.valueType === "QUANTITY" ? 10 : null),
       };
     }
-    
-    // Check if AI is limited
-    const aiKeys = ["ai_unlimited_niches", "ai_unlimited_styles", "ai_advanced_providers"];
-    const limited = features.some((f) => aiKeys.includes(f.key) && !map[f.id]?.enabled);
-    
     setSelectedFeatures(map);
-    setIsAiLimited(limited);
+
+    const unlimitedNichesFeature = features.find((f) => f.key === "ai_unlimited_niches");
+    const unlimitedStylesFeature = features.find((f) => f.key === "ai_unlimited_styles");
+    const advancedProvidersFeature = features.find((f) => f.key === "ai_advanced_providers");
+
+    const hasAnyRestricted =
+      (unlimitedNichesFeature && !map[unlimitedNichesFeature.id]?.enabled) ||
+      (unlimitedStylesFeature && !map[unlimitedStylesFeature.id]?.enabled) ||
+      (advancedProvidersFeature && !map[advancedProvidersFeature.id]?.enabled);
+
+    setIsAiLimited(Boolean(hasAnyRestricted));
     setMessage(null);
     setIsModalOpen(true);
+  };
+
+  const handleAiLimitedToggle = (limitActive: boolean) => {
+    setIsAiLimited(limitActive);
+
+    const unlimitedNiches = features.find((f) => f.key === "ai_unlimited_niches");
+    const unlimitedStyles = features.find((f) => f.key === "ai_unlimited_styles");
+    const advancedProviders = features.find((f) => f.key === "ai_advanced_providers");
+
+    setSelectedFeatures((prev) => {
+      const next = { ...prev };
+      if (unlimitedNiches) next[unlimitedNiches.id] = { enabled: !limitActive, limit: null };
+      if (unlimitedStyles) next[unlimitedStyles.id] = { enabled: !limitActive, limit: null };
+      if (advancedProviders) next[advancedProviders.id] = { enabled: !limitActive, limit: null };
+      return next;
+    });
+  };
+
+  const handleFeatureToggle = (featureId: string, enabled: boolean) => {
+    setSelectedFeatures((prev) => ({
+      ...prev,
+      [featureId]: {
+        ...prev[featureId],
+        enabled,
+      },
+    }));
+  };
+
+  const handleFeatureLimitChange = (featureId: string, limitVal: string) => {
+    const parsed = parseInt(limitVal, 10);
+    setSelectedFeatures((prev) => ({
+      ...prev,
+      [featureId]: {
+        ...prev[featureId],
+        limit: isNaN(parsed) ? null : parsed,
+      },
+    }));
   };
 
   const handleSave = async (e: React.FormEvent) => {
@@ -155,47 +203,49 @@ export function PlanManager({ initialPlans, initialFeatures }: PlanManagerProps)
     setIsLoading(true);
     setMessage(null);
 
-    const numMonthlyPrice = Number(monthlyPrice) || 0;
-    const numDiscount = Number(annualDiscountPercent) || 0;
+    const mPrice = typeof monthlyPrice === "string" ? parseFloat(monthlyPrice) : monthlyPrice;
+    const aDiscount = typeof annualDiscountPercent === "string" ? parseFloat(annualDiscountPercent) : annualDiscountPercent;
 
-    const validation = validatePlanPricing(numMonthlyPrice, numDiscount);
+    const validation = validatePlanPricing(mPrice, aDiscount);
     if (!validation.valid) {
-      setMessage({ type: "error", text: validation.error || "Preço ou desconto inválido." });
+      setMessage({ type: "error", text: validation.error || "Dados de precificação inválidos." });
       setIsLoading(false);
       return;
     }
 
-    const featurePayload = Object.entries(selectedFeatures)
-      .filter(([, val]) => val.enabled)
-      .map(([featureId, val]) => ({
+    try {
+      const featurePayload = Object.entries(selectedFeatures).map(([featureId, data]) => ({
         featureId,
-        enabled: val.enabled,
-        limit: val.limit,
+        enabled: data.enabled,
+        limit: data.limit ?? null,
       }));
 
-    try {
-      const url = editingPlan ? `/api/backoffice/plans/${editingPlan.id}` : `/api/backoffice/plans`;
+      const payload = {
+        name,
+        slug,
+        description: description || null,
+        price: mPrice,
+        monthlyPrice: mPrice,
+        annualDiscountPercent: aDiscount,
+        periodicity,
+        active,
+        highlight,
+        maxArticles: Number(maxArticles),
+        maxDailyArticles: Number(maxDailyArticles),
+        maxSources: Number(maxSources),
+        maxWordPressSites: Number(maxWordPressSites),
+        features: featurePayload,
+      };
+
+      const url = editingPlan
+        ? `/api/backoffice/plans/${editingPlan.id}`
+        : "/api/backoffice/plans";
       const method = editingPlan ? "PATCH" : "POST";
 
       const res = await fetch(url, {
         method,
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name,
-          slug,
-          description,
-          monthlyPrice: numMonthlyPrice,
-          annualDiscountPercent: numDiscount,
-          price: numMonthlyPrice,
-          periodicity,
-          active,
-          highlight,
-          maxArticles: Number(maxArticles),
-          maxDailyArticles: Number(maxDailyArticles),
-          maxSources: Number(maxSources),
-          maxWordPressSites: Number(maxWordPressSites),
-          features: featurePayload,
-        }),
+        body: JSON.stringify(payload),
       });
 
       const data = await res.json();
@@ -203,12 +253,13 @@ export function PlanManager({ initialPlans, initialFeatures }: PlanManagerProps)
 
       if (editingPlan) {
         setPlans((prev) => prev.map((p) => (p.id === data.id ? data : p)));
+        setMessage({ type: "success", text: `Plano "${data.name}" atualizado com sucesso!` });
       } else {
         setPlans((prev) => [...prev, data]);
+        setMessage({ type: "success", text: `Plano "${data.name}" criado com sucesso!` });
       }
 
       setIsModalOpen(false);
-      setMessage({ type: "success", text: `Plano ${data.name} salvo com sucesso!` });
     } catch (err) {
       setMessage({ type: "error", text: err instanceof Error ? err.message : "Erro ao salvar." });
     } finally {
@@ -216,47 +267,33 @@ export function PlanManager({ initialPlans, initialFeatures }: PlanManagerProps)
     }
   };
 
-  const previewAnnualPrice = calculateAnnualPlanPrice(monthlyPrice || 0, annualDiscountPercent || 0);
-  const previewAnnualSavings = calculateAnnualSavings(monthlyPrice || 0, annualDiscountPercent || 0);
-
   return (
     <div className="space-y-6">
-      {/* Action Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-zinc-800 pb-5">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight text-white flex items-center gap-2">
-            <Layers className="w-6 h-6 text-indigo-400" />
-            Planos & Features Globais
-          </h1>
-          <p className="text-xs sm:text-sm text-zinc-400">
-            Cadastre planos comerciais com preços mensais e descontos anuais, configure limites de artigos, fontes e vincule features.
-          </p>
-        </div>
-        <button
-          onClick={openCreateModal}
-          className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-amber-500 hover:bg-amber-400 text-zinc-950 font-semibold text-xs transition shadow-md shadow-amber-500/10"
-        >
-          <Plus className="w-4 h-4" />
-          <span>Novo Plano</span>
-        </button>
-      </div>
+      {/* Header com PageHeader */}
+      <PageHeader
+        title="Planos & Features"
+        description="Configure os limites operacionais, tiers de preços, ciclo anual com desconto e features habilitadas por plano."
+        icon={<Layers className="w-5 h-5 text-purple-500" />}
+        actions={
+          <Button
+            variant="gradient"
+            size="sm"
+            onClick={openCreateModal}
+            leadingIcon={<Plus className="w-4 h-4" />}
+          >
+            Novo Plano
+          </Button>
+        }
+      />
 
       {/* Global Alerts */}
       {message && (
-        <div
-          className={`p-4 rounded-xl text-xs flex items-center gap-2 border ${
-            message.type === "success"
-              ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-300"
-              : "bg-rose-500/10 border-rose-500/20 text-rose-300"
-          }`}
+        <Alert
+          variant={message.type === "success" ? "success" : "destructive"}
+          onClose={() => setMessage(null)}
         >
-          {message.type === "success" ? (
-            <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-          ) : (
-            <AlertCircle className="w-4 h-4 text-rose-400" />
-          )}
-          <span>{message.text}</span>
-        </div>
+          {message.text}
+        </Alert>
       )}
 
       {/* Plans Grid */}
@@ -268,413 +305,325 @@ export function PlanManager({ initialPlans, initialFeatures }: PlanManagerProps)
           const annualSavings = calculateAnnualSavings(planMonthly, planDiscount);
 
           return (
-            <div
+            <Card
               key={plan.id}
-              className={`p-6 rounded-xl bg-zinc-950 border flex flex-col justify-between space-y-6 shadow-sm transition ${
-                plan.highlight ? "border-amber-500/50 ring-1 ring-amber-500/20" : "border-zinc-800"
+              className={`p-6 flex flex-col justify-between space-y-6 shadow-xs transition-all ${
+                plan.highlight ? "border-2 border-primary shadow-lg ring-1 ring-primary/20" : ""
               }`}
             >
               <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-mono uppercase tracking-wider text-amber-400 font-semibold">
+                <CardHeader className="p-0 flex flex-row items-center justify-between">
+                  <span className="text-xs font-mono uppercase tracking-wider text-primary font-bold">
                     {plan.slug}
                   </span>
                   <div className="flex items-center gap-2">
                     {plan.highlight && (
-                      <span className="px-2 py-0.5 rounded text-[9px] font-bold bg-amber-500/10 text-amber-300 border border-amber-500/30">
+                      <Badge variant="purple" size="sm">
                         DESTAQUE
-                      </span>
+                      </Badge>
                     )}
-                    <span
-                      className={`px-2 py-0.5 rounded text-[10px] font-medium border ${
-                        plan.active
-                          ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
-                          : "bg-zinc-800 text-zinc-500 border-zinc-700"
-                      }`}
-                    >
+                    <Badge variant={plan.active ? "success" : "secondary"} size="sm">
                       {plan.active ? "Ativo" : "Inativo"}
-                    </span>
+                    </Badge>
                   </div>
-                </div>
+                </CardHeader>
 
-                <div>
-                  <h2 className="text-xl font-bold text-white">{plan.name}</h2>
-                  {plan.description && (
-                    <p className="text-xs text-zinc-400 mt-1 line-clamp-2">{plan.description}</p>
-                  )}
-                  <div className="mt-3 flex items-baseline gap-1">
-                    <span className="text-3xl font-extrabold text-white">
-                      {formatCurrency(planMonthly)}
-                    </span>
-                    <span className="text-xs text-zinc-500">/mês</span>
-                  </div>
+                <CardContent className="p-0 space-y-3">
+                  <div>
+                    <CardTitle className="text-xl font-bold">{plan.name}</CardTitle>
+                    {plan.description && (
+                      <p className="font-sans text-xs text-muted-foreground mt-1 line-clamp-2">{plan.description}</p>
+                    )}
+                    <div className="mt-3 flex items-baseline gap-1">
+                      <span className="font-heading text-3xl font-extrabold text-foreground">
+                        {formatCurrency(planMonthly)}
+                      </span>
+                      <span className="text-xs text-muted-foreground">/mês</span>
+                    </div>
 
-                  {planMonthly > 0 && (
-                    <div className="mt-2 p-2 rounded bg-zinc-900/60 border border-zinc-800/80 text-[11px] text-zinc-400 space-y-0.5">
-                      <div className="flex items-center justify-between">
-                        <span>Anual: <strong className="text-white">{formatCurrency(annualCalculated)}</strong> /ano</span>
+                    {planMonthly > 0 && (
+                      <div className="mt-2 p-2.5 rounded-xl bg-surface-muted/60 border border-border text-[11px] text-muted-foreground space-y-1">
+                        <div className="flex items-center justify-between">
+                          <span>Anual: <strong className="text-foreground">{formatCurrency(annualCalculated)}</strong> /ano</span>
+                          {planDiscount > 0 && (
+                            <Badge variant="success" size="sm">
+                              -{planDiscount}% OFF
+                            </Badge>
+                          )}
+                        </div>
                         {planDiscount > 0 && (
-                          <span className="px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 text-[10px] font-bold">
-                            -{planDiscount}% OFF
-                          </span>
+                          <div className="text-[10px] text-[#00C2A8] flex items-center gap-1 font-medium">
+                            <TrendingDown className="w-3 h-3" />
+                            <span>Economia de {formatCurrency(annualSavings)}/ano</span>
+                          </div>
                         )}
                       </div>
-                      {planDiscount > 0 && (
-                        <div className="text-[10px] text-emerald-400/90 flex items-center gap-1">
-                          <TrendingDown className="w-3 h-3" />
-                          <span>Economia de {formatCurrency(annualSavings)}/ano</span>
-                        </div>
-                      )}
+                    )}
+                  </div>
+
+                  <div className="pt-4 border-t border-border space-y-2 text-xs text-foreground">
+                    <div className="flex items-center justify-between">
+                      <span className="text-muted-foreground">Limite Artigos / Dia:</span>
+                      <span className="font-semibold text-foreground">
+                        {plan.maxDailyArticles === -1 ? "Ilimitado" : plan.maxDailyArticles}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-muted-foreground">Limite Artigos / Mês:</span>
+                      <span className="font-semibold text-foreground">
+                        {plan.maxArticles === -1 ? "Ilimitado" : plan.maxArticles}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-muted-foreground">Limite Sites WordPress:</span>
+                      <span className="font-semibold text-foreground">
+                        {plan.maxWordPressSites === -1 ? "Ilimitado" : plan.maxWordPressSites}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-muted-foreground">Limite de Fontes RSS:</span>
+                      <span className="font-semibold text-foreground">
+                        {plan.maxSources === -1 ? "Ilimitado" : plan.maxSources}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Linked Features */}
+                  {plan.planFeatures && plan.planFeatures.length > 0 && (
+                    <div className="pt-3 border-t border-border space-y-1.5">
+                      <p className="text-[10px] font-mono uppercase text-muted-foreground">Features Inclusas:</p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {plan.planFeatures
+                          .filter((pf) => pf.enabled)
+                          .map((pf) => (
+                            <span
+                              key={pf.id}
+                              className="px-2 py-0.5 rounded-md text-[10px] bg-surface-muted border border-border text-foreground flex items-center gap-1"
+                            >
+                              <Zap className="w-2.5 h-2.5 text-amber-500" />
+                              {pf.feature?.name || pf.featureId}
+                              {pf.limit ? ` (${pf.limit})` : ""}
+                            </span>
+                          ))}
+                      </div>
                     </div>
                   )}
-                </div>
-
-                <div className="pt-4 border-t border-zinc-800/80 space-y-2.5 text-xs text-zinc-300">
-                  <div className="flex items-center justify-between">
-                    <span className="text-zinc-400">Limite de Artigos / Dia:</span>
-                    <span className="font-semibold text-white">
-                      {plan.maxDailyArticles === -1 ? "Ilimitado" : plan.maxDailyArticles}
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-zinc-400">Limite de Artigos / Mês:</span>
-                    <span className="font-semibold text-white">
-                      {plan.maxArticles === -1 ? "Ilimitado" : plan.maxArticles}
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-zinc-400">Limite Sites WordPress:</span>
-                    <span className="font-semibold text-white">
-                      {plan.maxWordPressSites === -1 ? "Ilimitado" : plan.maxWordPressSites}
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-zinc-400">Limite de Fontes RSS:</span>
-                    <span className="font-semibold text-white">
-                      {plan.maxSources === -1 ? "Ilimitado" : plan.maxSources}
-                    </span>
-                  </div>
-                </div>
-
-                {/* Linked Features */}
-                {plan.planFeatures && plan.planFeatures.length > 0 && (
-                  <div className="pt-3 border-t border-zinc-800/60 space-y-1.5">
-                    <p className="text-[10px] font-mono uppercase text-zinc-500">Features Inclusas:</p>
-                    <div className="flex flex-wrap gap-1.5">
-                      {plan.planFeatures
-                        .filter((pf) => pf.enabled)
-                        .map((pf) => (
-                          <span
-                            key={pf.id}
-                            className="px-2 py-0.5 rounded text-[10px] bg-zinc-900 border border-zinc-800 text-zinc-300 flex items-center gap-1"
-                          >
-                            <Zap className="w-2.5 h-2.5 text-amber-400" />
-                            {pf.feature?.name || pf.featureId}
-                            {pf.limit ? ` (${pf.limit})` : ""}
-                          </span>
-                        ))}
-                    </div>
-                  </div>
-                )}
+                </CardContent>
               </div>
 
-              <button
-                onClick={() => openEditModal(plan)}
-                className="inline-flex items-center justify-center gap-1.5 w-full py-2 px-3 rounded-lg text-xs font-semibold bg-zinc-900 border border-zinc-800 hover:bg-zinc-800 text-zinc-200 transition"
-              >
-                <Edit2 className="w-3.5 h-3.5" />
-                <span>Editar Plano</span>
-              </button>
-            </div>
+              <CardFooter className="p-0 pt-3 border-t border-border">
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => openEditModal(plan)}
+                  className="w-full"
+                  leadingIcon={<Edit2 className="w-3.5 h-3.5" />}
+                >
+                  Editar Plano
+                </Button>
+              </CardFooter>
+            </Card>
           );
         })}
       </div>
 
       {/* Create / Edit Plan Modal */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm overflow-y-auto">
-          <div className="bg-zinc-950 border border-zinc-800 rounded-xl max-w-lg w-full p-6 space-y-5 shadow-2xl my-8">
-            <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
-              <h3 className="text-base font-bold text-white flex items-center gap-2">
-                <Sparkles className="w-4 h-4 text-amber-400" />
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs overflow-y-auto">
+          <Card className="max-w-lg w-full p-6 space-y-5 shadow-2xl my-8 bg-surface border-border">
+            <CardHeader className="p-0 flex flex-row items-center justify-between border-b border-border pb-3">
+              <CardTitle className="text-base font-bold flex items-center gap-2">
+                <Sparkles className="w-4 h-4 text-primary" />
                 {editingPlan ? "Editar Plano" : "Novo Plano Comercial"}
-              </h3>
-              <button
+              </CardTitle>
+              <Button
+                variant="ghost"
+                size="icon"
                 onClick={() => setIsModalOpen(false)}
-                className="text-zinc-500 hover:text-zinc-300"
               >
                 <X className="w-5 h-5" />
-              </button>
-            </div>
+              </Button>
+            </CardHeader>
 
             <form onSubmit={handleSave} className="space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-medium text-zinc-400 mb-1">Nome do Plano</label>
-                  <input
+                <FormField label="Nome do Plano" required>
+                  <Input
                     type="text"
                     required
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                     placeholder="Ex: Plano Pro"
-                    className="w-full px-3 py-1.5 rounded-lg bg-zinc-900 border border-zinc-800 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-amber-500"
                   />
-                </div>
+                </FormField>
 
-                <div>
-                  <label className="block text-xs font-medium text-zinc-400 mb-1">Slug Único</label>
-                  <input
+                <FormField label="Slug Único" required>
+                  <Input
                     type="text"
                     required
                     value={slug}
                     onChange={(e) => setSlug(e.target.value)}
                     placeholder="Ex: pro"
-                    className="w-full px-3 py-1.5 rounded-lg bg-zinc-900 border border-zinc-800 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-amber-500"
                   />
-                </div>
+                </FormField>
               </div>
 
-              <div>
-                <label className="block text-xs font-medium text-zinc-400 mb-1">Descrição</label>
-                <input
+              <FormField label="Descrição">
+                <Input
                   type="text"
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
                   placeholder="Descrição comercial dos benefícios..."
-                  className="w-full px-3 py-1.5 rounded-lg bg-zinc-900 border border-zinc-800 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-amber-500"
                 />
-              </div>
+              </FormField>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-medium text-zinc-400 mb-1">Preço Mensal (R$)</label>
-                  <input
+                <FormField label="Preço Mensal (R$)" required>
+                  <Input
                     type="number"
                     step="0.01"
+                    min="0"
                     required
                     value={monthlyPrice}
                     onChange={(e) => setMonthlyPrice(e.target.value)}
-                    className="w-full px-3 py-1.5 rounded-lg bg-zinc-900 border border-zinc-800 text-xs text-white focus:outline-none focus:border-amber-500"
                   />
-                </div>
+                </FormField>
 
-                <div>
-                  <label className="block text-xs font-medium text-zinc-400 mb-1">Desconto Anual (%)</label>
-                  <input
+                <FormField label="Desconto Anual (%)">
+                  <Input
                     type="number"
-                    step="0.01"
-                    required
+                    step="1"
+                    min="0"
+                    max="100"
                     value={annualDiscountPercent}
                     onChange={(e) => setAnnualDiscountPercent(e.target.value)}
-                    className="w-full px-3 py-1.5 rounded-lg bg-zinc-900 border border-zinc-800 text-xs text-white focus:outline-none focus:border-amber-500"
                   />
-                </div>
+                </FormField>
               </div>
 
-              {/* Automatic Live Preview Box */}
-              <div className="p-3 rounded-lg bg-zinc-900/90 border border-zinc-800 space-y-1.5 text-xs">
-                <span className="font-semibold text-amber-400 text-[11px] uppercase tracking-wider block">
-                  Preview de Precificação Comercial
-                </span>
-                <div className="grid grid-cols-2 gap-2 text-zinc-300">
-                  <div>
-                    <span className="text-zinc-500 block text-[10px]">Preço mensal:</span>
-                    <strong className="text-white">{formatCurrency(monthlyPrice || 0)}</strong> /mês
-                  </div>
-                  <div>
-                    <span className="text-zinc-500 block text-[10px]">Preço anual calculado:</span>
-                    <strong className="text-amber-300">{formatCurrency(previewAnnualPrice)}</strong> /ano
-                  </div>
-                  <div>
-                    <span className="text-zinc-500 block text-[10px]">Desconto configurado:</span>
-                    <span className="text-emerald-400 font-semibold">{Number(annualDiscountPercent || 0)}%</span>
-                  </div>
-                  <div>
-                    <span className="text-zinc-500 block text-[10px]">Economia anual:</span>
-                    <span className="text-emerald-400 font-semibold">{formatCurrency(previewAnnualSavings)}</span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-medium text-zinc-400 mb-1">
-                    Limite Artigos/Mês (-1 p/ ilimitado)
-                  </label>
-                  <input
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2">
+                <FormField label="Artigos/Dia">
+                  <Input
                     type="number"
-                    required
-                    value={maxArticles}
-                    onChange={(e) => setMaxArticles(parseInt(e.target.value, 10) || 0)}
-                    className="w-full px-3 py-1.5 rounded-lg bg-zinc-900 border border-zinc-800 text-xs text-white focus:outline-none focus:border-amber-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-medium text-zinc-400 mb-1">
-                    Limite Artigos/Dia (-1 p/ ilimitado)
-                  </label>
-                  <input
-                    type="number"
-                    required
                     value={maxDailyArticles}
                     onChange={(e) => setMaxDailyArticles(parseInt(e.target.value, 10) || 0)}
-                    className="w-full px-3 py-1.5 rounded-lg bg-zinc-900 border border-zinc-800 text-xs text-white focus:outline-none focus:border-amber-500"
                   />
-                </div>
-              </div>
+                </FormField>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-medium text-zinc-400 mb-1">
-                    Limite Fontes RSS (-1 p/ ilimitado)
-                  </label>
-                  <input
+                <FormField label="Artigos/Mês">
+                  <Input
                     type="number"
-                    required
-                    value={maxSources}
-                    onChange={(e) => setMaxSources(parseInt(e.target.value, 10) || 0)}
-                    className="w-full px-3 py-1.5 rounded-lg bg-zinc-900 border border-zinc-800 text-xs text-white focus:outline-none focus:border-amber-500"
+                    value={maxArticles}
+                    onChange={(e) => setMaxArticles(parseInt(e.target.value, 10) || 0)}
                   />
-                </div>
+                </FormField>
 
-                <div>
-                  <label className="block text-xs font-medium text-zinc-400 mb-1">
-                    Limite Sites WordPress (-1 p/ ilimitado)
-                  </label>
-                  <input
+                <FormField label="Sites WP">
+                  <Input
                     type="number"
-                    required
                     value={maxWordPressSites}
                     onChange={(e) => setMaxWordPressSites(parseInt(e.target.value, 10) || 0)}
-                    className="w-full px-3 py-1.5 rounded-lg bg-zinc-900 border border-zinc-800 text-xs text-white focus:outline-none focus:border-amber-500"
                   />
-                </div>
+                </FormField>
+
+                <FormField label="Fontes RSS">
+                  <Input
+                    type="number"
+                    value={maxSources}
+                    onChange={(e) => setMaxSources(parseInt(e.target.value, 10) || 0)}
+                  />
+                </FormField>
               </div>
 
-              <div className="flex items-center gap-6 pt-2">
-                <label className="flex items-center gap-2 text-xs font-medium text-zinc-300 cursor-pointer">
+              {/* Switches */}
+              <div className="flex flex-wrap items-center gap-6 pt-2">
+                <label className="flex items-center gap-2 cursor-pointer select-none text-xs font-semibold text-foreground">
                   <input
                     type="checkbox"
                     checked={active}
                     onChange={(e) => setActive(e.target.checked)}
-                    className="accent-amber-500 rounded"
+                    className="accent-primary h-4 w-4 rounded"
                   />
                   <span>Plano Ativo</span>
                 </label>
 
-                <label className="flex items-center gap-2 text-xs font-medium text-zinc-300 cursor-pointer">
+                <label className="flex items-center gap-2 cursor-pointer select-none text-xs font-semibold text-foreground">
                   <input
                     type="checkbox"
                     checked={highlight}
                     onChange={(e) => setHighlight(e.target.checked)}
-                    className="accent-amber-500 rounded"
+                    className="accent-primary h-4 w-4 rounded"
                   />
-                  <span>Destacar Plano (Recomendado)</span>
+                  <span>Destaque (Mais Escolhido)</span>
+                </label>
+
+                <label className="flex items-center gap-2 cursor-pointer select-none text-xs font-semibold text-amber-600 dark:text-amber-400">
+                  <input
+                    type="checkbox"
+                    checked={isAiLimited}
+                    onChange={(e) => handleAiLimitedToggle(e.target.checked)}
+                    className="accent-amber-500 h-4 w-4 rounded"
+                  />
+                  <span>Restringir IA (Modo Econômico)</span>
                 </label>
               </div>
 
-              {/* Features Toggle Section */}
-              {features.length > 0 && (
-                <div className="pt-3 border-t border-zinc-800 space-y-2">
-                  <label className="block text-xs font-semibold text-zinc-300">
-                    Vincular Features do Sistema
-                  </label>
-                  <div className="space-y-2 max-h-40 overflow-y-auto pr-1">
-                    <div className="flex items-center justify-between p-2 rounded-lg bg-zinc-900 border border-zinc-800 text-xs">
-                      <label className="flex items-center gap-2 cursor-pointer flex-1">
-                        <input
-                          type="checkbox"
-                          checked={isAiLimited}
-                          onChange={(e) => {
-                            const limited = e.target.checked;
-                            setIsAiLimited(limited);
-                            setSelectedFeatures((prev) => {
-                              const next = { ...prev };
-                              features.forEach((f) => {
-                                if (["ai_unlimited_niches", "ai_unlimited_styles", "ai_advanced_providers"].includes(f.key)) {
-                                  next[f.id] = { ...(next[f.id] || { limit: null }), enabled: !limited };
-                                }
-                              });
-                              return next;
-                            });
-                          }}
-                          className="accent-amber-500 rounded"
-                        />
-                        <div className="flex flex-col">
-                          <span className="text-zinc-200 font-semibold text-amber-500">Restringir IA</span>
-                          <span className="text-[10px] text-zinc-500">Limita nichos, estilos e remove provedores avançados (Gemini/Anthropic).</span>
-                        </div>
-                      </label>
-                    </div>
-
-                    {features.filter(f => !["ai_unlimited_niches", "ai_unlimited_styles", "ai_advanced_providers"].includes(f.key)).map((f) => {
-                      const state = selectedFeatures[f.id] || { enabled: false, limit: null };
-                      return (
-                        <div
-                          key={f.id}
-                          className="flex items-center justify-between p-2 rounded-lg bg-zinc-900 border border-zinc-800 text-xs"
-                        >
-                          <label className="flex items-center gap-2 cursor-pointer flex-1">
-                            <input
-                              type="checkbox"
-                              checked={state.enabled}
-                              onChange={(e) =>
-                                setSelectedFeatures((prev) => ({
-                                  ...prev,
-                                  [f.id]: { ...state, enabled: e.target.checked },
-                                }))
-                              }
-                              className="accent-amber-500 rounded"
-                            />
-                            <span className="text-zinc-200">{f.name}</span>
-                          </label>
-
-                          {f.valueType === "QUANTITY" && state.enabled && (
-                            <div className="flex items-center gap-1.5">
-                              <span className="text-[10px] text-zinc-500">Limite:</span>
-                              <input
-                                type="number"
-                                value={state.limit ?? 0}
-                                onChange={(e) =>
-                                  setSelectedFeatures((prev) => ({
-                                    ...prev,
-                                    [f.id]: {
-                                      ...state,
-                                      limit: parseInt(e.target.value, 10) || 0,
-                                    },
-                                  }))
-                                }
-                                className="w-16 px-1.5 py-0.5 rounded bg-zinc-950 border border-zinc-700 text-xs text-white"
-                              />
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
+              {/* Features Toggle List */}
+              <div className="pt-3 border-t border-border space-y-2">
+                <p className="text-xs font-bold text-foreground">Features do Sistema:</p>
+                <div className="max-h-48 overflow-y-auto space-y-2 pr-1">
+                  {features.map((f) => {
+                    const featData = selectedFeatures[f.id] || { enabled: false, limit: null };
+                    return (
+                      <div
+                        key={f.id}
+                        className="flex items-center justify-between p-2 rounded-lg bg-surface-muted/50 border border-border text-xs"
+                      >
+                        <label className="flex items-center gap-2 cursor-pointer flex-1 min-w-0">
+                          <input
+                            type="checkbox"
+                            checked={featData.enabled}
+                            onChange={(e) => handleFeatureToggle(f.id, e.target.checked)}
+                            className="accent-primary h-3.5 w-3.5 rounded"
+                          />
+                          <span className="font-medium text-foreground truncate">{f.name}</span>
+                        </label>
+                        {f.valueType === "QUANTITY" && featData.enabled && (
+                          <Input
+                            type="number"
+                            value={featData.limit ?? ""}
+                            onChange={(e) => handleFeatureLimitChange(f.id, e.target.value)}
+                            placeholder="Limite"
+                            className="w-20 h-7 text-xs"
+                          />
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
-              )}
+              </div>
 
-              <div className="flex items-center justify-end gap-3 pt-3 border-t border-zinc-800">
-                <button
+              <CardFooter className="p-0 flex items-center justify-end gap-3 pt-4 border-t border-border">
+                <Button
                   type="button"
+                  variant="outline"
+                  size="sm"
                   onClick={() => setIsModalOpen(false)}
-                  className="px-3 py-1.5 rounded-lg text-xs font-medium text-zinc-400 hover:text-white"
                 >
                   Cancelar
-                </button>
-                <button
+                </Button>
+                <Button
                   type="submit"
-                  disabled={isLoading}
-                  className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-zinc-950 font-semibold text-xs disabled:opacity-50"
+                  variant="gradient"
+                  size="sm"
+                  isLoading={isLoading}
+                  leadingIcon={<Check className="w-4 h-4" />}
                 >
-                  <Check className="w-4 h-4" />
-                  <span>{isLoading ? "Salvando..." : "Salvar Plano"}</span>
-                </button>
-              </div>
+                  {editingPlan ? "Salvar Alterações" : "Criar Plano"}
+                </Button>
+              </CardFooter>
             </form>
-          </div>
+          </Card>
         </div>
       )}
     </div>

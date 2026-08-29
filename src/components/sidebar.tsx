@@ -6,10 +6,6 @@ import { signOut } from "next-auth/react";
 import { usePathname, useSearchParams } from "next/navigation";
 import {
   LayoutDashboard,
-  Newspaper,
-  Clock,
-  CheckCircle2,
-  XCircle,
   Settings,
   Rss,
   Globe,
@@ -32,6 +28,13 @@ import {
 
 import { ThemeToggle, ThemeToggleRow } from "@/components/theme-toggle";
 import { PlanUsageCard } from "@/components/plan-usage-card";
+import { Badge } from "@/components/ui/badge";
+import {
+  SidebarItem,
+  SidebarSection,
+  SidebarSectionLabel,
+} from "@/components/layout/sidebar-primitives";
+import { Logo } from "@/components/brand/logo";
 
 export function Sidebar({
   isSuperAdmin = false,
@@ -63,7 +66,7 @@ export function Sidebar({
       {/* Mobile Toggle Button */}
       <button
         onClick={() => setIsMobileOpen(!isMobileOpen)}
-        className="lg:hidden fixed top-4 left-4 z-40 p-2.5 rounded-lg bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-700 dark:text-zinc-300 hover:text-zinc-950 dark:hover:text-white shadow-lg"
+        className="lg:hidden fixed top-4 left-4 z-40 p-2.5 rounded-xl bg-surface border border-border text-foreground hover:bg-surface-muted shadow-md cursor-pointer transition-colors"
         aria-label="Alternar menu"
       >
         {isMobileOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
@@ -79,297 +82,175 @@ export function Sidebar({
 
       {/* Sidebar Container */}
       <aside
-        className={`fixed lg:static top-0 left-0 bottom-0 z-30 w-64 bg-white dark:bg-zinc-900 border-r border-zinc-200 dark:border-zinc-800/80 flex flex-col justify-between transition-all duration-300 ease-in-out ${
+        className={`fixed lg:static top-0 left-0 bottom-0 z-30 w-64 bg-surface border-r border-border flex flex-col justify-between transition-all duration-300 ease-in-out shrink-0 select-none ${
           isMobileOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
         }`}
       >
-        <div className="p-4 space-y-6 overflow-y-auto">
-          {/* Brand Header */}
-          <div className="flex items-center justify-between px-2 py-1">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-indigo-600/10 dark:bg-indigo-600/20 text-indigo-600 dark:text-indigo-400 rounded-lg border border-indigo-500/20 dark:border-indigo-500/30">
-                <Newspaper className="w-5 h-5" />
-              </div>
-              <div>
-                <h2 className="text-base font-bold text-zinc-900 dark:text-white tracking-tight">GeraFeed</h2>
-                <p className="text-[11px] text-zinc-500 dark:text-zinc-400">Painel Editorial & IA</p>
-              </div>
+        <div className="p-4 space-y-6 overflow-y-auto flex-1">
+          {/* Brand Header com Logo Oficial */}
+          <div className="flex items-center justify-between px-1 py-1">
+            <div onClick={() => setIsMobileOpen(false)}>
+              <Logo href="/dashboard" size="sm" priority />
             </div>
             <ThemeToggle />
           </div>
 
           {/* Navigation Links */}
-          <nav className="space-y-5">
-            {/* Dashboard */}
-            <div>
-              <Link
+          <nav className="space-y-6">
+            {/* Seção Principal */}
+            <SidebarSection>
+              <SidebarItem
                 href="/dashboard"
+                label="Dashboard"
+                icon={<LayoutDashboard className="w-4 h-4" />}
+                active={isActive("/dashboard", undefined) && !currentStatus}
                 onClick={() => setIsMobileOpen(false)}
-                className={`flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-semibold transition ${
-                  isActive("/dashboard", undefined) && !currentStatus
-                    ? "bg-indigo-600 text-white shadow-md shadow-indigo-600/20"
-                    : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800/60"
-                }`}
-              >
-                <LayoutDashboard className="w-4 h-4" />
-                Dashboard
-              </Link>
-            </div>
-
-            {/* Publicar Posts */}
-            <div>
-              <Link
+              />
+              <SidebarItem
                 href="/publishing"
+                label="Publicar Posts"
+                icon={<Send className="w-4 h-4" />}
+                active={isActive("/publishing")}
                 onClick={() => setIsMobileOpen(false)}
-                className={`flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-semibold transition ${
-                  isActive("/publishing")
-                    ? "bg-indigo-600 text-white shadow-md shadow-indigo-600/20"
-                    : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800/60"
-                }`}
-              >
-                <Send className="w-4 h-4 text-indigo-400" />
-                Publicar Posts
-              </Link>
-            </div>
+              />
+            </SidebarSection>
 
-            {/* Notícias Fila */}
-            <div className="space-y-1">
-              <div className="px-3 text-[10px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-wider">
-                Notícias
-              </div>
-
-              <Link
-                href="/dashboard?status=PENDING"
-                onClick={() => setIsMobileOpen(false)}
-                className={`flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-medium transition ${
-                  isActive("/dashboard", "PENDING")
-                    ? "bg-indigo-50 dark:bg-indigo-600/20 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-500/30 font-semibold"
-                    : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800/60"
-                }`}
-              >
-                <Clock className="w-4 h-4 text-amber-500 dark:text-amber-400" />
-                Pendentes
-              </Link>
-
-              <Link
-                href="/dashboard?status=PUBLISHED"
-                onClick={() => setIsMobileOpen(false)}
-                className={`flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-medium transition ${
-                  isActive("/dashboard", "PUBLISHED")
-                    ? "bg-indigo-50 dark:bg-indigo-600/20 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-500/30 font-semibold"
-                    : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800/60"
-                }`}
-              >
-                <CheckCircle2 className="w-4 h-4 text-emerald-500 dark:text-emerald-400" />
-                Publicadas
-              </Link>
-
-              <Link
-                href="/dashboard?status=REJECTED"
-                onClick={() => setIsMobileOpen(false)}
-                className={`flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-medium transition ${
-                  isActive("/dashboard", "REJECTED")
-                    ? "bg-indigo-50 dark:bg-indigo-600/20 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-500/30 font-semibold"
-                    : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800/60"
-                }`}
-              >
-                <XCircle className="w-4 h-4 text-rose-500 dark:text-rose-400" />
-                Rejeitadas
-              </Link>
-            </div>
-
-            {/* Afiliados */}
-            <div className="space-y-1">
-              <div className="px-3 text-[10px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-wider flex items-center justify-between">
-                <div className="flex items-center gap-1.5">
-                  <ShoppingBag className="w-3 h-3 text-emerald-500" />
+            {/* Módulo de Afiliados */}
+            <SidebarSection>
+              <SidebarSectionLabel className="flex items-center justify-between">
+                <span className="flex items-center gap-1.5">
+                  <ShoppingBag className="w-3 h-3 text-[#00C2A8]" />
                   <span>Afiliados</span>
-                </div>
+                </span>
                 {!hasAffiliateModule && (
-                  <span className="text-[9px] px-1.5 py-0.2 bg-amber-500/10 text-amber-600 dark:text-amber-400 rounded border border-amber-500/20 font-semibold">
+                  <Badge variant="warning" size="sm">
                     PRO
-                  </span>
+                  </Badge>
                 )}
-              </div>
+              </SidebarSectionLabel>
 
               {hasAffiliateModule ? (
                 <>
-                  <Link
+                  <SidebarItem
                     href="/affiliates/import"
+                    label="Importar Produto"
+                    icon={<ArrowDownToLine className="w-4 h-4" />}
+                    active={isActive("/affiliates/import")}
                     onClick={() => setIsMobileOpen(false)}
-                    className={`flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-medium transition ${
-                      isActive("/affiliates/import")
-                        ? "bg-emerald-50 dark:bg-emerald-600/20 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-500/30 font-semibold"
-                        : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800/60"
-                    }`}
-                  >
-                    <ArrowDownToLine className="w-4 h-4 text-emerald-500 dark:text-emerald-400" />
-                    Importar Produto
-                  </Link>
-
-                  <Link
+                  />
+                  <SidebarItem
                     href="/affiliates/products"
+                    label="Catálogo de Produtos"
+                    icon={<Package className="w-4 h-4" />}
+                    active={isActive("/affiliates/products")}
                     onClick={() => setIsMobileOpen(false)}
-                    className={`flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-medium transition ${
-                      isActive("/affiliates/products")
-                        ? "bg-emerald-50 dark:bg-emerald-600/20 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-500/30 font-semibold"
-                        : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800/60"
-                    }`}
-                  >
-                    <Package className="w-4 h-4 text-emerald-500 dark:text-emerald-400" />
-                    Catálogo de Produtos
-                  </Link>
-
-                  <Link
+                  />
+                  <SidebarItem
                     href="/affiliates/offers"
+                    label="Ofertas"
+                    icon={<Tag className="w-4 h-4" />}
+                    active={isActive("/affiliates/offers")}
                     onClick={() => setIsMobileOpen(false)}
-                    className={`flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-medium transition ${
-                      isActive("/affiliates/offers")
-                        ? "bg-emerald-50 dark:bg-emerald-600/20 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-500/30 font-semibold"
-                        : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800/60"
-                    }`}
-                  >
-                    <Tag className="w-4 h-4 text-emerald-500 dark:text-emerald-400" />
-                    Ofertas
-                  </Link>
-
-                  <Link
+                  />
+                  <SidebarItem
                     href="/affiliates/prompts"
+                    label="Prompts Afiliados"
+                    icon={<FileText className="w-4 h-4" />}
+                    active={isActive("/affiliates/prompts")}
                     onClick={() => setIsMobileOpen(false)}
-                    className={`flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-medium transition ${
-                      isActive("/affiliates/prompts")
-                        ? "bg-emerald-50 dark:bg-emerald-600/20 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-500/30 font-semibold"
-                        : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800/60"
-                    }`}
-                  >
-                    <FileText className="w-4 h-4 text-emerald-500 dark:text-emerald-400" />
-                    Prompts Afiliados
-                  </Link>
-
-                  <Link
+                  />
+                  <SidebarItem
                     href="/affiliates/dashboard"
+                    label="Analytics Afiliados"
+                    icon={<TrendingUp className="w-4 h-4" />}
+                    active={isActive("/affiliates/dashboard")}
                     onClick={() => setIsMobileOpen(false)}
-                    className={`flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-medium transition ${
-                      isActive("/affiliates/dashboard")
-                        ? "bg-emerald-50 dark:bg-emerald-600/20 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-500/30 font-semibold"
-                        : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800/60"
-                    }`}
-                  >
-                    <TrendingUp className="w-4 h-4 text-emerald-500 dark:text-emerald-400" />
-                    Analytics Afiliados
-                  </Link>
+                  />
                 </>
               ) : (
-                <Link
+                <SidebarItem
                   href="/settings/billing/upgrade"
+                  label="Módulo Afiliados"
+                  icon={<Lock className="w-4 h-4 text-amber-500" />}
+                  badge={
+                    <span className="text-[10px] text-amber-600 dark:text-amber-400 font-semibold uppercase">
+                      Upgrade
+                    </span>
+                  }
                   onClick={() => setIsMobileOpen(false)}
-                  className="flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800/40 transition"
-                >
-                  <div className="flex items-center gap-3">
-                    <Lock className="w-3.5 h-3.5 text-amber-500" />
-                    <span>Módulo Afiliados</span>
-                  </div>
-                  <span className="text-[10px] text-amber-600 dark:text-amber-400 font-semibold">Upgrade</span>
-                </Link>
+                />
               )}
-            </div>
+            </SidebarSection>
 
             {/* Configurações */}
-            <div className="space-y-1">
-              <div className="px-3 text-[10px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-wider flex items-center gap-1.5">
-                <Settings className="w-3 h-3" />
-                Configurações
-              </div>
+            <SidebarSection>
+              <SidebarSectionLabel className="flex items-center gap-1.5">
+                <Settings className="w-3 h-3 text-muted-foreground" />
+                <span>Configurações</span>
+              </SidebarSectionLabel>
 
-              <Link
+              <SidebarItem
                 href="/settings/billing"
+                label="Plano & Cobrança"
+                icon={<CreditCard className="w-4 h-4 text-amber-500 dark:text-amber-400" />}
+                active={isActive("/settings/billing")}
                 onClick={() => setIsMobileOpen(false)}
-                className={`flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-medium transition ${
-                  isActive("/settings/billing")
-                    ? "bg-indigo-50 dark:bg-indigo-600/20 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-500/30 font-semibold"
-                    : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800/60"
-                }`}
-              >
-                <CreditCard className="w-4 h-4 text-amber-500 dark:text-amber-400" />
-                Plano & Cobrança
-              </Link>
-
-              <Link
+              />
+              <SidebarItem
                 href="/settings/sources"
+                label="Fontes RSS"
+                icon={<Rss className="w-4 h-4 text-primary" />}
+                active={isActive("/settings/sources")}
                 onClick={() => setIsMobileOpen(false)}
-                className={`flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-medium transition ${
-                  isActive("/settings/sources")
-                    ? "bg-indigo-50 dark:bg-indigo-600/20 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-500/30 font-semibold"
-                    : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800/60"
-                }`}
-              >
-                <Rss className="w-4 h-4 text-indigo-500 dark:text-indigo-400" />
-                Fontes RSS
-              </Link>
-
-              <Link
+              />
+              <SidebarItem
                 href="/settings/wordpress"
+                label="WordPress"
+                icon={<Globe className="w-4 h-4 text-[#38BDF8]" />}
+                active={isActive("/settings/wordpress")}
                 onClick={() => setIsMobileOpen(false)}
-                className={`flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-medium transition ${
-                  isActive("/settings/wordpress")
-                    ? "bg-indigo-50 dark:bg-indigo-600/20 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-500/30 font-semibold"
-                    : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800/60"
-                }`}
-              >
-                <Globe className="w-4 h-4 text-sky-500 dark:text-sky-400" />
-                WordPress
-              </Link>
-
-              <Link
+              />
+              <SidebarItem
                 href="/settings/ai"
+                label="Inteligência Artificial"
+                icon={<Sparkles className="w-4 h-4 text-[#C084FC]" />}
+                active={isActive("/settings/ai")}
                 onClick={() => setIsMobileOpen(false)}
-                className={`flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-medium transition ${
-                  isActive("/settings/ai")
-                    ? "bg-indigo-50 dark:bg-indigo-600/20 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-500/30 font-semibold"
-                    : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800/60"
-                }`}
-              >
-                <Sparkles className="w-4 h-4 text-emerald-500 dark:text-emerald-400" />
-                Inteligência Artificial
-              </Link>
-
-              <Link
+              />
+              <SidebarItem
                 href="/settings/images"
+                label="Estratégia de Imagens"
+                icon={<ImageIcon className="w-4 h-4 text-[#8B5CF6]" />}
+                active={isActive("/settings/images")}
                 onClick={() => setIsMobileOpen(false)}
-                className={`flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-medium transition ${
-                  isActive("/settings/images")
-                    ? "bg-indigo-50 dark:bg-indigo-600/20 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-500/30 font-semibold"
-                    : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800/60"
-                }`}
-              >
-                <ImageIcon className="w-4 h-4 text-purple-500 dark:text-purple-400" />
-                Estratégia de Imagens
-              </Link>
-            </div>
+              />
+            </SidebarSection>
 
-            {/* Opção Visual de Tema no Menu */}
-            <div className="pt-2 border-t border-zinc-100 dark:border-zinc-800/60">
+            {/* Tema e Governança */}
+            <div className="pt-2 border-t border-border space-y-1">
               <ThemeToggleRow />
             </div>
 
-            {/* Backoffice Link — EXCLUSIVO para Superadmin */}
+            {/* Link para Backoffice SuperAdmin */}
             {isSuperAdmin && (
-              <div className="pt-2 border-t border-zinc-100 dark:border-zinc-800/60">
+              <div className="pt-2 border-t border-border">
                 <Link
                   href="/backoffice"
                   onClick={() => setIsMobileOpen(false)}
-                  className="flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-semibold bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 hover:bg-amber-500/20 transition"
+                  className="flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-semibold bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 hover:bg-amber-500/20 transition-colors"
                 >
                   <ShieldAlert className="w-4 h-4 text-amber-500" />
-                  Superadmin Backoffice
+                  <span>Superadmin Backoffice</span>
                 </Link>
               </div>
             )}
-            {/* Botão de Logout no Menu */}
-            <div className="pt-2 border-t border-zinc-100 dark:border-zinc-800/60">
+
+            {/* Logout */}
+            <div className="pt-2 border-t border-border">
               <button
+                type="button"
                 onClick={() => signOut({ callbackUrl: "/login" })}
-                className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-medium text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 border border-transparent hover:border-rose-200 dark:hover:border-rose-900/50 transition"
+                className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-medium text-rose-600 dark:text-rose-400 hover:bg-rose-500/10 border border-transparent hover:border-rose-500/20 transition-colors cursor-pointer"
               >
                 <LogOut className="w-4 h-4 text-rose-500" />
                 <span>Sair do Sistema</span>
@@ -378,16 +259,15 @@ export function Sidebar({
           </nav>
         </div>
 
-        {/* Plan Usage Card & Footer info */}
-        <div className="p-4 border-t border-zinc-200 dark:border-zinc-800/80 space-y-4">
+        {/* Plan Usage Card & Footer */}
+        <div className="p-4 border-t border-border space-y-3 bg-surface-muted/30">
           <PlanUsageCard />
-          <div className="flex items-center justify-between text-[11px] pt-1 text-zinc-400 dark:text-zinc-500">
-            <span>GeraFeed v0.6.0</span>
+          <div className="flex items-center justify-between text-[11px] pt-1 text-muted-foreground">
+            <span className="font-heading font-medium">GeraFeed v1.0</span>
             <span>Seguro & Criptografado</span>
           </div>
         </div>
       </aside>
-
     </>
   );
 }

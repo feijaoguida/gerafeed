@@ -1,11 +1,10 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Link from "next/link";
 import {
   Sparkles,
   Save,
-  CheckCircle2,
-  AlertCircle,
   ShieldCheck,
   RefreshCw,
   Sliders,
@@ -18,6 +17,16 @@ import {
   ALLOWED_STYLES_RESTRICTED,
   ALLOWED_PROVIDERS_RESTRICTED,
 } from "@/lib/billing-constants";
+
+import { PageHeader } from "@/components/design-system/page-header";
+import { Card, CardHeader, CardTitle, CardContent, CardFooter } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { FormField } from "@/components/design-system/form-field";
+import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
+import { Alert } from "@/components/ui/alert";
+import { Skeleton } from "@/components/ui/skeleton";
 
 type AIProviderType = "openai" | "gemini" | "anthropic" | "openai-compatible";
 type TabType = "connection" | "prompt";
@@ -138,25 +147,21 @@ export default function SettingsAiPage() {
 
         const settings = data.settings || data;
         if (settings.portalArea) setPortalArea(settings.portalArea);
-        if (settings.customPortalArea !== undefined) setCustomPortalArea(settings.customPortalArea);
-        if (Array.isArray(settings.writingStyles)) {
-          const validStyles = settings.writingStyles.filter((s: string) => WRITING_STYLES.includes(s));
-          setWritingStyles(validStyles);
-        }
-        if (settings.customWritingStyle !== undefined) setCustomWritingStyle(settings.customWritingStyle);
+        if (settings.customPortalArea) setCustomPortalArea(settings.customPortalArea);
+        if (Array.isArray(settings.writingStyles)) setWritingStyles(settings.writingStyles);
+        if (settings.customWritingStyle) setCustomWritingStyle(settings.customWritingStyle);
 
-        // Load AI feature entitlements
         if (billingRes.ok) {
-          const billing = await billingRes.json();
-          const features = billing.aiFeatures || {};
-          setUnlimitedNiches(Boolean(features.unlimitedNiches));
-          setUnlimitedStyles(Boolean(features.unlimitedStyles));
-          setAdvancedProviders(Boolean(features.advancedProviders));
+          const billingData = await billingRes.json();
+          const features = billingData.features || [];
+          setUnlimitedNiches(features.includes("unlimited_ai_niches"));
+          setUnlimitedStyles(features.includes("unlimited_ai_styles"));
+          setAdvancedProviders(features.includes("advanced_ai_providers"));
         }
       } catch (err) {
         if (!active) return;
         console.error("Error loading prompt settings:", err);
-        setPromptError("Erro ao carregar configurações de prompt.");
+        setPromptError("Erro ao carregar configurações de prompt editorial.");
       } finally {
         if (active) setIsLoadingPrompt(false);
       }
@@ -168,21 +173,6 @@ export default function SettingsAiPage() {
     };
   }, []);
 
-  // Handler for writing style toggle (max 3)
-  const handleStyleToggle = (style: string) => {
-    if (writingStyles.includes(style)) {
-      setWritingStyles(writingStyles.filter((s) => s !== style));
-    } else {
-      if (writingStyles.length >= 3) {
-        setPromptError("Você pode selecionar no máximo 3 estilos de escrita.");
-        return;
-      }
-      setPromptError(null);
-      setWritingStyles([...writingStyles, style]);
-    }
-  };
-
-  // Save connection handler
   const handleSaveConnection = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSavingConnection(true);
@@ -195,28 +185,27 @@ export default function SettingsAiPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           provider,
-          apiKey,
-          model,
-          baseUrl,
+          apiKey: apiKey.trim() || undefined,
+          model: model.trim() || undefined,
+          baseUrl: baseUrl.trim() || undefined,
         }),
       });
 
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Erro ao salvar conexão.");
+      if (!res.ok) throw new Error(data.error || "Erro ao salvar configurações.");
 
-      setConnectionSuccess(data.message || "Configurações de conexão salvas com sucesso!");
-      setHasApiKey(data.config.hasApiKey);
-      setIsConfigured(data.config.isConfigured);
-      setIsFromEnv(false);
-      setApiKey(""); // Clear input
+      setConnectionSuccess("Configurações do provedor de IA salvas com sucesso!");
+      setHasApiKey(Boolean(data.hasApiKey));
+      setIsConfigured(Boolean(data.isConfigured));
+      setIsFromEnv(Boolean(data.isFromEnv));
+      setApiKey("");
     } catch (err) {
-      setConnectionError(err instanceof Error ? err.message : "Erro ao salvar conexão.");
+      setConnectionError(err instanceof Error ? err.message : "Erro ao salvar.");
     } finally {
       setIsSavingConnection(false);
     }
   };
 
-  // Test connection handler
   const handleTestConnection = async () => {
     setIsTestingConnection(true);
     setConnectionError(null);
@@ -226,34 +215,21 @@ export default function SettingsAiPage() {
       const res = await fetch("/api/ai/test", { method: "POST" });
       const data = await res.json();
 
-      if (!res.ok) throw new Error(data.error || "Falha ao testar conexão com IA.");
+      if (!res.ok) throw new Error(data.error || "Falha no teste de conexão.");
 
-      setConnectionSuccess(`Conexão OK! Modelo: ${data.model} | Resposta: "${data.response}"`);
+      setConnectionSuccess(`Conexão bem-sucedida! Resposta do modelo: "${data.reply}"`);
     } catch (err) {
-      setConnectionError(err instanceof Error ? err.message : "Erro ao testar IA.");
+      setConnectionError(err instanceof Error ? err.message : "Falha ao testar IA.");
     } finally {
       setIsTestingConnection(false);
     }
   };
 
-  // Save prompt settings handler
   const handleSavePrompt = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSavingPrompt(true);
     setPromptError(null);
     setPromptSuccess(null);
-
-    if (portalArea === "Outro" && !customPortalArea.trim()) {
-      setPromptError("Por favor, preencha o campo de área personalizada.");
-      setIsSavingPrompt(false);
-      return;
-    }
-
-    if (writingStyles.includes("Outro") && !customWritingStyle.trim()) {
-      setPromptError("Por favor, preencha o campo de estilo personalizado.");
-      setIsSavingPrompt(false);
-      return;
-    }
 
     try {
       const res = await fetch("/api/ai/prompt-settings", {
@@ -261,21 +237,32 @@ export default function SettingsAiPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           portalArea,
-          customPortalArea,
+          customPortalArea: portalArea === "Outro" ? customPortalArea.trim() : null,
           writingStyles,
-          customWritingStyle,
+          customWritingStyle: writingStyles.includes("Outro") ? customWritingStyle.trim() : null,
         }),
       });
 
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Erro ao salvar prompt.");
+      if (!res.ok) throw new Error(data.error || "Erro ao salvar prompt settings.");
 
-      setPromptSuccess(data.message || "Configurações do Prompt salvas com sucesso!");
+      setPromptSuccess("Diretrizes do prompt editorial salvas com sucesso!");
     } catch (err) {
-      setPromptError(err instanceof Error ? err.message : "Erro ao salvar prompt.");
+      setPromptError(err instanceof Error ? err.message : "Erro ao salvar.");
     } finally {
       setIsSavingPrompt(false);
     }
+  };
+
+  const handleStyleToggle = (style: string) => {
+    setWritingStyles((prev) => {
+      if (prev.includes(style)) {
+        return prev.filter((s) => s !== style);
+      } else {
+        if (prev.length >= 3) return prev;
+        return [...prev, style];
+      }
+    });
   };
 
   const getModelPlaceholder = () => {
@@ -287,7 +274,7 @@ export default function SettingsAiPage() {
       case "anthropic":
         return "claude-3-5-haiku-20241022";
       case "openai-compatible":
-        return "deepseek/deepseek-chat";
+        return "deepseek-chat";
       default:
         return "";
     }
@@ -296,7 +283,7 @@ export default function SettingsAiPage() {
   const getBaseUrlPlaceholder = () => {
     switch (provider) {
       case "openai-compatible":
-        return "https://openrouter.ai/api/v1";
+        return "https://api.deepseek.com/v1";
       case "openai":
         return "https://api.openai.com/v1 (opcional)";
       default:
@@ -306,206 +293,182 @@ export default function SettingsAiPage() {
 
   if (isLoadingConnection && isLoadingPrompt) {
     return (
-      <div className="p-8 text-xs text-zinc-500 animate-pulse flex items-center justify-center">
-        Carregando configurações de Inteligência Artificial...
+      <div className="p-6 sm:p-8 max-w-4xl mx-auto space-y-6">
+        <Skeleton className="h-10 w-64" />
+        <Skeleton className="h-20 w-full rounded-xl" />
+        <Skeleton className="h-96 w-full rounded-xl" />
       </div>
     );
   }
 
   return (
-    <div className="p-6 sm:p-8 max-w-4xl mx-auto space-y-6 transition-colors duration-200">
-      <div>
-        <div className="flex items-center gap-2">
-          <Sparkles className="w-5 h-5 text-emerald-500 dark:text-emerald-400" />
-          <h1 className="text-xl font-bold text-zinc-900 dark:text-white tracking-tight">Configurações de Inteligência Artificial</h1>
-        </div>
-        <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
-          Gerenciamento do provedor de IA (chaves e modelos) e personalização dinâmica das diretrizes editoriais.
-        </p>
-      </div>
+    <div className="p-6 sm:p-8 max-w-4xl mx-auto space-y-6">
+      {/* Header com PageHeader */}
+      <PageHeader
+        title="Configurações de Inteligência Artificial"
+        description="Gerenciamento do provedor de IA (chaves e modelos) e personalização dinâmica das diretrizes editoriais."
+        icon={<Sparkles className="w-5 h-5 text-primary" />}
+      />
 
       {/* Tabs Navigation */}
-      <div className="flex items-center gap-2 border-b border-zinc-200 dark:border-zinc-800 pb-px mt-6">
-        <button
+      <div className="flex items-center gap-2 border-b border-border pb-3">
+        <Button
           type="button"
+          variant={activeTab === "connection" ? "secondary" : "ghost"}
+          size="sm"
           onClick={() => setActiveTab("connection")}
-          className={`inline-flex items-center gap-2 px-4 py-2.5 text-xs font-semibold rounded-t-lg transition border-b-2 ${
-            activeTab === "connection"
-              ? "border-emerald-500 text-emerald-700 dark:text-emerald-400 bg-white dark:bg-zinc-900/40"
-              : "border-transparent text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-900/20"
-          }`}
+          leadingIcon={<Sliders className="w-4 h-4" />}
+          className={activeTab === "connection" ? "font-bold text-primary shadow-xs" : "text-muted-foreground"}
         >
-          <Sliders className="w-4 h-4" />
-          Conexão
-        </button>
-        <button
+          Conexão & Provedor
+        </Button>
+        <Button
           type="button"
+          variant={activeTab === "prompt" ? "secondary" : "ghost"}
+          size="sm"
           onClick={() => setActiveTab("prompt")}
-          className={`inline-flex items-center gap-2 px-4 py-2.5 text-xs font-semibold rounded-t-lg transition border-b-2 ${
-            activeTab === "prompt"
-              ? "border-emerald-500 text-emerald-700 dark:text-emerald-400 bg-white dark:bg-zinc-900/40"
-              : "border-transparent text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-900/20"
-          }`}
+          leadingIcon={<FileText className="w-4 h-4" />}
+          className={activeTab === "prompt" ? "font-bold text-primary shadow-xs" : "text-muted-foreground"}
         >
-          <FileText className="w-4 h-4" />
-          Prompt Editorial
-        </button>
+          Prompt Editorial & Nichos
+        </Button>
       </div>
 
       {/* TAB 1: CONEXÃO */}
       {activeTab === "connection" && (
         <div className="space-y-6">
-          {/* Connection Status Badge */}
-          <div className="p-4 rounded-xl bg-white dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-sm dark:shadow-none">
+          {/* Connection Status Card */}
+          <Card className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-xs bg-surface-muted/30">
             <div className="flex items-center gap-3">
-              <ShieldCheck className={`w-5 h-5 ${isConfigured ? "text-emerald-500 dark:text-emerald-400" : "text-amber-500 dark:text-amber-400"}`} />
+              <ShieldCheck className={`w-5 h-5 ${isConfigured ? "text-[#00C2A8]" : "text-amber-500"}`} />
               <div>
-                <p className="text-xs font-semibold text-zinc-900 dark:text-white">
-                  Provedor Ativo: <span className="uppercase text-emerald-600 dark:text-emerald-400 font-bold">{provider}</span> ({isConfigured ? "Configurado" : "Pendente"})
+                <p className="font-heading text-xs font-semibold text-foreground">
+                  Provedor Ativo: <span className="uppercase text-primary font-bold">{provider}</span> ({isConfigured ? "Configurado" : "Pendente"})
                 </p>
-                <p className="text-[11px] text-zinc-500 dark:text-zinc-400">
+                <p className="font-sans text-[11px] text-muted-foreground">
                   {isFromEnv
                     ? "Utilizando OPENAI_API_KEY das variáveis de ambiente (.env) como fallback"
-                    : "Utilizando provedor e API Key criptografada armazenados no banco de dados"}
+                    : "Utilizando provedor e API Key criptografada com AES-256-GCM"}
                 </p>
               </div>
             </div>
 
-            <button
+            <Button
+              variant="outline"
+              size="sm"
               onClick={handleTestConnection}
-              disabled={isTestingConnection}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-600/20 dark:hover:bg-emerald-600/30 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-500/30 transition disabled:opacity-50"
+              isLoading={isTestingConnection}
+              leadingIcon={<RefreshCw className="w-3.5 h-3.5" />}
             >
-              <RefreshCw className={`w-3.5 h-3.5 ${isTestingConnection ? "animate-spin" : ""}`} />
-              {isTestingConnection ? "Testando..." : "Testar Conexão"}
-            </button>
-          </div>
+              Testar Conexão
+            </Button>
+          </Card>
 
           {/* Incompatibility Warning for Advanced Providers */}
           {!advancedProviders && !(ALLOWED_PROVIDERS_RESTRICTED as readonly string[]).includes(provider) && (
-            <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-800 dark:text-amber-300 text-xs flex items-start gap-3">
-              <AlertCircle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
+            <Alert variant="warning">
               <div>
                 <p className="font-semibold">Provedor incompatível com seu plano atual</p>
                 <p className="mt-0.5 text-[11px]">
                   O provedor atualmente salvo (<strong className="uppercase">{provider}</strong>) requer o recurso de Provedores Avançados.
-                  Para utilizar Gemini ou Anthropic, faça o <a href="/billing" className="underline font-bold">upgrade do plano</a> ou altere para OpenAI / OpenAI-Compatible abaixo.
+                  Para utilizar Gemini ou Anthropic, faça o <Link href="/settings/billing/upgrade" className="underline font-bold text-primary">upgrade do plano</Link> ou altere para OpenAI abaixo.
                 </p>
               </div>
-            </div>
+            </Alert>
           )}
 
           {/* Alerts */}
           {connectionError && (
-            <div className="p-4 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-600 dark:text-rose-300 text-xs flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <AlertCircle className="w-4 h-4 text-rose-500 dark:text-rose-400 shrink-0" />
-                <span>{connectionError}</span>
-              </div>
-              <button onClick={() => setConnectionError(null)} className="text-rose-500 hover:underline">
-                Fechar
-              </button>
-            </div>
+            <Alert variant="destructive" onClose={() => setConnectionError(null)}>
+              {connectionError}
+            </Alert>
           )}
 
           {connectionSuccess && (
-            <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-700 dark:text-emerald-300 text-xs flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <CheckCircle2 className="w-4 h-4 text-emerald-500 dark:text-emerald-400 shrink-0" />
-                <span>{connectionSuccess}</span>
-              </div>
-              <button onClick={() => setConnectionSuccess(null)} className="text-emerald-600 hover:underline">
-                Fechar
-              </button>
-            </div>
+            <Alert variant="success" onClose={() => setConnectionSuccess(null)}>
+              {connectionSuccess}
+            </Alert>
           )}
 
           {/* Settings Form */}
-          <form onSubmit={handleSaveConnection} className="p-6 rounded-xl bg-white dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 space-y-5 shadow-sm dark:shadow-none">
-            <h2 className="text-sm font-semibold text-zinc-900 dark:text-zinc-200 border-b border-zinc-200 dark:border-zinc-800 pb-3">
-              Seleção e Credenciais do Provedor de IA
-            </h2>
+          <form onSubmit={handleSaveConnection}>
+            <Card className="p-6 space-y-5 shadow-xs">
+              <CardHeader className="p-0 border-b border-border pb-3">
+                <CardTitle className="text-sm font-semibold">
+                  Seleção e Credenciais do Provedor de IA
+                </CardTitle>
+              </CardHeader>
 
-            <div className="space-y-4">
-              {/* Provider Selection */}
-              <div>
-                <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">Selecione o Provedor de IA</label>
-                <select
-                  value={provider}
-                  onChange={(e) => setProvider(e.target.value as AIProviderType)}
-                  className="w-full px-3.5 py-2.5 rounded-lg bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-xs text-zinc-900 dark:text-white focus:outline-none focus:border-emerald-500"
-                >
-                  <option value="openai">OpenAI (GPT-4o / GPT-4o-mini)</option>
-                  <option value="gemini" disabled={!advancedProviders}>
-                    Google Gemini (Gemini 1.5 Flash / Pro){!advancedProviders ? " 🔒 (Requer Upgrade)" : ""}
-                  </option>
-                  <option value="anthropic" disabled={!advancedProviders}>
-                    Anthropic Claude (Claude 3.5 Haiku / Sonnet){!advancedProviders ? " 🔒 (Requer Upgrade)" : ""}
-                  </option>
-                  <option value="openai-compatible">OpenAI-Compatible (DeepSeek, OpenRouter, Kimi, etc.)</option>
-                </select>
-              </div>
+              <CardContent className="p-0 space-y-4">
+                <FormField label="Selecione o Provedor de IA" required>
+                  <Select
+                    value={provider}
+                    onChange={(e) => setProvider(e.target.value as AIProviderType)}
+                  >
+                    <option value="openai">OpenAI (GPT-4o / GPT-4o-mini)</option>
+                    <option value="gemini" disabled={!advancedProviders}>
+                      Google Gemini (Gemini 1.5 Flash / Pro){!advancedProviders ? " 🔒 (Requer Upgrade)" : ""}
+                    </option>
+                    <option value="anthropic" disabled={!advancedProviders}>
+                      Anthropic Claude (Claude 3.5 Haiku / Sonnet){!advancedProviders ? " 🔒 (Requer Upgrade)" : ""}
+                    </option>
+                    <option value="openai-compatible">OpenAI-Compatible (DeepSeek, OpenRouter, Kimi, etc.)</option>
+                  </Select>
+                </FormField>
 
-              {/* Model Input */}
-              <div>
-                <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">Modelo de IA (Model)</label>
-                <input
-                  type="text"
-                  value={model}
-                  onChange={(e) => setModel(e.target.value)}
-                  placeholder={`Ex: ${getModelPlaceholder()}`}
-                  className="w-full px-3.5 py-2.5 rounded-lg bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-xs text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-zinc-600 focus:outline-none focus:border-emerald-500"
-                />
-                <p className="text-[11px] text-zinc-500 dark:text-zinc-400 mt-1">
-                  Deixe em branco para utilizar o modelo padrão recomendado do provedor ({getModelPlaceholder()}).
-                </p>
-              </div>
-
-              {/* Base URL */}
-              {(provider === "openai-compatible" || provider === "openai") && (
-                <div>
-                  <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">
-                    Base URL do Endpoint {provider === "openai-compatible" ? "(Obrigatório)" : "(Opcional)"}
-                  </label>
-                  <input
-                    type="url"
-                    value={baseUrl}
-                    onChange={(e) => setBaseUrl(e.target.value)}
-                    placeholder={getBaseUrlPlaceholder()}
-                    required={provider === "openai-compatible"}
-                    className="w-full px-3.5 py-2.5 rounded-lg bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-xs text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-zinc-600 focus:outline-none focus:border-emerald-500"
+                <FormField label="Modelo de IA (Model)">
+                  <Input
+                    type="text"
+                    value={model}
+                    onChange={(e) => setModel(e.target.value)}
+                    placeholder={`Ex: ${getModelPlaceholder()}`}
                   />
-                </div>
-              )}
+                  <p className="text-[11px] text-muted-foreground mt-1">
+                    Deixe em branco para utilizar o modelo padrão recomendado do provedor ({getModelPlaceholder()}).
+                  </p>
+                </FormField>
 
-              {/* API Key Input */}
-              <div>
-                <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">
-                  API Key {hasApiKey ? "(Chave criptografada em uso)" : ""}
-                </label>
-                <input
-                  type="password"
-                  value={apiKey}
-                  onChange={(e) => setApiKey(e.target.value)}
-                  placeholder={hasApiKey ? "•••••••••••••••• (Deixe em branco para manter a chave atual)" : "sk-..."}
-                  className="w-full px-3.5 py-2.5 rounded-lg bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-xs text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-zinc-600 focus:outline-none focus:border-emerald-500"
-                />
-                <p className="text-[11px] text-zinc-500 dark:text-zinc-400 mt-1">
-                  A chave é armazenada de forma segura com criptografia autenticada AES-256-GCM.
-                </p>
-              </div>
-            </div>
+                {(provider === "openai-compatible" || provider === "openai") && (
+                  <FormField
+                    label={`Base URL do Endpoint ${provider === "openai-compatible" ? "(Obrigatório)" : "(Opcional)"}`}
+                    required={provider === "openai-compatible"}
+                  >
+                    <Input
+                      type="url"
+                      value={baseUrl}
+                      onChange={(e) => setBaseUrl(e.target.value)}
+                      placeholder={getBaseUrlPlaceholder()}
+                      required={provider === "openai-compatible"}
+                    />
+                  </FormField>
+                )}
 
-            <div className="pt-2 flex items-center justify-between">
-              <button
-                type="submit"
-                disabled={isSavingConnection}
-                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg shadow-emerald-600/20 transition disabled:opacity-50"
-              >
-                <Save className="w-4 h-4" />
-                {isSavingConnection ? "Salvando..." : "Salvar Configurações de Conexão"}
-              </button>
-            </div>
+                <FormField
+                  label={`API Key ${hasApiKey ? "(Chave criptografada em uso)" : ""}`}
+                >
+                  <Input
+                    type="password"
+                    value={apiKey}
+                    onChange={(e) => setApiKey(e.target.value)}
+                    placeholder={hasApiKey ? "•••••••••••••••• (Deixe em branco para manter a chave atual)" : "sk-..."}
+                  />
+                  <p className="text-[11px] text-muted-foreground mt-1">
+                    A chave é armazenada de forma segura com criptografia autenticada AES-256-GCM.
+                  </p>
+                </FormField>
+              </CardContent>
+
+              <CardFooter className="p-0 pt-2">
+                <Button
+                  type="submit"
+                  variant="gradient"
+                  isLoading={isSavingConnection}
+                  leadingIcon={<Save className="w-4 h-4" />}
+                >
+                  Salvar Configurações de Conexão
+                </Button>
+              </CardFooter>
+            </Card>
           </form>
         </div>
       )}
@@ -513,216 +476,192 @@ export default function SettingsAiPage() {
       {/* TAB 2: PROMPT EDITORIAL */}
       {activeTab === "prompt" && (
         <div className="space-y-6">
-          {/* Alerts */}
           {promptError && (
-            <div className="p-4 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-600 dark:text-rose-300 text-xs flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <AlertCircle className="w-4 h-4 text-rose-500 dark:text-rose-400 shrink-0" />
-                <span>{promptError}</span>
-              </div>
-              <button onClick={() => setPromptError(null)} className="text-rose-500 hover:underline">
-                Fechar
-              </button>
-            </div>
+            <Alert variant="destructive" onClose={() => setPromptError(null)}>
+              {promptError}
+            </Alert>
           )}
 
           {promptSuccess && (
-            <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-700 dark:text-emerald-300 text-xs flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <CheckCircle2 className="w-4 h-4 text-emerald-500 dark:text-emerald-400 shrink-0" />
-                <span>{promptSuccess}</span>
-              </div>
-              <button onClick={() => setPromptSuccess(null)} className="text-emerald-600 hover:underline">
-                Fechar
-              </button>
-            </div>
+            <Alert variant="success" onClose={() => setPromptSuccess(null)}>
+              {promptSuccess}
+            </Alert>
           )}
 
           <form onSubmit={handleSavePrompt} className="space-y-6">
             {/* Section 1: Área do Portal */}
-            <div className="p-6 rounded-xl bg-white dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 space-y-4 shadow-sm dark:shadow-none">
-              <div className="flex items-center justify-between border-b border-zinc-200 dark:border-zinc-800 pb-3">
-                <div>
-                  <h2 className="text-sm font-semibold text-zinc-900 dark:text-zinc-200">Área de Atuação do Portal</h2>
-                  <p className="text-[11px] text-zinc-500 dark:text-zinc-400 mt-0.5">
-                    Define o nicho editorial utilizado para avaliar relevância e orientar o tom jornalístico.
-                  </p>
+            <Card className="p-6 space-y-4 shadow-xs">
+              <CardHeader className="p-0 border-b border-border pb-3">
+                <CardTitle className="text-sm font-semibold">
+                  Área de Atuação do Portal
+                </CardTitle>
+                <p className="font-sans text-[11px] text-muted-foreground mt-0.5">
+                  Define o nicho editorial utilizado para avaliar relevância e orientar o tom jornalístico.
+                </p>
+              </CardHeader>
+
+              <CardContent className="p-0 space-y-4">
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2.5">
+                  {PORTAL_AREAS.map((area) => {
+                    const isAllowed = unlimitedNiches ||
+                      (ALLOWED_NICHES_RESTRICTED as readonly string[]).includes(area);
+                    const isLocked = !isAllowed;
+
+                    return (
+                      <label
+                        key={area}
+                        title={isLocked ? `Disponível apenas em planos superiores. Opções disponíveis: ${ALLOWED_NICHES_RESTRICTED.join(", ")}` : undefined}
+                        className={`relative flex items-center gap-2.5 p-3 rounded-xl border text-xs font-medium transition-all select-none ${
+                          isLocked
+                            ? "opacity-50 cursor-not-allowed bg-surface-muted/40 border-border text-muted-foreground"
+                            : portalArea === area
+                            ? "cursor-pointer bg-primary/10 border-primary text-primary shadow-xs ring-1 ring-primary/20"
+                            : "cursor-pointer bg-surface border-border text-muted-foreground hover:text-foreground hover:border-muted-foreground/30"
+                        }`}
+                      >
+                        {isLocked ? (
+                          <>
+                            <Lock className="w-3.5 h-3.5 shrink-0" />
+                            <span className="flex-1 truncate">{area}</span>
+                            <Link
+                              href="/settings/billing/upgrade"
+                              onClick={(e) => e.stopPropagation()}
+                              className="ml-auto px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-600 dark:text-amber-400 border border-amber-500/30 hover:bg-amber-500/30 transition-colors"
+                            >
+                              Upgrade
+                            </Link>
+                          </>
+                        ) : (
+                          <>
+                            <input
+                              type="radio"
+                              name="portalArea"
+                              value={area}
+                              checked={portalArea === area}
+                              onChange={() => setPortalArea(area)}
+                              className="accent-primary h-3.5 w-3.5"
+                            />
+                            <span>{area}</span>
+                          </>
+                        )}
+                      </label>
+                    );
+                  })}
                 </div>
-              </div>
 
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2.5">
-                {PORTAL_AREAS.map((area) => {
-                  const isAllowed = unlimitedNiches ||
-                    (ALLOWED_NICHES_RESTRICTED as readonly string[]).includes(area);
-                  const isLocked = !isAllowed;
-
-                  return (
-                    <label
-                      key={area}
-                      title={isLocked ? `Disponível apenas em planos superiores. Opções disponíveis: ${ALLOWED_NICHES_RESTRICTED.join(", ")}` : undefined}
-                      className={`relative flex items-center gap-2.5 p-3 rounded-lg border text-xs font-medium transition select-none ${
-                        isLocked
-                          ? "opacity-50 cursor-not-allowed bg-zinc-100 dark:bg-zinc-950/30 border-zinc-200 dark:border-zinc-800 text-zinc-400 dark:text-zinc-600"
-                          : portalArea === area
-                          ? "cursor-pointer bg-emerald-50 dark:bg-emerald-950/30 border-emerald-500 text-emerald-700 dark:text-emerald-300 shadow-sm"
-                          : "cursor-pointer bg-zinc-50 dark:bg-zinc-950/60 border-zinc-200 dark:border-zinc-800 text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200 hover:border-zinc-300 dark:hover:border-zinc-700"
-                      }`}
-                    >
-                      {isLocked ? (
-                        <>
-                          <Lock className="w-3.5 h-3.5 shrink-0" />
-                          <span className="flex-1">{area}</span>
-                          <a
-                            href="/billing"
-                            onClick={(e) => e.stopPropagation()}
-                            className="ml-auto px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-600 dark:text-amber-400 border border-amber-500/30 hover:bg-amber-500/30 transition"
-                          >
-                            Upgrade
-                          </a>
-                        </>
-                      ) : (
-                        <>
-                          <input
-                            type="radio"
-                            name="portalArea"
-                            value={area}
-                            checked={portalArea === area}
-                            onChange={() => setPortalArea(area)}
-                            className="text-emerald-500 focus:ring-emerald-500 h-3.5 w-3.5 bg-zinc-100 dark:bg-zinc-900 border-zinc-300 dark:border-zinc-700"
-                          />
-                          <span>{area}</span>
-                        </>
-                      )}
-                    </label>
-                  );
-                })}
-              </div>
-
-              {portalArea === "Outro" && (
-                <div className="pt-2">
-                  <div className="flex items-center justify-between mb-1">
-                    <label className="block text-xs font-medium text-zinc-700 dark:text-zinc-300">
-                      Informe a área personalizada
-                    </label>
-                    <span className="text-[10px] text-zinc-500">{customPortalArea.length}/100</span>
+                {portalArea === "Outro" && (
+                  <div className="pt-2">
+                    <FormField label="Informe a área personalizada" required>
+                      <Input
+                        type="text"
+                        value={customPortalArea}
+                        onChange={(e) => setCustomPortalArea(e.target.value.slice(0, 100))}
+                        placeholder="Ex: Criptoeconomia, Gastronomia, Games, etc."
+                        maxLength={100}
+                        required={portalArea === "Outro"}
+                      />
+                    </FormField>
                   </div>
-                  <input
-                    type="text"
-                    value={customPortalArea}
-                    onChange={(e) => setCustomPortalArea(e.target.value.slice(0, 100))}
-                    placeholder="Ex: Criptoeconomia, Gastronomia, Games, etc."
-                    maxLength={100}
-                    required={portalArea === "Outro"}
-                    className="w-full px-3.5 py-2.5 rounded-lg bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-xs text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-zinc-600 focus:outline-none focus:border-emerald-500"
-                  />
-                </div>
-              )}
-            </div>
+                )}
+              </CardContent>
+            </Card>
 
             {/* Section 2: Estilos de Escrita */}
-            <div className="p-6 rounded-xl bg-white dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 space-y-4 shadow-sm dark:shadow-none">
-              <div className="flex items-center justify-between border-b border-zinc-200 dark:border-zinc-800 pb-3">
+            <Card className="p-6 space-y-4 shadow-xs">
+              <CardHeader className="p-0 border-b border-border pb-3 flex flex-row items-center justify-between">
                 <div>
-                  <h2 className="text-sm font-semibold text-zinc-900 dark:text-zinc-200">Estilos de Escrita</h2>
-                  <p className="text-[11px] text-zinc-500 dark:text-zinc-400 mt-0.5">
+                  <CardTitle className="text-sm font-semibold">
+                    Estilos de Escrita
+                  </CardTitle>
+                  <p className="font-sans text-[11px] text-muted-foreground mt-0.5">
                     Escolha até 3 estilos editoriais para direcionar o tom da reescrita dos artigos.
                   </p>
                 </div>
-                <span
-                  className={`px-2 py-0.5 rounded text-[11px] font-semibold border ${
-                    writingStyles.length === 3
-                      ? "bg-amber-500/10 text-amber-600 dark:text-amber-300 border-amber-500/30"
-                      : "bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 border-zinc-200 dark:border-zinc-700"
-                  }`}
-                >
+                <Badge variant={writingStyles.length === 3 ? "warning" : "secondary"}>
                   {writingStyles.length}/3 selecionados
-                </span>
-              </div>
+                </Badge>
+              </CardHeader>
 
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2.5">
-                {WRITING_STYLES.map((style) => {
-                  const isAllowed = unlimitedStyles ||
-                    (ALLOWED_STYLES_RESTRICTED as readonly string[]).includes(style);
-                  const isLocked = !isAllowed;
-                  const isChecked = writingStyles.includes(style);
-                  const isDisabledByCount = !isChecked && writingStyles.length >= 3;
-                  const isDisabled = isLocked || isDisabledByCount;
+              <CardContent className="p-0 space-y-4">
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2.5">
+                  {WRITING_STYLES.map((style) => {
+                    const isAllowed = unlimitedStyles ||
+                      (ALLOWED_STYLES_RESTRICTED as readonly string[]).includes(style);
+                    const isLocked = !isAllowed;
+                    const isChecked = writingStyles.includes(style);
+                    const isDisabledByCount = !isChecked && writingStyles.length >= 3;
+                    const isDisabled = isLocked || isDisabledByCount;
 
-                  return (
-                    <label
-                      key={style}
-                      title={isLocked ? `Disponível apenas em planos superiores. Estilos disponíveis: ${ALLOWED_STYLES_RESTRICTED.join(", ")}` : undefined}
-                      className={`relative flex items-center gap-2.5 p-3 rounded-lg border text-xs font-medium transition select-none ${
-                        isLocked
-                          ? "opacity-50 cursor-not-allowed bg-zinc-100 dark:bg-zinc-950/30 border-zinc-200 dark:border-zinc-800 text-zinc-400 dark:text-zinc-600"
-                          : isDisabledByCount
-                          ? "opacity-40 cursor-not-allowed bg-zinc-100 dark:bg-zinc-950/30 border-zinc-200 dark:border-zinc-800 text-zinc-400 dark:text-zinc-600"
-                          : isChecked
-                          ? "cursor-pointer bg-emerald-50 dark:bg-emerald-950/30 border-emerald-500 text-emerald-700 dark:text-emerald-300 shadow-sm"
-                          : "cursor-pointer bg-zinc-50 dark:bg-zinc-950/60 border-zinc-200 dark:border-zinc-800 text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200 hover:border-zinc-300 dark:hover:border-zinc-700"
-                      }`}
-                    >
-                      {isLocked ? (
-                        <>
-                          <Lock className="w-3.5 h-3.5 shrink-0" />
-                          <span className="flex-1">{style}</span>
-                          <a
-                            href="/billing"
-                            onClick={(e) => e.stopPropagation()}
-                            className="ml-auto px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-600 dark:text-amber-400 border border-amber-500/30 hover:bg-amber-500/30 transition"
-                          >
-                            Upgrade
-                          </a>
-                        </>
-                      ) : (
-                        <>
-                          <input
-                            type="checkbox"
-                            checked={isChecked}
-                            disabled={isDisabled}
-                            onChange={() => handleStyleToggle(style)}
-                            className="rounded text-emerald-500 focus:ring-emerald-500 h-3.5 w-3.5 bg-zinc-100 dark:bg-zinc-900 border-zinc-300 dark:border-zinc-700 disabled:opacity-40"
-                          />
-                          <span>{style}</span>
-                        </>
-                      )}
-                    </label>
-                  );
-                })}
-              </div>
-
-              {writingStyles.includes("Outro") && (
-                <div className="pt-2">
-                  <div className="flex items-center justify-between mb-1">
-                    <label className="block text-xs font-medium text-zinc-700 dark:text-zinc-300">
-                      Informe o estilo personalizado
-                    </label>
-                    <span className="text-[10px] text-zinc-500">{customWritingStyle.length}/100</span>
-                  </div>
-                  <input
-                    type="text"
-                    value={customWritingStyle}
-                    onChange={(e) => setCustomWritingStyle(e.target.value.slice(0, 100))}
-                    placeholder="Ex: Investigativo, Irônico, Didático, etc."
-                    maxLength={100}
-                    required={writingStyles.includes("Outro")}
-                    className="w-full px-3.5 py-2.5 rounded-lg bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-xs text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-zinc-600 focus:outline-none focus:border-emerald-500"
-                  />
+                    return (
+                      <label
+                        key={style}
+                        title={isLocked ? `Disponível apenas em planos superiores. Estilos disponíveis: ${ALLOWED_STYLES_RESTRICTED.join(", ")}` : undefined}
+                        className={`relative flex items-center gap-2.5 p-3 rounded-xl border text-xs font-medium transition-all select-none ${
+                          isLocked
+                            ? "opacity-50 cursor-not-allowed bg-surface-muted/40 border-border text-muted-foreground"
+                            : isDisabledByCount
+                            ? "opacity-40 cursor-not-allowed bg-surface-muted/40 border-border text-muted-foreground"
+                            : isChecked
+                            ? "cursor-pointer bg-primary/10 border-primary text-primary shadow-xs ring-1 ring-primary/20"
+                            : "cursor-pointer bg-surface border-border text-muted-foreground hover:text-foreground hover:border-muted-foreground/30"
+                        }`}
+                      >
+                        {isLocked ? (
+                          <>
+                            <Lock className="w-3.5 h-3.5 shrink-0" />
+                            <span className="flex-1 truncate">{style}</span>
+                            <Link
+                              href="/settings/billing/upgrade"
+                              onClick={(e) => e.stopPropagation()}
+                              className="ml-auto px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-600 dark:text-amber-400 border border-amber-500/30 hover:bg-amber-500/30 transition-colors"
+                            >
+                              Upgrade
+                            </Link>
+                          </>
+                        ) : (
+                          <>
+                            <input
+                              type="checkbox"
+                              checked={isChecked}
+                              disabled={isDisabled}
+                              onChange={() => handleStyleToggle(style)}
+                              className="accent-primary h-3.5 w-3.5 disabled:opacity-40"
+                            />
+                            <span>{style}</span>
+                          </>
+                        )}
+                      </label>
+                    );
+                  })}
                 </div>
-              )}
-            </div>
 
-            {/* Save Prompt Settings Button */}
-            <div className="flex items-center justify-between pt-2">
-              <button
-                type="submit"
-                disabled={isSavingPrompt}
-                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg shadow-emerald-600/20 transition disabled:opacity-50"
-              >
-                <Save className="w-4 h-4" />
-                {isSavingPrompt ? "Salvando..." : "Salvar Configurações do Prompt"}
-              </button>
-            </div>
+                {writingStyles.includes("Outro") && (
+                  <div className="pt-2">
+                    <FormField label="Informe o estilo personalizado" required>
+                      <Input
+                        type="text"
+                        value={customWritingStyle}
+                        onChange={(e) => setCustomWritingStyle(e.target.value.slice(0, 100))}
+                        placeholder="Ex: Investigativo, Irônico, Didático, etc."
+                        maxLength={100}
+                        required={writingStyles.includes("Outro")}
+                      />
+                    </FormField>
+                  </div>
+                )}
+              </CardContent>
+
+              <CardFooter className="p-0 pt-2">
+                <Button
+                  type="submit"
+                  variant="gradient"
+                  isLoading={isSavingPrompt}
+                  leadingIcon={<Save className="w-4 h-4" />}
+                >
+                  Salvar Configurações do Prompt
+                </Button>
+              </CardFooter>
+            </Card>
           </form>
         </div>
       )}

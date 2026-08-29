@@ -1,7 +1,14 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Image as ImageIcon, Save, CheckCircle2, AlertCircle, ShieldCheck } from "lucide-react";
+import { Image as ImageIcon, Save, ShieldCheck } from "lucide-react";
+
+import { PageHeader } from "@/components/design-system/page-header";
+import { Card, CardHeader, CardTitle, CardContent, CardFooter } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Alert } from "@/components/ui/alert";
+import { Skeleton } from "@/components/ui/skeleton";
 
 type ImageStrategy = "ORIGINAL" | "MODIFIED";
 
@@ -69,137 +76,141 @@ export default function SettingsImagesPage() {
 
   if (isLoading) {
     return (
-      <div className="p-8 text-xs text-zinc-500 animate-pulse flex items-center justify-center">
-        Carregando configurações de imagem...
+      <div className="p-6 sm:p-8 max-w-4xl mx-auto space-y-6">
+        <Skeleton className="h-10 w-64" />
+        <Skeleton className="h-20 w-full rounded-xl" />
+        <Skeleton className="h-64 w-full rounded-xl" />
       </div>
     );
   }
 
   return (
-    <div className="p-6 sm:p-8 max-w-4xl mx-auto space-y-8 transition-colors duration-200">
-      <div>
-        <div className="flex items-center gap-2">
-          <ImageIcon className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
-          <h1 className="text-xl font-bold text-zinc-900 dark:text-white tracking-tight">Estratégia de Imagens</h1>
-        </div>
-        <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
-          Defina o comportamento padrão para as imagens das matérias coletadas via RSS (imagem original vs. imagem processada).
-        </p>
-      </div>
+    <div className="p-6 sm:p-8 max-w-4xl mx-auto space-y-6">
+      {/* Header com PageHeader */}
+      <PageHeader
+        title="Estratégia de Imagens"
+        description="Defina o comportamento padrão para as imagens das matérias coletadas via RSS (imagem original vs. processamento com IA e Sharp)."
+        icon={<ImageIcon className="w-5 h-5" />}
+      />
 
-      {/* Current Active Strategy Badge */}
-      <div className="p-4 rounded-xl bg-white dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 flex items-center justify-between shadow-sm dark:shadow-none">
+      {/* Current Active Strategy Card */}
+      <Card className="p-4 flex items-center justify-between shadow-xs bg-surface-muted/40">
         <div className="flex items-center gap-3">
-          <ShieldCheck className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
+          <div className="p-2 bg-primary/10 text-primary rounded-xl">
+            <ShieldCheck className="w-5 h-5" />
+          </div>
           <div>
-            <p className="text-xs font-semibold text-zinc-900 dark:text-white">
+            <p className="font-heading text-xs font-semibold text-foreground">
               Estratégia Padrão Ativa:{" "}
-              <span className="uppercase text-indigo-600 dark:text-indigo-400 font-bold">
+              <span className="uppercase text-primary font-bold">
                 {defaultStrategy === "ORIGINAL" ? "Usar Imagem Original" : "Processar / Modificar Imagem"}
               </span>
             </p>
-            <p className="text-[11px] text-zinc-500 dark:text-zinc-400">
+            <p className="font-sans text-[11px] text-muted-foreground">
               Esta preferência será aplicada como valor inicial no editor de notícias.
             </p>
           </div>
         </div>
-      </div>
+        <Badge variant={defaultStrategy === "ORIGINAL" ? "outline" : "purple"}>
+          {defaultStrategy === "ORIGINAL" ? "Original RSS" : "Sharp / IA"}
+        </Badge>
+      </Card>
 
       {/* Alerts */}
       {errorMessage && (
-        <div className="p-4 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-600 dark:text-rose-300 text-xs flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <AlertCircle className="w-4 h-4 text-rose-500 dark:text-rose-400 shrink-0" />
-            <span>{errorMessage}</span>
-          </div>
-          <button onClick={() => setErrorMessage(null)} className="text-rose-500 hover:underline">
-            Fechar
-          </button>
-        </div>
+        <Alert variant="destructive" onClose={() => setErrorMessage(null)}>
+          {errorMessage}
+        </Alert>
       )}
 
       {successMessage && (
-        <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-700 dark:text-emerald-300 text-xs flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <CheckCircle2 className="w-4 h-4 text-emerald-500 dark:text-emerald-400 shrink-0" />
-            <span>{successMessage}</span>
-          </div>
-          <button onClick={() => setSuccessMessage(null)} className="text-emerald-600 hover:underline">
-            Fechar
-          </button>
-        </div>
+        <Alert variant="success" onClose={() => setSuccessMessage(null)}>
+          {successMessage}
+        </Alert>
       )}
 
       {/* Settings Form */}
-      <form onSubmit={handleSave} className="p-6 rounded-xl bg-white dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 space-y-6 shadow-sm dark:shadow-none">
-        <h2 className="text-sm font-semibold text-zinc-900 dark:text-zinc-200 border-b border-zinc-200 dark:border-zinc-800 pb-3">
-          Seleção da Estratégia Padrão
-        </h2>
+      <form onSubmit={handleSave}>
+        <Card className="p-6 space-y-6 shadow-xs">
+          <CardHeader className="p-0 border-b border-border pb-3">
+            <CardTitle className="text-sm font-semibold">
+              Seleção da Estratégia Padrão
+            </CardTitle>
+          </CardHeader>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {/* Option 1: Original Image */}
-          <label
-            className={`p-4 rounded-xl border cursor-pointer transition flex flex-col justify-between space-y-3 ${
-              defaultStrategy === "ORIGINAL"
-                ? "bg-indigo-50 dark:bg-indigo-600/10 border-indigo-500/50 text-zinc-900 dark:text-white shadow-sm"
-                : "bg-zinc-50 dark:bg-zinc-950/60 border-zinc-200 dark:border-zinc-800 text-zinc-600 dark:text-zinc-400 hover:border-zinc-300 dark:hover:border-zinc-700"
-            }`}
-          >
-            <div className="flex items-start justify-between">
-              <div className="flex items-center gap-2">
-                <input
-                  type="radio"
-                  name="strategy"
-                  value="ORIGINAL"
-                  checked={defaultStrategy === "ORIGINAL"}
-                  onChange={() => setDefaultStrategy("ORIGINAL")}
-                  className="accent-indigo-500"
-                />
-                <span className="text-xs font-bold text-zinc-900 dark:text-white">Usar Imagem Original</span>
-              </div>
+          <CardContent className="p-0">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Option 1: Original Image */}
+              <label
+                className={`p-4 rounded-xl border cursor-pointer transition-all flex flex-col justify-between space-y-3 ${
+                  defaultStrategy === "ORIGINAL"
+                    ? "bg-primary/5 border-primary shadow-xs ring-1 ring-primary/20 text-foreground"
+                    : "bg-surface border-border hover:border-muted-foreground/30 text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                <div className="flex items-start justify-between">
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="radio"
+                      name="strategy"
+                      value="ORIGINAL"
+                      checked={defaultStrategy === "ORIGINAL"}
+                      onChange={() => setDefaultStrategy("ORIGINAL")}
+                      className="accent-primary"
+                    />
+                    <span className="font-heading text-xs font-bold text-foreground">Usar Imagem Original</span>
+                  </div>
+                  {defaultStrategy === "ORIGINAL" && (
+                    <Badge variant="outline" size="sm">Selecionada</Badge>
+                  )}
+                </div>
+                <p className="font-sans text-[11px] text-muted-foreground leading-relaxed">
+                  Mantém a imagem original extraída do feed RSS da matéria sem alterações ou filtros adicionais.
+                </p>
+              </label>
+
+              {/* Option 2: Processed / Modified Image */}
+              <label
+                className={`p-4 rounded-xl border cursor-pointer transition-all flex flex-col justify-between space-y-3 ${
+                  defaultStrategy === "MODIFIED"
+                    ? "bg-primary/5 border-primary shadow-xs ring-1 ring-primary/20 text-foreground"
+                    : "bg-surface border-border hover:border-muted-foreground/30 text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                <div className="flex items-start justify-between">
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="radio"
+                      name="strategy"
+                      value="MODIFIED"
+                      checked={defaultStrategy === "MODIFIED"}
+                      onChange={() => setDefaultStrategy("MODIFIED")}
+                      className="accent-primary"
+                    />
+                    <span className="font-heading text-xs font-bold text-foreground">Processar / Alterar Imagem</span>
+                  </div>
+                  {defaultStrategy === "MODIFIED" && (
+                    <Badge variant="purple" size="sm">Selecionada</Badge>
+                  )}
+                </div>
+                <p className="font-sans text-[11px] text-muted-foreground leading-relaxed">
+                  Gera e aplica filtros/modificações na imagem para padronização visual e diferenciação do conteúdo original.
+                </p>
+              </label>
             </div>
-            <p className="text-[11px] text-zinc-500 dark:text-zinc-400 leading-relaxed">
-              Mantém a imagem original extraída do feed RSS da matéria sem alterações ou filtros adicionais.
-            </p>
-          </label>
+          </CardContent>
 
-          {/* Option 2: Processed / Modified Image */}
-          <label
-            className={`p-4 rounded-xl border cursor-pointer transition flex flex-col justify-between space-y-3 ${
-              defaultStrategy === "MODIFIED"
-                ? "bg-indigo-50 dark:bg-indigo-600/10 border-indigo-500/50 text-zinc-900 dark:text-white shadow-sm"
-                : "bg-zinc-50 dark:bg-zinc-950/60 border-zinc-200 dark:border-zinc-800 text-zinc-600 dark:text-zinc-400 hover:border-zinc-300 dark:hover:border-zinc-700"
-            }`}
-          >
-            <div className="flex items-start justify-between">
-              <div className="flex items-center gap-2">
-                <input
-                  type="radio"
-                  name="strategy"
-                  value="MODIFIED"
-                  checked={defaultStrategy === "MODIFIED"}
-                  onChange={() => setDefaultStrategy("MODIFIED")}
-                  className="accent-indigo-500"
-                />
-                <span className="text-xs font-bold text-zinc-900 dark:text-white">Processar / Alterar Imagem</span>
-              </div>
-            </div>
-            <p className="text-[11px] text-zinc-500 dark:text-zinc-400 leading-relaxed">
-              Gera e aplica filtros/modificações na imagem para padronização visual e diferenciação do conteúdo original.
-            </p>
-          </label>
-        </div>
-
-        <div className="pt-2">
-          <button
-            type="submit"
-            disabled={isSaving}
-            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg text-xs font-semibold bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg shadow-indigo-600/20 transition disabled:opacity-50"
-          >
-            <Save className="w-4 h-4" />
-            {isSaving ? "Salvando..." : "Salvar Estratégia de Imagens"}
-          </button>
-        </div>
+          <CardFooter className="p-0 pt-2">
+            <Button
+              type="submit"
+              variant="gradient"
+              isLoading={isSaving}
+              leadingIcon={<Save className="w-4 h-4" />}
+            >
+              Salvar Estratégia de Imagens
+            </Button>
+          </CardFooter>
+        </Card>
       </form>
     </div>
   );

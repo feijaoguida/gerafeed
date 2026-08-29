@@ -28,10 +28,10 @@ export default async function AppLayout({
   }
 
   return (
-    <div className="flex min-h-screen bg-slate-50 dark:bg-zinc-950 text-slate-900 dark:text-zinc-100 transition-colors duration-200">
+    <div className="flex min-h-screen bg-background text-foreground transition-colors duration-200">
       <Suspense
         fallback={
-          <div className="w-64 bg-white dark:bg-zinc-900 border-r border-zinc-200 dark:border-zinc-800 shrink-0" />
+          <div className="w-64 bg-surface border-r border-border shrink-0" />
         }
       >
         <Sidebar
@@ -43,4 +43,3 @@ export default async function AppLayout({
     </div>
   );
 }
-

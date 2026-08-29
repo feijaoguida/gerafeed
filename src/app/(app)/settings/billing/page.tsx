@@ -1,10 +1,16 @@
 import { Metadata } from "next";
+import Link from "next/link";
 import { getAuthenticatedWorkspace, DEFAULT_WORKSPACE_ID } from "@/lib/workspace";
 import { BillingService } from "@/lib/billing";
 import { BillingProfileForm } from "@/components/settings/billing-profile-form";
 import { BillingInvoicesList } from "@/components/settings/billing-invoices-list";
 import { SubscriptionManagementCard } from "@/components/settings/subscription-management-card";
-import { CreditCard, AlertCircle } from "lucide-react";
+import { CreditCard, Sparkles, Layers, Globe } from "lucide-react";
+
+import { PageHeader } from "@/components/design-system/page-header";
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { Alert } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
 
 export const metadata: Metadata = {
   title: "Plano & Cobrança | GeraFeed",
@@ -56,93 +62,99 @@ export default async function BillingSettingsPage({
 
   return (
     <div className="p-6 max-w-5xl mx-auto space-y-8">
-      {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight text-zinc-900 dark:text-white flex items-center gap-2">
-          <CreditCard className="w-6 h-6 text-indigo-500" />
-          Plano & Cobrança
-        </h1>
-        <p className="text-xs sm:text-sm text-zinc-500 dark:text-zinc-400 mt-1">
-          Gerencie seu plano ativo, vigência, consumo de IA, faturas e dados de faturamento do Workspace.
-        </p>
-      </div>
+      {/* Header com PageHeader */}
+      <PageHeader
+        title="Plano & Cobrança"
+        description="Gerencie seu plano ativo, vigência, consumo de IA, faturas e dados de faturamento do Workspace."
+        icon={<CreditCard className="w-5 h-5 text-primary" />}
+        actions={
+          <Link href="/settings/billing/upgrade">
+            <Button variant="gradient" size="sm" leadingIcon={<Sparkles className="w-3.5 h-3.5" />}>
+              Fazer Upgrade de Plano
+            </Button>
+          </Link>
+        }
+      />
 
       {redirect === "upgrade" && planName && (
-        <div className="p-4 rounded-xl text-xs bg-amber-500/10 border border-amber-500/20 text-amber-700 dark:text-amber-300 flex items-start gap-2">
-          <AlertCircle className="w-5 h-5 shrink-0 mt-0.5" />
-          <p className="font-medium">
-            Atenção: Preencha ou confirme seus dados de cobrança abaixo para continuar com a contratação do plano {decodeURIComponent(planName)}.
-          </p>
-        </div>
+        <Alert variant="warning">
+          Atenção: Preencha ou confirme seus dados de cobrança abaixo para continuar com a contratação do plano {decodeURIComponent(planName)}.
+        </Alert>
       )}
 
       {/* Callback Status Banners */}
       {checkout === "success" && (
         subscription.status === "ACTIVE" && subscription.plan.slug !== "free" ? (
-          <div className="p-4 rounded-xl text-xs bg-emerald-500/10 border border-emerald-500/20 text-emerald-700 dark:text-emerald-300 space-y-1">
-            <p className="font-bold flex items-center gap-1.5 text-sm">
-              <span>🎉 Pagamento confirmado com sucesso!</span>
-            </p>
-            <p className="text-xs opacity-90">
-              Seu <strong>{subscription.plan.name}</strong> foi ativado com sucesso. Todos os benefícios, limites e recursos já estão liberados para seu workspace.
-            </p>
-          </div>
+          <Alert variant="success">
+            <strong>🎉 Pagamento confirmado com sucesso!</strong> Seu plano {subscription.plan.name} foi ativado com sucesso. Todos os benefícios, limites e recursos já estão liberados para seu workspace.
+          </Alert>
         ) : (
-          <div className="p-4 rounded-xl text-xs bg-amber-500/10 border border-amber-500/20 text-amber-700 dark:text-amber-300 space-y-1">
-            <p className="font-bold flex items-center gap-1.5">
-              <span>⏳ Solicitação de pagamento registrada</span>
-            </p>
-            <p className="text-[11px] opacity-90">
-              A cobrança foi gerada no Asaas. Se você realizou o pagamento via Pix ou Cartão, a liberação ocorre em instantes. Para boleto bancário, a ativação ocorre após a compensação.
-            </p>
-          </div>
+          <Alert variant="warning">
+            <strong>⏳ Solicitação de pagamento registrada:</strong> A cobrança foi gerada no Asaas. Se você realizou o pagamento via Pix ou Cartão, a liberação ocorre em instantes. Para boleto bancário, a ativação ocorre após a compensação.
+          </Alert>
         )
       )}
 
       {checkout === "canceled" && (
-        <div className="p-4 rounded-xl text-xs bg-zinc-500/10 border border-zinc-500/20 text-zinc-700 dark:text-zinc-300">
-          <p className="font-medium">O processo de checkout foi cancelado. Seu plano atual permanece inalterado.</p>
-        </div>
+        <Alert variant="default">
+          O processo de checkout foi cancelado. Seu plano atual permanece inalterado.
+        </Alert>
       )}
 
       {/* Subscription Card with Actions */}
       <SubscriptionManagementCard subscription={serializableSubscription} />
 
       {/* Consumo & Limites */}
-      <div className="p-6 rounded-xl bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 space-y-4 shadow-sm">
-        <h2 className="text-base font-bold text-zinc-900 dark:text-white">Consumo de Recursos no Ciclo Vigente</h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
-          <div className="p-4 rounded-lg bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 space-y-1.5">
-            <span className="text-zinc-500 dark:text-zinc-400 font-medium">Artigos IA / Mês:</span>
-            <div className="text-lg font-bold text-zinc-900 dark:text-white flex items-baseline justify-between">
-              <span>{articlesCheck.current}</span>
-              <span className="text-xs font-normal text-zinc-500">
-                / {articlesCheck.limit === -1 ? "Ilimitado" : articlesCheck.limit}
-              </span>
-            </div>
-          </div>
+      <Card className="p-6 space-y-4 shadow-xs">
+        <CardHeader className="p-0 border-b border-border pb-3">
+          <CardTitle className="text-base font-bold">
+            Consumo de Recursos no Ciclo Vigente
+          </CardTitle>
+        </CardHeader>
 
-          <div className="p-4 rounded-lg bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 space-y-1.5">
-            <span className="text-zinc-500 dark:text-zinc-400 font-medium">Fontes RSS Ativas:</span>
-            <div className="text-lg font-bold text-zinc-900 dark:text-white flex items-baseline justify-between">
-              <span>{sourcesCheck.current}</span>
-              <span className="text-xs font-normal text-zinc-500">
-                / {sourcesCheck.limit === -1 ? "Ilimitado" : sourcesCheck.limit}
+        <CardContent className="p-0">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
+            <div className="p-4 rounded-xl bg-surface-muted/50 border border-border space-y-1.5">
+              <span className="text-muted-foreground font-medium flex items-center gap-1.5">
+                <Sparkles className="w-3.5 h-3.5 text-primary" />
+                Artigos IA / Mês:
               </span>
+              <div className="font-heading text-xl font-bold text-foreground flex items-baseline justify-between pt-1">
+                <span>{articlesCheck.current}</span>
+                <span className="text-xs font-normal text-muted-foreground font-sans">
+                  / {articlesCheck.limit === -1 ? "Ilimitado" : articlesCheck.limit}
+                </span>
+              </div>
             </div>
-          </div>
 
-          <div className="p-4 rounded-lg bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 space-y-1.5">
-            <span className="text-zinc-500 dark:text-zinc-400 font-medium">Sites WordPress:</span>
-            <div className="text-lg font-bold text-zinc-900 dark:text-white flex items-baseline justify-between">
-              <span>{wpCheck.current}</span>
-              <span className="text-xs font-normal text-zinc-500">
-                / {wpCheck.limit === -1 ? "Ilimitado" : wpCheck.limit}
+            <div className="p-4 rounded-xl bg-surface-muted/50 border border-border space-y-1.5">
+              <span className="text-muted-foreground font-medium flex items-center gap-1.5">
+                <Layers className="w-3.5 h-3.5 text-amber-500" />
+                Fontes RSS Ativas:
               </span>
+              <div className="font-heading text-xl font-bold text-foreground flex items-baseline justify-between pt-1">
+                <span>{sourcesCheck.current}</span>
+                <span className="text-xs font-normal text-muted-foreground font-sans">
+                  / {sourcesCheck.limit === -1 ? "Ilimitado" : sourcesCheck.limit}
+                </span>
+              </div>
+            </div>
+
+            <div className="p-4 rounded-xl bg-surface-muted/50 border border-border space-y-1.5">
+              <span className="text-muted-foreground font-medium flex items-center gap-1.5">
+                <Globe className="w-3.5 h-3.5 text-primary" />
+                Sites WordPress:
+              </span>
+              <div className="font-heading text-xl font-bold text-foreground flex items-baseline justify-between pt-1">
+                <span>{wpCheck.current}</span>
+                <span className="text-xs font-normal text-muted-foreground font-sans">
+                  / {wpCheck.limit === -1 ? "Ilimitado" : wpCheck.limit}
+                </span>
+              </div>
             </div>
           </div>
-        </div>
-      </div>
+        </CardContent>
+      </Card>
 
       {/* Histórico de Cobranças / Faturas */}
       <BillingInvoicesList />

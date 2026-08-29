@@ -1,25 +1,32 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Sora, Inter } from "next/font/google";
 import { ThemeProvider } from "@/components/theme-provider";
 import "./globals.css";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+const sora = Sora({
+  variable: "--font-heading",
   subsets: ["latin"],
+  weight: ["500", "600", "700"],
 });
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
+const inter = Inter({
+  variable: "--font-sans",
   subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
 });
 
 export const metadata: Metadata = {
-  title: "GeraFeed - Curadoria Inteligente & Publicação Automática",
-  description: "Curadoria de notícias via RSS com inteligência artificial e publicação automática",
+  title: "GeraFeed - Conteúdo que flui. Inteligência que publica.",
+  description: "Curadoria inteligente de notícias RSS, reescrita assistida por IA e publicação automática no WordPress",
+  icons: {
+    icon: "/brand/icon.png",
+    shortcut: "/brand/icon.png",
+    apple: "/brand/icon.png",
+  },
 };
 
 /**
- * Root layout — shell global: fontes, tema claro/escuro e ThemeProvider.
+ * Root layout — shell global: fontes oficiais Sora & Inter, tema claro/escuro e ThemeProvider.
  */
 export default function RootLayout({
   children,
@@ -29,11 +36,11 @@ export default function RootLayout({
   return (
     <html
       lang="pt-BR"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      className={`${sora.variable} ${inter.variable} h-full antialiased`}
       suppressHydrationWarning
     >
       <body
-        className="min-h-full bg-background text-foreground antialiased selection:bg-indigo-500 selection:text-white transition-colors duration-200"
+        className="min-h-full bg-background text-foreground font-sans antialiased selection:bg-primary selection:text-white transition-colors duration-200"
         suppressHydrationWarning
       >
         <ThemeProvider

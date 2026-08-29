@@ -6,20 +6,27 @@ import { useSearchParams, useRouter } from "next/navigation";
 import {
   RefreshCw,
   Newspaper,
-  CheckCircle2,
-  XCircle,
-  Clock,
-  Sparkles,
   ExternalLink,
   Edit3,
-  AlertCircle,
   FolderSync,
   Filter,
   RotateCcw,
   Globe,
   Calendar,
   Layers,
+  Sparkles,
 } from "lucide-react";
+
+import { PageHeader } from "@/components/design-system/page-header";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Card } from "@/components/ui/card";
+import { Alert } from "@/components/ui/alert";
+import { EmptyState } from "@/components/ui/empty-state";
+import { Skeleton } from "@/components/ui/skeleton";
+import { FormField } from "@/components/design-system/form-field";
+import { Select } from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
 
 interface Article {
   id: string;
@@ -51,7 +58,7 @@ export function RssPublishingQueue() {
   return (
     <Suspense
       fallback={
-        <div className="p-8 text-center text-slate-500 animate-pulse">
+        <div className="p-8 text-center text-muted-foreground animate-pulse">
           Carregando fila de notícias...
         </div>
       }
@@ -231,7 +238,9 @@ function RssPublishingQueueContent() {
         setErrorMessage(
           <span>
             Nenhum feed RSS ativo encontrado. Cadastre suas fontes em{" "}
-            <Link href="/settings/sources" className="underline font-bold hover:text-rose-700 dark:hover:text-rose-400">Configurações &gt; Fontes RSS</Link>.
+            <Link href="/settings/sources" className="underline font-bold text-primary">
+              Configurações &gt; Fontes RSS
+            </Link>.
           </span>
         );
       } else {
@@ -263,7 +272,9 @@ function RssPublishingQueueContent() {
         setErrorMessage(
           <span>
             Nenhuma configuração do WordPress encontrada. Configure um site WordPress em{" "}
-            <Link href="/settings/wordpress" className="underline font-bold hover:text-rose-700 dark:hover:text-rose-400">Configurações &gt; WordPress</Link>.
+            <Link href="/settings/wordpress" className="underline font-bold text-primary">
+              Configurações &gt; WordPress
+            </Link>.
           </span>
         );
       } else {
@@ -313,105 +324,80 @@ function RssPublishingQueueContent() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-200 dark:border-zinc-800 pb-5">
-        <div>
-          <div className="flex items-center gap-2 text-xs font-semibold text-indigo-600 dark:text-indigo-400 mb-1">
-            <Link href="/publishing" className="hover:underline flex items-center gap-1">
-              <Layers className="w-3.5 h-3.5" /> Central de Publicação
-            </Link>
-            <span>/</span>
-            <span>Fluxo Noticioso</span>
+      {/* Header com PageHeader */}
+      <PageHeader
+        title="Publicação de Notícias & Curadoria RSS"
+        description="Filtre por destino WordPress e feeds de origem, processe reescritas com IA e revise antes de publicar."
+        icon={<Newspaper className="w-5 h-5" />}
+        badge={
+          <Link href="/publishing" className="inline-flex items-center gap-1 text-xs text-primary hover:underline font-medium">
+            <Layers className="w-3.5 h-3.5" /> Central de Publicação
+          </Link>
+        }
+        actions={
+          <div className="flex flex-wrap items-center gap-3">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleSyncWpCategories}
+              isLoading={isSyncingWp}
+              leadingIcon={<FolderSync className="w-3.5 h-3.5 text-primary" />}
+            >
+              Sincronizar Categorias
+            </Button>
+
+            <Button
+              variant="gradient"
+              size="sm"
+              onClick={handleProcessRss}
+              isLoading={isProcessingRss}
+              leadingIcon={<RefreshCw className="w-3.5 h-3.5" />}
+            >
+              Buscar Novas Notícias nos Feeds
+            </Button>
           </div>
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-white tracking-tight flex items-center gap-2">
-            <Newspaper className="w-6 h-6 text-amber-500" />
-            Publicação de Notícias & Curadoria RSS
-          </h1>
-          <p className="text-xs text-slate-500 dark:text-zinc-400 mt-1">
-            Filtre por destino WordPress e feeds de origem, processe reescritas com IA e revise antes de publicar.
-          </p>
-        </div>
-
-        <div className="flex flex-wrap items-center gap-3">
-          <button
-            onClick={handleSyncWpCategories}
-            disabled={isSyncingWp}
-            className="inline-flex items-center gap-2 px-3.5 py-2 text-xs font-semibold text-slate-700 dark:text-zinc-200 bg-white dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 hover:bg-slate-50 dark:hover:bg-zinc-700 rounded-lg shadow-sm transition-colors disabled:opacity-50"
-          >
-            <FolderSync className={`w-3.5 h-3.5 text-blue-600 ${isSyncingWp ? "animate-spin" : ""}`} />
-            Sincronizar Categorias
-          </button>
-
-          <button
-            onClick={handleProcessRss}
-            disabled={isProcessingRss}
-            className="inline-flex items-center gap-2 px-4 py-2 text-xs font-semibold text-white bg-amber-600 hover:bg-amber-700 rounded-lg shadow-sm transition-colors disabled:opacity-50"
-          >
-            <RefreshCw className={`w-3.5 h-3.5 ${isProcessingRss ? "animate-spin" : ""}`} />
-            Buscar Novas Notícias nos Feeds
-          </button>
-        </div>
-      </div>
+        }
+      />
 
       {/* Messages */}
       {successMessage && (
-        <div className="p-4 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 text-emerald-800 dark:text-emerald-300 rounded-xl text-xs flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-            <span>{successMessage}</span>
-          </div>
-          <button onClick={() => setSuccessMessage(null)} className="text-slate-400 hover:text-slate-600">
-            &times;
-          </button>
-        </div>
+        <Alert variant="success" onClose={() => setSuccessMessage(null)}>
+          {successMessage}
+        </Alert>
       )}
 
       {errorMessage && (
-        <div className="p-4 bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800 text-rose-800 dark:text-rose-300 rounded-xl text-xs flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
-            <span>{errorMessage}</span>
-          </div>
-          <button onClick={() => setErrorMessage(null)} className="text-slate-400 hover:text-slate-600">
-            &times;
-          </button>
-        </div>
+        <Alert variant="destructive" onClose={() => setErrorMessage(null)}>
+          {errorMessage}
+        </Alert>
       )}
 
-      {/* Filter Bar */}
-      <div className="bg-white dark:bg-zinc-900 p-4 rounded-xl border border-slate-200 dark:border-zinc-800 shadow-sm space-y-3">
-        <div className="flex items-center gap-2 text-xs font-bold text-slate-700 dark:text-zinc-300 uppercase tracking-wider">
-          <Filter className="w-3.5 h-3.5 text-indigo-500" />
+      {/* Filter Bar com Card */}
+      <Card className="p-5 space-y-4">
+        <div className="flex items-center gap-2 text-xs font-bold text-foreground uppercase tracking-wider">
+          <Filter className="w-3.5 h-3.5 text-primary" />
           Filtros de Publicação & Destino
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
           {/* Status */}
-          <div>
-            <label className="block text-[11px] font-medium text-slate-500 dark:text-zinc-400 mb-1">
-              Status da Notícia
-            </label>
-            <select
+          <FormField label="Status da Notícia">
+            <Select
               value={statusFilter}
               onChange={(e) => updateFilters({ status: e.target.value })}
-              className="w-full text-xs px-3 py-2 bg-slate-50 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 rounded-lg text-slate-800 dark:text-zinc-200"
             >
               <option value="PENDING">Pendentes de Revisão</option>
               <option value="PUBLISHED">Publicadas</option>
               <option value="REJECTED">Rejeitadas</option>
               <option value="ALL">Todos os Status</option>
-            </select>
-          </div>
+            </Select>
+          </FormField>
 
           {/* WordPress Destination */}
-          <div>
-            <label className="block text-[11px] font-medium text-slate-500 dark:text-zinc-400 mb-1">
-              Destino WordPress
-            </label>
-            <select
+          <FormField label="Destino WordPress">
+            <Select
               value={wpFilter}
               onChange={(e) => updateFilters({ wordpressSiteId: e.target.value })}
-              className="w-full text-xs px-3 py-2 bg-slate-50 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 rounded-lg text-slate-800 dark:text-zinc-200"
             >
               <option value="ALL">Todos os Portais</option>
               {(Array.isArray(availableWpSites) ? availableWpSites : []).map((site) => (
@@ -419,18 +405,14 @@ function RssPublishingQueueContent() {
                   {site.name}
                 </option>
               ))}
-            </select>
-          </div>
+            </Select>
+          </FormField>
 
           {/* Feed/Source */}
-          <div>
-            <label className="block text-[11px] font-medium text-slate-500 dark:text-zinc-400 mb-1">
-              Feed RSS de Origem
-            </label>
-            <select
+          <FormField label="Feed RSS de Origem">
+            <Select
               value={sourceFilter}
               onChange={(e) => updateFilters({ sourceId: e.target.value })}
-              className="w-full text-xs px-3 py-2 bg-slate-50 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 rounded-lg text-slate-800 dark:text-zinc-200"
             >
               <option value="ALL">Todos os Feeds</option>
               {(Array.isArray(availableSources) ? availableSources : []).map((src) => (
@@ -438,106 +420,111 @@ function RssPublishingQueueContent() {
                   {src.name}
                 </option>
               ))}
-            </select>
-          </div>
+            </Select>
+          </FormField>
 
           {/* Start Date */}
-          <div>
-            <label className="block text-[11px] font-medium text-slate-500 dark:text-zinc-400 mb-1">
-              Data Inicial
-            </label>
-            <input
+          <FormField label="Data Inicial">
+            <Input
               type="date"
               value={startDate}
               onChange={(e) => updateFilters({ startDate: e.target.value })}
-              className="w-full text-xs px-3 py-1.5 bg-slate-50 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 rounded-lg text-slate-800 dark:text-zinc-200"
             />
-          </div>
+          </FormField>
 
           {/* End Date */}
-          <div>
-            <label className="block text-[11px] font-medium text-slate-500 dark:text-zinc-400 mb-1">
-              Data Final
-            </label>
-            <input
+          <FormField label="Data Final">
+            <Input
               type="date"
               value={endDate}
               onChange={(e) => updateFilters({ endDate: e.target.value })}
-              className="w-full text-xs px-3 py-1.5 bg-slate-50 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 rounded-lg text-slate-800 dark:text-zinc-200"
             />
-          </div>
+          </FormField>
         </div>
-      </div>
+      </Card>
 
       {/* Articles Queue List */}
       {isLoading ? (
-        <div className="space-y-3 animate-pulse">
+        <div className="space-y-3">
           {[...Array(3)].map((_, i) => (
-            <div key={i} className="h-32 bg-slate-200 dark:bg-zinc-800 rounded-xl"></div>
+            <Skeleton key={i} className="h-32 rounded-xl" />
           ))}
         </div>
       ) : articles.length === 0 ? (
-        <div className="p-12 text-center bg-white dark:bg-zinc-900 rounded-xl border border-slate-200 dark:border-zinc-800 space-y-3">
-          <Newspaper className="w-12 h-12 text-slate-300 dark:text-zinc-600 mx-auto" />
-          <h3 className="text-base font-semibold text-slate-800 dark:text-zinc-200">
-            Nenhuma notícia encontrada
-          </h3>
-          <p className="text-xs text-slate-500 dark:text-zinc-400 max-w-md mx-auto">
-            Não há artigos correspondentes aos filtros selecionados. Clique em &quot;Buscar Novas Notícias nos Feeds&quot; para atualizar a fila de curadoria.
-          </p>
-        </div>
+        <EmptyState
+          title="Nenhuma notícia encontrada"
+          description="Não há artigos correspondentes aos filtros selecionados. Clique em 'Buscar Novas Notícias nos Feeds' para atualizar a fila de curadoria."
+          action={
+            <Button
+              variant="gradient"
+              onClick={handleProcessRss}
+              isLoading={isProcessingRss}
+              leadingIcon={<RefreshCw className="w-4 h-4" />}
+            >
+              Buscar Novas Notícias nos Feeds
+            </Button>
+          }
+          secondaryAction={
+            <Button
+              variant="outline"
+              onClick={() => updateFilters({ status: "ALL", sourceId: "ALL", wordpressSiteId: "ALL", startDate: "", endDate: "" })}
+            >
+              Limpar Filtros
+            </Button>
+          }
+        />
       ) : (
         <div className="space-y-4">
-          <div className="text-xs font-semibold text-slate-500 dark:text-zinc-400 flex items-center justify-between">
+          <div className="text-xs font-semibold text-muted-foreground flex items-center justify-between">
             <span>Mostrando {(Array.isArray(articles) ? articles : []).length} notícia(s) na fila</span>
           </div>
 
           <div className="grid grid-cols-1 gap-4">
             {(Array.isArray(articles) ? articles : []).map((art) => (
-              <div
+              <Card
                 key={art.id}
-                className="bg-white dark:bg-zinc-900 rounded-xl border border-slate-200 dark:border-zinc-800 p-5 shadow-sm hover:border-indigo-300 dark:hover:border-indigo-800 transition-colors space-y-3"
+                className="p-5 shadow-xs hover:border-primary/40 transition-colors space-y-3"
               >
                 <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
-                  <div className="space-y-1.5 flex-1 min-w-0">
+                  <div className="space-y-2 flex-1 min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
-                      <span className="text-[11px] font-semibold px-2 py-0.5 bg-slate-100 dark:bg-zinc-800 text-slate-700 dark:text-zinc-300 rounded">
+                      <Badge variant="outline" size="sm">
                         {art.source?.name || "Feed RSS"}
-                      </span>
+                      </Badge>
                       {art.wordpressSite && (
-                        <span className="text-[11px] font-semibold px-2 py-0.5 bg-blue-50 dark:bg-blue-950/50 text-blue-700 dark:text-blue-300 rounded flex items-center gap-1">
-                          <Globe className="w-3 h-3" />
+                        <Badge variant="secondary" size="sm" className="flex items-center gap-1">
+                          <Globe className="w-3 h-3 text-primary" />
                           {art.wordpressSite.name}
-                        </span>
+                        </Badge>
                       )}
                       {art.status === "PENDING" && (
-                        <span className="text-[11px] font-semibold px-2 py-0.5 bg-amber-50 dark:bg-amber-950/50 text-amber-700 dark:text-amber-400 rounded flex items-center gap-1">
-                          <Clock className="w-3 h-3" /> Pendente
-                        </span>
+                        <Badge variant="warning" size="sm">
+                          Pendente
+                        </Badge>
                       )}
                       {art.status === "PUBLISHED" && (
-                        <span className="text-[11px] font-semibold px-2 py-0.5 bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-400 rounded flex items-center gap-1">
-                          <CheckCircle2 className="w-3 h-3" /> Publicado
-                        </span>
+                        <Badge variant="success" size="sm">
+                          Publicado
+                        </Badge>
                       )}
                       {art.status === "REJECTED" && (
-                        <span className="text-[11px] font-semibold px-2 py-0.5 bg-rose-50 dark:bg-rose-950/50 text-rose-700 dark:text-rose-400 rounded flex items-center gap-1">
-                          <XCircle className="w-3 h-3" /> Rejeitado
-                        </span>
+                        <Badge variant="danger" size="sm">
+                          Rejeitado
+                        </Badge>
                       )}
                     </div>
 
-                    <h3 className="text-base font-bold text-slate-900 dark:text-white leading-snug">
+                    <h3 className="font-heading text-base font-bold text-foreground leading-snug">
                       {art.title || art.originalTitle}
                     </h3>
-                    <p className="text-xs text-slate-500 dark:text-zinc-400 line-clamp-2">
+                    <p className="font-sans text-xs text-muted-foreground line-clamp-2">
                       {art.summary || "Notícia capturada via RSS aguardando reescrita ou revisão editorial."}
                     </p>
                   </div>
 
                   <div className="flex sm:flex-col items-end justify-between sm:justify-start gap-2 shrink-0">
-                    <div className="text-[11px] text-slate-400 flex items-center gap-1">
-                      <Calendar className="w-3 h-3" />
+                    <div className="text-[11px] text-muted-foreground flex items-center gap-1">
+                      <Calendar className="w-3 h-3 text-muted-foreground" />
                       {art.originalPublishedAt
                         ? new Date(art.originalPublishedAt).toLocaleDateString("pt-BR")
                         : new Date(art.createdAt).toLocaleDateString("pt-BR")}
@@ -547,7 +534,7 @@ function RssPublishingQueueContent() {
                       href={art.originalUrl}
                       target="_blank"
                       rel="noreferrer noopener"
-                      className="text-[11px] text-indigo-600 dark:text-indigo-400 hover:underline flex items-center gap-1"
+                      className="text-[11px] text-primary hover:underline flex items-center gap-1 font-medium"
                     >
                       Fonte Original <ExternalLink className="w-3 h-3" />
                     </a>
@@ -555,60 +542,68 @@ function RssPublishingQueueContent() {
                 </div>
 
                 {/* Actions toolbar */}
-                <div className="pt-3 border-t border-slate-100 dark:border-zinc-800/80 flex flex-wrap items-center justify-between gap-3">
+                <div className="pt-3 border-t border-border flex flex-wrap items-center justify-between gap-3">
                   <div className="flex items-center gap-2">
                     {art.status === "PENDING" && !art.title && (
-                      <button
+                      <Button
+                        variant="secondary"
+                        size="sm"
                         onClick={() => handleProcessAi(art.id)}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-indigo-700 dark:text-indigo-300 bg-indigo-50 dark:bg-indigo-950/40 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 rounded-lg transition-colors"
+                        leadingIcon={<Sparkles className="w-3.5 h-3.5 text-primary" />}
                       >
-                        <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
                         Processar com IA
-                      </button>
+                      </Button>
                     )}
                   </div>
 
                   <div className="flex items-center gap-2">
                     {art.status === "PENDING" && (
                       <>
-                        <button
+                        <Button
+                          variant="ghost"
+                          size="sm"
                           onClick={() => handleReject(art.id)}
-                          className="px-3 py-1.5 text-xs font-medium text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/50 rounded-lg transition-colors"
+                          className="text-rose-600 dark:text-rose-400 hover:bg-rose-500/10"
                         >
                           Rejeitar
-                        </button>
-                        <Link
-                          href={`/articles/${art.id}`}
-                          className="inline-flex items-center gap-1.5 px-4 py-1.5 text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg shadow-sm transition-colors"
-                        >
-                          <Edit3 className="w-3.5 h-3.5" />
-                          Revisar & Publicar
+                        </Button>
+                        <Link href={`/articles/${art.id}`}>
+                          <Button
+                            variant="gradient"
+                            size="sm"
+                            leadingIcon={<Edit3 className="w-3.5 h-3.5" />}
+                          >
+                            Revisar & Publicar
+                          </Button>
                         </Link>
                       </>
                     )}
 
                     {art.status === "REJECTED" && (
-                      <button
+                      <Button
+                        variant="outline"
+                        size="sm"
                         onClick={() => handleRepublish(art.id)}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-700 dark:text-zinc-300 bg-slate-100 dark:bg-zinc-800 hover:bg-slate-200 rounded-lg transition-colors"
+                        leadingIcon={<RotateCcw className="w-3.5 h-3.5" />}
                       >
-                        <RotateCcw className="w-3.5 h-3.5" />
                         Restaurar para Pendentes
-                      </button>
+                      </Button>
                     )}
 
                     {art.status === "PUBLISHED" && (
-                      <Link
-                        href={`/articles/${art.id}`}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-700 dark:text-zinc-300 bg-slate-100 dark:bg-zinc-800 hover:bg-slate-200 rounded-lg transition-colors"
-                      >
-                        <Edit3 className="w-3.5 h-3.5" />
-                        Ver / Editar Publicação
+                      <Link href={`/articles/${art.id}`}>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          leadingIcon={<Edit3 className="w-3.5 h-3.5" />}
+                        >
+                          Ver / Editar Publicação
+                        </Button>
                       </Link>
                     )}
                   </div>
                 </div>
-              </div>
+              </Card>
             ))}
           </div>
         </div>

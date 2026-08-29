@@ -3,6 +3,9 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { Zap, Calendar, ArrowUpRight } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
+import { Skeleton } from "@/components/ui/skeleton";
 
 interface SubscriptionInfo {
   subscription?: {
@@ -61,10 +64,10 @@ export function PlanUsageCard() {
 
   if (isLoading) {
     return (
-      <div className="p-3.5 rounded-xl bg-zinc-100/80 dark:bg-zinc-800/40 border border-zinc-200 dark:border-zinc-800 animate-pulse space-y-2.5">
-        <div className="h-4 bg-zinc-200 dark:bg-zinc-700/50 rounded w-1/2" />
-        <div className="h-2.5 bg-zinc-200 dark:bg-zinc-700/50 rounded w-full" />
-        <div className="h-3 bg-zinc-200 dark:bg-zinc-700/50 rounded w-3/4" />
+      <div className="p-3.5 rounded-xl bg-surface border border-border space-y-2.5">
+        <Skeleton className="h-4 w-1/2" />
+        <Skeleton className="h-2 w-full" />
+        <Skeleton className="h-3 w-3/4" />
       </div>
     );
   }
@@ -89,54 +92,49 @@ export function PlanUsageCard() {
   const isNearLimit = percentUsed >= 80;
 
   return (
-    <div className="p-3.5 rounded-xl bg-gradient-to-br from-indigo-50/80 via-white to-indigo-50/30 dark:from-zinc-800/70 dark:via-zinc-900/60 dark:to-zinc-950 border border-indigo-100 dark:border-zinc-800 shadow-sm dark:shadow-none space-y-3">
+    <div className="p-3.5 rounded-xl bg-surface border border-border shadow-xs space-y-3">
       {/* Plan Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-1.5">
-          <div className="p-1 rounded-md bg-indigo-600/10 dark:bg-indigo-600/20 text-indigo-600 dark:text-indigo-400">
+          <div className="p-1 rounded-md bg-primary/10 text-primary">
             <Zap className="w-3.5 h-3.5" />
           </div>
-          <span className="text-xs font-bold text-zinc-900 dark:text-white tracking-tight">
+          <span className="font-heading text-xs font-bold text-foreground tracking-tight">
             {planName}
           </span>
         </div>
 
-        <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-500/20">
+        <Badge variant="success" size="sm">
           Ativo
-        </span>
+        </Badge>
       </div>
 
       {/* Progress Bar & Counter */}
       <div className="space-y-1.5">
         <div className="flex items-center justify-between text-[11px]">
-          <span className="text-zinc-500 dark:text-zinc-400 font-medium">Posts gerados</span>
-          <span className="font-semibold text-zinc-800 dark:text-zinc-200">
-            {usedArticles} <span className="text-zinc-400 font-normal">/ {limitArticles}</span>
+          <span className="text-muted-foreground font-medium">Posts gerados</span>
+          <span className="font-semibold text-foreground">
+            {usedArticles} <span className="text-muted-foreground font-normal">/ {limitArticles}</span>
           </span>
         </div>
 
-        <div className="w-full h-1.5 bg-zinc-200 dark:bg-zinc-800 rounded-full overflow-hidden">
-          <div
-            className={`h-full rounded-full transition-all duration-500 ${
-              isNearLimit
-                ? "bg-amber-500"
-                : "bg-gradient-to-r from-indigo-500 to-emerald-500"
-            }`}
-            style={{ width: `${percentUsed}%` }}
-          />
-        </div>
+        <Progress
+          value={percentUsed}
+          size="sm"
+          color={isNearLimit ? "amber" : "gradient"}
+        />
       </div>
 
       {/* Expiration and Upgrade Action */}
-      <div className="pt-2 border-t border-indigo-100/60 dark:border-zinc-800/80 flex items-center justify-between text-[10px]">
-        <div className="flex items-center gap-1 text-zinc-500 dark:text-zinc-400">
-          <Calendar className="w-3 h-3 text-zinc-400" />
-          <span>Vence: <strong>{formattedExpiry}</strong></span>
+      <div className="pt-2 border-t border-border flex items-center justify-between text-[10px]">
+        <div className="flex items-center gap-1 text-muted-foreground">
+          <Calendar className="w-3 h-3 text-muted-foreground" />
+          <span>Vence: <strong className="text-foreground">{formattedExpiry}</strong></span>
         </div>
 
         <Link
           href="/#precos"
-          className="inline-flex items-center gap-0.5 font-semibold text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 transition"
+          className="inline-flex items-center gap-0.5 font-semibold text-primary hover:underline transition-colors"
         >
           Upgrade <ArrowUpRight className="w-3 h-3" />
         </Link>

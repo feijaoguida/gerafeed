@@ -2393,3 +2393,52 @@ Feeds RSS geralmente disponibilizam apenas snippets curtos (~1-2 frases). Isso l
 - [ ] Ajuste no prompt editorial.
 - [ ] TypeScript PASS, Lint PASS, Build PASS.
 
+---
+
+# Phase 22. Design System GeraFeed (Fundação & Backoffice Showcase)
+
+## 173. Objetivo
+Criar a fundação do Design System proprietário do GeraFeed baseado na identidade visual oficial ("Conteúdo que flui. Inteligência que publica."), estruturado com tokens semânticos nativos para Modo Claro e Modo Escuro, tipografia Sora (títulos) e Inter (interface), componentes primitivos tipados via `class-variance-authority` (CVA), e uma vitrine/página interativa no Backoffice (`/backoffice/design-system`) para visualização de todos os componentes e tokens.
+
+## 174. Regra Fundamental de Execução
+**NÃO refatorar telas existentes nesta fase.** A Phase 22 cria exclusivamente a fundação de tokens, utilitários, componentes primitivos/compostos e a página de visualização no Backoffice. A migração das telas existentes só ocorrerá nas fases subsequentes após autorização expressa do usuário.
+
+## 175. Pilares da Fundação
+1. **Tokens Semânticos**: Variáveis CSS declaradas no `globals.css` integradas ao Tailwind CSS 4 via `@theme inline`. Cores neutras navy e superfícies contrastadas no Dark Mode, fundos limpos e bordas suaves no Light Mode.
+2. **Tipografia Oficial**: Fontes `Sora` e `Inter` integradas via `next/font/google`.
+3. **Utilitário Central**: `cn` em `src/lib/utils.ts` consolidando `clsx` e `tailwind-merge`.
+4. **Componentes Primitivos com CVA**:
+   - `Button`: Variantes (`default`, `secondary`, `outline`, `ghost`, `destructive`, `gradient`, `link`), tamanhos (`sm`, `md`, `lg`, `icon`), estados de loading com spinner, ícones Lucide.
+   - `Badge`: Variantes semânticas (`default`, `secondary`, `success`, `warning`, `danger`, `info`, `purple`, `outline`).
+   - `Card Primitives`: `Card`, `CardHeader`, `CardTitle`, `CardDescription`, `CardContent`, `CardFooter` com variantes (`default`, `elevated`, `interactive`, `highlighted`).
+   - `StatCard`: Métricas com títulos, valores, descrições, ícones, tendências e ações.
+   - `Form Controls`: `Input`, `Textarea`, `Select`, `Switch`, `Label`, `FormField` (com suporte a error, required, helper text).
+   - `Feedback & Layout`: `PageHeader`, `SectionHeader`, `EmptyState`, `Alert`, `Progress`, `Skeleton`, `IconButton`, `StatusIndicator`, `BrandDecoration`.
+   - `Sidebar Primitives`: `Sidebar`, `SidebarHeader`, `SidebarContent`, `SidebarSection`, `SidebarSectionLabel`, `SidebarItem`, `SidebarFooter`.
+5. **Vitrine no Backoffice**: Rota `/backoffice/design-system` (com atalho `/design-system`) demonstrando todas as variantes, controles e alternância em tempo real entre Modo Claro e Escuro.
+
+## 176. Definition of Done Phase 22
+- [ ] Tokens semânticos criados no CSS e mapeados no Tailwind 4.
+- [ ] Fontes Sora e Inter integradas com classes utilitárias de tipografia.
+- [ ] Componente `Button` com CVA, gradient de marca e loading spinner.
+- [ ] Componentes de `Card` e `StatCard` com suporte a Light e Dark mode.
+- [ ] Componentes de formulário (`Input`, `Textarea`, `Select`, `Switch`, `FormField`) acessíveis.
+- [ ] Componentes de navegação e layout (`PageHeader`, `SectionHeader`, `EmptyState`, `Progress`).
+- [ ] Primitivas de `Sidebar` estruturadas e tipadas.
+- [ ] Página de vitrine `/backoffice/design-system` (e `/design-system`) implementada e funcional.
+- [ ] Nenhuma tela pré-existente alterada ou quebrada.
+- [ ] `npx tsc --noEmit`: PASS.
+- [ ] `npm run lint`: PASS.
+- [ ] `npm run build`: PASS.
+
+---
+
+# Roadmap de Migração de Telas (Fases 23 a 27)
+
+- **Phase 23**: Telas Públicas & Shell (Landing, Login, Registro, Shell da Aplicação e Sidebar).
+- **Phase 24**: Dashboard, Curadoria & Publicação (`/dashboard`, `/articles`, `/articles/[id]`, `/publishing`).
+- **Phase 25**: Módulo de Afiliados (`/affiliates/dashboard`, `/products`, `/offers`, `/import`, `/prompts`).
+- **Phase 26**: Configurações & Billing (`/settings/wordpress`, `/settings/sources`, `/settings/ai`, `/settings/billing`, `/upgrade`).
+- **Phase 27**: Backoffice SuperAdmin (`/backoffice`, `/companies`, `/plans`, `/affiliate-prompts`).
+
+

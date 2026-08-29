@@ -1,13 +1,13 @@
 # PROGRESS.md
 
 ## Current Phase
-All Planned Phases (1 to 21) Completed
+Phase 27. Migração de Telas - Backoffice SuperAdmin (Concluída)
 
 ## Current Task
-None
+229-migrate-backoffice-screens
 
 ## Status
-ALL_TASKS_COMPLETED
+DONE
 
 ## Completed
 - Phase 1. Core MVP
@@ -29,33 +29,166 @@ ALL_TASKS_COMPLETED
 - Phase 17. Affiliate Product Enrichment & Research
 - Phase 18. Publishing Center & RSS Monetization
 - Phase 19. Global Affiliate Prompt Governance
+- Phase 20. Billing Asaas Production Ready
+- Phase 21. Article Content Enrichment & Scraping
+- Phase 22. Design System GeraFeed (Fundação & Backoffice Showcase)
+- Phase 23. Migração de Telas - Telas Públicas & Shell
+- Phase 24. Migração de Telas - Core Editorial (Dashboard & Artigos)
+- Phase 25. Migração de Telas - Central de Publicação & Afiliados
+- Phase 26. Migração de Telas - Configurações & Billing
+- Phase 27. Migração de Telas - Backoffice SuperAdmin
 
-## Phase 20. Billing Asaas Production Ready
-- [x] 180-plan-monthly-annual-pricing
-- [x] 181-billing-profile-and-customer-data
-- [x] 182-payment-provider-contract-and-asaas-customer-sync
-- [x] 183-hosted-checkout-and-billing-methods
-- [x] 184-asaas-recurring-subscriptions
-- [x] 185-asaas-webhook-ingestion
-- [x] 186-payment-ledger-and-invoice-history
-- [x] 187-subscription-lifecycle-and-access-control
-- [x] 188-customer-billing-portal
-- [x] 189-backoffice-billing-management
-- [x] 190-manual-reconciliation-and-recovery
-- [x] 191-phase20-integration-and-hardening
+## Phase 27. Migração de Telas - Backoffice SuperAdmin
+- [x] 229-migrate-backoffice-screens
 
-## Phase 21. Article Content Enrichment & Scraping
-- [x] 200-article-content-scraping-and-enrichment
-- [x] 201-multi-wordpress-editorial-review
-- [x] 202-fix-billing-checkout-flow
-- [x] 203-asaas-url-and-billing-type
-- [x] 204-asaas-idempotent-customer
-- [x] 205-asaas-webhook-setup
-- [x] 206-asaas-checkout-e2e
-- [x] 207-asaas-test-script
+## Last Evidence
+Phase 27 e Task 229 concluídas com sucesso:
+- `src/app/(backoffice)/backoffice/layout.tsx`: Suporte total a temas Claro e Escuro com tokens semânticos `bg-background`, `text-foreground` e `bg-surface-muted/30`.
+- `src/components/backoffice/backoffice-sidebar.tsx`: Migrado para suporte dinâmico Claro/Escuro com `bg-surface`, `border-border`, `text-foreground`, `ThemeToggle` e navegação para todas as áreas administrativas e showcase do Design System.
+- `src/app/(backoffice)/backoffice/page.tsx`: Migrado com `PageHeader`, 4 `StatCard` com métricas reais do banco de dados (Empresas, Usuários, Artigos e Planos), cards de navegação rápida e banner de auditoria.
+- `src/components/backoffice/company-list.tsx`: Migrado com `PageHeader`, busca e filtros em `Card`, tabela com badges semânticos de plano e status, barra de progresso de cota e modal de criação com `FormField`, `Input` e `Select`.
+- `src/components/backoffice/company-details.tsx`: Migrado com `PageHeader`, badges de status e plano, abas com realce ativo do Design System e seções de overview, plano, feeds, WordPress, IA e configurações operando com tokens semânticos.
+- `src/components/backoffice/plan-manager.tsx`: Migrado com `PageHeader`, cards de planos em `Card` com destaque, tipografia Sora nos preços, badges semânticos, economia do plano anual e modal de criação/edição com toggles de features.
+- `src/components/backoffice/affiliate-prompt-manager.tsx`: Migrado com `PageHeader`, cards dos 7 formatos comerciais com badges semânticos, preview de prompts legíveis nos dois temas, modal de nova versão e modal de histórico de versões.
+- `npx tsc --noEmit`: PASS.
+- `npm run lint`: PASS (0 erros).
+- `npm run build`: PASS (72/72 rotas compiladas com sucesso em 1.7s).
 
-## In Progress
-- Nenhuma
+
+## Last Evidence
+Phase 26 e Task 228 concluídas com sucesso:
+- `src/app/(app)/settings/billing/page.tsx`: Migrado com `PageHeader`, `Card` com consumo de limites do ciclo vigente, alertas de transação Asaas e botões de upgrade em `Button variant="gradient"`.
+- `src/app/(app)/settings/billing/upgrade/page.tsx`: Migrado com `PageHeader`, seletor de ciclo Mensal/Anual com `Button`, cards de planos destacados com gradientes e checkmarks em Accent Teal (`#00C2A8`), tipografia Sora nos preços e checkout direto via Asaas com `window.location.assign`.
+- `npx tsc --noEmit`: PASS.
+- `npm run lint`: PASS (0 erros).
+- `npm run build`: PASS (72/72 rotas compiladas com sucesso em 993ms).
+
+
+## Last Evidence
+Task 227 concluída com sucesso:
+- `src/app/(app)/settings/wordpress/page.tsx`: Migrado com `PageHeader`, `Card`, `Badge` de status, `FormField`, `Input`, `Alert`, modal em `Card` e gerenciador de feeds associados com overrides.
+- `src/app/(app)/settings/sources/page.tsx`: Migrado com `PageHeader`, cadastro em `Card` com `FormField` e `Input`, listagem com badges de créditos e prompt, edição inline e `EmptyState`.
+- `src/app/(app)/settings/ai/page.tsx`: Migrado com `PageHeader`, tabs em `Button`, conexão e chaves AES-256 em `Card`, seleção de nichos e estilos em `Card` com paridade Claro/Escuro e alertas contextuais de planos.
+- `src/app/(app)/settings/images/page.tsx`: Migrado com `PageHeader`, `Card` com radio cards de seleção de estratégia (Original vs Sharp/Modificada) e `Button variant="gradient"`.
+- `npx tsc --noEmit`: PASS.
+- `npm run lint`: PASS (0 erros).
+- `npm run build`: PASS (72/72 rotas compiladas com sucesso em 1.3s).
+
+
+## Last Evidence
+Phase 25 e Task 226 concluídas com sucesso:
+- `src/app/(app)/affiliates/import/page.tsx`: Migrado com `PageHeader`, `AffiliateImporter` padronizado em `Card`, inputs semânticos e alertas de duplicidade/sucesso.
+- `src/components/affiliate/offer-list.tsx`: Migrado com `PageHeader`, `Select` de status, tabela em `Card` com `Badge` de status semânticos (`ACTIVE`, `OUT_OF_STOCK`), botões CVA com variante `ghost` e `EmptyState`.
+- `src/components/affiliate/prompt-template-manager.tsx`: Migrado com `PageHeader`, badges de governança global, blocos de código com contraste e legibilidade impecáveis nos modos Claro e Escuro, e modal/container de teste de prompt renderizado.
+- `npx tsc --noEmit`: PASS.
+- `npm run lint`: PASS (0 erros).
+- `npm run build`: PASS (72/72 rotas compiladas com sucesso em 1.1s).
+
+
+## Last Evidence
+Task 225 concluída com sucesso:
+- `src/components/affiliate/affiliate-dashboard-view.tsx`: Migrado com `PageHeader`, 4 `StatCard` (Cliques no Período, Produtos no Catálogo, Ofertas Ativas e Artigos Comerciais com badges de status), gráfico de evolução temporal de cliques em `Card` com gradiente Blue → Purple, rankings de produtos, artigos e componentes em `Card` e nota de transparência.
+- `src/components/affiliate/product-list.tsx`: Migrado com `PageHeader`, barra de filtros em `Card` com `Input` e `Select`, cards de produtos com `Badge` semântico, `EmptyState` e paginação com botões `Button`.
+- `src/components/affiliate/product-new.tsx`: Migrado com `PageHeader`, `Card`, `FormField`, `Input`, `Textarea`, `Select` e `Alert`.
+- `npx tsc --noEmit`: PASS.
+- `npm run lint`: PASS (0 erros).
+- `npm run build`: PASS (72/72 rotas compiladas com sucesso em 1.2s).
+
+
+## Last Evidence
+Task 224 concluída com sucesso:
+- `src/app/(app)/publishing/page.tsx`: Migrado integralmente com `PageHeader`, 2 `Card` destacados para cada modalidade de publicação (Curadoria RSS com fluxo editorial de 4 etapas e Conteúdo Comercial de Afiliados com badge de conversão/Pro), botões CVA com variante gradient e faixa de navegação rápida com `Card` e `Button`.
+- `src/app/(app)/publishing/rss/page.tsx`: Mantida integração nativa com `RssPublishingQueue`, já 100% atualizada para o Design System.
+- `src/app/(app)/publishing/affiliate/page.tsx`: Atualizado com container e estado de bloqueio padronizados em `Card` e `Button`.
+- `npx tsc --noEmit`: PASS.
+- `npm run lint`: PASS (0 erros).
+
+
+## Last Evidence
+Phase 24 e Task 223 concluídas com sucesso:
+- `src/components/publishing/rss-publishing-queue.tsx`: Refatorado com `PageHeader`, `Button` CVA (`variant="gradient"` para buscar notícias), `Card` para a barra de filtros avançados com `Select` e `Input`, `Alert` para mensagens de sucesso e erro, `Badge` semântico nos status dos artigos (`PENDING`, `PUBLISHED`, `REJECTED`), e `EmptyState` com ação rápida.
+- `src/app/(app)/articles/[id]/page.tsx`: Migrado integralmente com `Card`, `Badge` de status, `FormField`, `Input`, `Textarea`, `Select`, `Alert`, `Skeleton` no loading e botões de ação CVA (`Button variant="gradient"` para aprovação e publicação).
+- `npx tsc --noEmit`: PASS.
+- `npm run lint`: PASS (0 erros).
+- `npm run build`: PASS (72/72 rotas compiladas com sucesso em 1.3s).
+
+
+## Last Evidence
+Task 222 concluída com sucesso:
+- `src/components/plan-usage-card.tsx`: Refatorado com `Card`, `Badge` (ativo), `Progress` (com color gradient ou amber) e `Skeleton` no loading.
+- `src/app/(app)/dashboard/page.tsx`: Migrado integralmente com `PageHeader`, 4 `StatCard` para métricas-chave (Artigos Pendentes, Publicados no Portal, Catálogo Afiliados, Cliques Afiliados), `Card` para "Consumo e Limites do Plano" com 4 barras de `Progress` (Artigos diários/mensais, Sites WP e Fontes RSS), `Card` de destinos e cards de ações rápidas.
+- Suporte a `badge` adicionado a `StatCardProps` em `src/components/design-system/stat-card.tsx`.
+- `npx tsc --noEmit`: PASS.
+- `npm run lint`: PASS (0 erros).
+
+
+## Last Evidence
+Phase 23 e Task 221 concluídas com sucesso:
+- `src/app/(app)/layout.tsx`: Atualizado com fundo semântico `bg-background text-foreground` e suspense fallback em `bg-surface border-border`.
+- `src/components/sidebar.tsx`: Reescrito utilizando as novas primitivas modulares do Design System (`SidebarItem`, `SidebarSection`, `SidebarSectionLabel`), logo oficial com símbolo da marca e tipografia Sora, badges semânticas, drawer mobile responsivo e suporte fluido a Light e Dark mode.
+- `npx tsc --noEmit`: PASS.
+- `npm run lint`: PASS (0 erros).
+- `npm run build`: PASS (72/72 rotas compiladas com sucesso).
+
+
+## Last Evidence
+Task 220 concluída com sucesso:
+- `src/app/(public)/layout.tsx`: Estruturado para o fluxo público com herança dos tokens de tema.
+- `src/app/(public)/page.tsx` (Landing page): Migrado integralmente para o Design System GeraFeed com tokens oficiais, tipografia Sora (títulos) e Inter (textos), CTAs em gradiente de marca (`#2563EB` → `#7C3AED`), logo oficial com ícones conceituais e destaque para Accent Teal (`#00C2A8`).
+- `src/app/(public)/login/page.tsx`: Migrado para utilizar `Button` (variante gradient), `Input`, `FormField`, `Heading1-2`, `Text` e painel institucional escuro navy com `BrandDecoration` e logo oficial.
+- `src/app/(public)/register/page.tsx`: Migrado utilizando as primitivas oficiais de formulário e identidade visual GeraFeed com total paridade nos modos Claro e Escuro.
+- `npx tsc --noEmit`: PASS.
+- `npm run lint`: PASS (0 erros).
+
+
+
+## Last Evidence
+Phase 22 e Task 217 concluídas com sucesso:
+- **Task 210 (Tokens & Tipografia)**:
+  - `src/app/globals.css` configurado com paleta oficial GeraFeed: Primary Blue (`#2563EB`), Primary Purple (`#7C3AED`), Accent Teal (`#00C2A8`), Dark/Ink (`#0F172A`), Muted (`#64748B`), Light Surface (`#F1F5F9`) e superfícies navy contrastadas no modo escuro (`#07111F`, `#0D1B2D`, `#112239`). Mapeamento no `@theme inline` para Tailwind CSS 4.
+  - `src/app/layout.tsx` atualizado com fontes Google Sora (`--font-heading`) e Inter (`--font-sans`).
+  - `src/lib/cn.ts` criado exportando utilitário central `cn` com `clsx` e `tailwind-merge`.
+  - `src/components/design-system/typography.tsx` criado com Display, Heading1-4, Text, Caption e Overline.
+- **Task 211 (Primitivas Centrais)**:
+  - `src/components/ui/button.tsx` (CVA: default, gradient, secondary, outline, ghost, destructive, link; tamanhos sm/md/lg/icon; spinner e ícones).
+  - `src/components/ui/badge.tsx` (CVA: status semânticos do GeraFeed).
+  - `src/components/ui/icon-button.tsx` (com `aria-label` obrigatório por tipagem).
+  - `src/components/ui/separator.tsx` (horizontal e vertical).
+  - `src/components/ui/skeleton.tsx` (placeholder animado).
+- **Task 212 (Cards & Dados)**:
+  - `src/components/ui/card.tsx` (Card, Header, Title, Description, Content, Footer com variantes CVA).
+  - `src/components/design-system/stat-card.tsx` (KPIs com tendências, ícones e ações).
+  - `src/components/ui/progress.tsx` (barra de progresso com cálculo percentual e tags acessíveis).
+  - `src/components/design-system/status-indicator.tsx` (ponto com pulso animado para sincronização).
+- **Task 213 (Formulários)**:
+  - `src/components/ui/label.tsx` (com required).
+  - `src/components/ui/input.tsx` (foco WCAG, ícones leading/trailing e erro).
+  - `src/components/ui/textarea.tsx` e `src/components/ui/select.tsx` (chevron customizado).
+  - `src/components/ui/switch.tsx` (acessível por teclado).
+  - `src/components/design-system/form-field.tsx` (composição com IDs acessíveis).
+- **Task 214 (Layout & Feedback)**:
+  - `src/components/design-system/page-header.tsx` e `src/components/design-system/section-header.tsx`.
+  - `src/components/ui/alert.tsx`, `src/components/ui/empty-state.tsx` e `src/components/design-system/brand-decoration.tsx`.
+- **Task 215 (Sidebar Primitives)**:
+  - `src/components/layout/sidebar-primitives.tsx` estruturado sem quebrar a sidebar de produção legada.
+- **Task 216 (Vitrine no Backoffice)**:
+  - `src/app/(backoffice)/backoffice/design-system/page.tsx` criado como vitrine oficial completa demonstrando todos os tokens, componentes e alternância de tema em tempo real.
+  - `src/app/design-system/page.tsx` criado como rota alias.
+  - Link de navegação adicionado em `src/components/backoffice/backoffice-sidebar.tsx`.
+- **Task 217 (Validação Integral)**:
+  - `npx tsc --noEmit`: PASS (0 erros).
+  - `npm run lint`: PASS (0 erros).
+  - `npm run build`: PASS (72/72 rotas estáticas e dinâmicas geradas com sucesso).
+
+
+
+
+
+
+
+
+
+
 
 ## Completed (Current Phase)
 - [x] 201-multi-wordpress-editorial-review

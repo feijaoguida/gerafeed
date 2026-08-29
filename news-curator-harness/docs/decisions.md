@@ -332,3 +332,24 @@ Status: Accepted
 Phase 20 prefere troca no próximo ciclo.
 
 Pró-rata/immediate upgrade sofisticado fica fora de escopo até regra comercial explícita.
+
+## ADR-075. Design System Próprio com Tokens Semânticos e Tailwind CSS 4
+Status: Accepted
+
+O GeraFeed adotará um Design System próprio e modular, sem incorporar bibliotecas de componentes externas pesadas (como MUI, Chakra ou Ant Design).
+A base técnica utilizará:
+- Variáveis CSS nativas para tokens semânticos (`:root` e `.dark`).
+- Mapeamento no Tailwind CSS 4 via `@theme inline`.
+- Fontes oficiais via `next/font/google`: Sora (Títulos/Destaques) e Inter (Textos/Interface).
+- Utilitário unificado `cn` (`clsx` + `tailwind-merge`).
+- `class-variance-authority` (CVA) para variantes previsíveis e tipadas de componentes primitivos.
+- Suporte a Light Mode e Dark Mode sem duplicar componentes JSX.
+
+## ADR-076. Separação Estrita entre Fundação do Design System e Migração de Telas
+Status: Accepted
+
+Para garantir estabilidade, prevenir regressões e assegurar controle de qualidade:
+1. A Phase 22 cria exclusivamente a fundação de tokens, utilitários, componentes primitivos/compostos e a página de demonstração visual `/backoffice/design-system` (e `/design-system`).
+2. Nenhuma tela existente em produção será refatorada ou migrada até a conclusão e validação da fundação do Design System e autorização explícita do operador.
+3. Cada tela do sistema possui task dedicada de migração com garantia de paridade visual em Modo Claro e Modo Escuro.
+

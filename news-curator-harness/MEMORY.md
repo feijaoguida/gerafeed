@@ -344,3 +344,15 @@ Webhook/reconciliation é a fonte financeira.
 ## Asaas Hosted Checkout (invoiceUrl)
 
 A contratação de planos no Asaas deve ser feita gerando a assinatura (`POST /v3/subscriptions`) e, em seguida, capturando a `invoiceUrl` do primeiro pagamento (`GET /v3/subscriptions/{id}/payments`). Isso garante que o cliente seja direcionado à página oficial de pagamento do Asaas, que suporta Cartão de Crédito, Pix (QR Code/Copia e Cola) e Boleto de forma nativa e associada corretamente à assinatura gerada para aquele cliente. A tela de Upgrade deve tratar o redirecionamento com cuidado, e nunca enviar o cliente para a tela de "sucesso" se o `checkoutUrl` estiver ausente.
+
+## Design System GeraFeed (Phase 22+)
+- **Identidade**: "Conteúdo que flui. Inteligência que publica."
+- **Paleta**: Primary Blue (`#2563EB`), Primary Purple (`#7C3AED`), Accent Teal (`#00C2A8`), Dark/Ink (`#0F172A`), Muted (`#64748B`), Light Surface (`#F1F5F9`).
+- **Gradiente**: `linear-gradient(135deg, #2563EB 0%, #7C3AED 100%)`.
+- **Tipografia**: Sora (Títulos/Destaques) e Inter (Interface/Textos) via `next/font/google`.
+- **Tema**: Suporte estrito a Light Mode e Dark Mode sem duplicar componentes JSX.
+- **Tokens Semânticos**: Uso estrito de variáveis CSS (`--background`, `--foreground`, `--surface`, `--primary`, `--muted`, etc.) mapeadas no Tailwind CSS 4 via `@theme inline`.
+- **Componentes Primitivos**: `class-variance-authority` (CVA), `clsx`, `tailwind-merge`.
+- **Acessibilidade**: Foco visível obrigatório (`focus-visible:ring-2`), rótulos associados e contraste WCAG.
+- **Isolamento de Fases**: A Phase 22 é restrita à fundação e vitrine (`/backoffice/design-system`). A migração de telas existentes é realizada nas Fases 23 a 27 sob autorização.
+
