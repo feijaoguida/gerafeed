@@ -387,3 +387,94 @@ Toda task Billing exige, quando aplicável:
 - Tests PASS;
 - Build PASS;
 - Evidence.
+
+
+# Phase 28+. Regras adicionais de SEO e Measurement
+
+## Fonte de verdade SEO
+
+O código e a configuração pública do GeraFeed são a fonte de verdade para:
+
+- metadata;
+- canonicals;
+- sitemap;
+- robots;
+- structured data;
+- instrumentação GTM/dataLayer.
+
+Search Console e GA4 são ferramentas externas de observação. Não codificar suposições de status de indexação ou métricas dentro do domínio.
+
+## Indexação
+
+Rotas autenticadas, administrativas e de conta não são páginas de aquisição.
+
+Não inserir rotas privadas no sitemap.
+
+`robots.txt` não é segurança.
+
+Quando uma página HTML pública precisa sair do índice, usar diretiva `noindex` apropriada. Não bloquear a leitura dessa diretiva por acidente antes de validar o estado.
+
+## Metadata
+
+Toda landing page indexável deve possuir title, description e canonical próprios.
+
+Não herdar title comercial da home em login/register.
+
+Não duplicar a mesma intenção de busca em várias páginas quase iguais.
+
+## Structured Data
+
+Nunca fabricar:
+
+- review;
+- aggregateRating;
+- número de clientes;
+- preço;
+- desconto;
+- estatística;
+- autor;
+
+Structured data deve representar o conteúdo visível e fatos reais.
+
+## Analytics
+
+GTM é a camada de deployment de tags desta fase.
+
+GA4 deve ser configurado dentro do GTM. Não instalar GA4 novamente via gtag direto se GTM já o entrega.
+
+Nunca enviar PII para dataLayer/GA4:
+
+- email;
+- nome;
+- CPF/CNPJ;
+- userId;
+- workspaceId;
+- secrets;
+- corpo de artigos;
+- URLs privadas.
+
+Callback de checkout não é pagamento confirmado.
+
+## Consentimento
+
+Preferências devem ser acessíveis, reversíveis e sem dark pattern.
+
+Não declarar conformidade jurídica absoluta no código ou UI.
+
+## Conteúdo e posicionamento
+
+Preferir "curadoria editorial assistida por IA" a promessas de "anti-plágio".
+
+Não afirmar que transformação de imagem elimina direito autoral.
+
+Não publicar conteúdo SEO superficial só para preencher calendário.
+
+## Design System
+
+Toda nova página pública reutiliza os tokens, primitivas e padrões oficiais do GeraFeed.
+
+Não criar uma segunda biblioteca de UI para o blog ou landing pages.
+
+## Harness
+
+Uma task por vez. Discovered Work fora do escopo deve ser registrado e não implementado automaticamente.

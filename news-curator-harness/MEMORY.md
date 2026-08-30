@@ -356,3 +356,19 @@ A contratação de planos no Asaas deve ser feita gerando a assinatura (`POST /v
 - **Acessibilidade**: Foco visível obrigatório (`focus-visible:ring-2`), rótulos associados e contraste WCAG.
 - **Isolamento de Fases**: A Phase 22 é restrita à fundação e vitrine (`/backoffice/design-system`). A migração de telas existentes é realizada nas Fases 23 a 27 sob autorização.
 
+# Phase 28+. SEO & Organic Acquisition
+
+- O domínio público canônico do GeraFeed é `https://www.gerafeed.com.br`.
+- SEO técnico é implementado usando recursos do Next.js App Router sempre que possível.
+- Rotas autenticadas e Backoffice não fazem parte do sitemap.
+- Login e cadastro não devem herdar metadata comercial da home e devem permanecer fora do índice.
+- Google Search Console deve preferir propriedade de domínio validada por DNS.
+- GTM é a camada única de deployment das tags Google na Phase 28.
+- GA4 é configurado dentro do GTM para evitar disparo duplicado.
+- Analytics nunca recebe PII ou secrets.
+- Consentimento analítico deve ter escolha explícita e possibilidade de alteração.
+- Structured data nunca inventa reviews, ratings, clientes, preços ou métricas.
+- Posicionamento comercial recomendado: curadoria editorial assistida por IA, automação editorial WordPress e publicação multissite.
+- Evitar promessa de "anti-plágio" como eixo de SEO/marketing.
+- Landing pages iniciais: como-funciona, automacao-wordpress, rss-para-wordpress, curadoria-de-conteudo-com-ia, para-agencias, para-portais-de-noticias.
+- Blog usa fundação simples compatível com Vercel, preferencialmente filesystem Markdown/MDX se não existir CMS.
