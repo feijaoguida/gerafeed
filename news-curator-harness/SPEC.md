@@ -2441,4 +2441,384 @@ Criar a fundação do Design System proprietário do GeraFeed baseado na identid
 - **Phase 26**: Configurações & Billing (`/settings/wordpress`, `/settings/sources`, `/settings/ai`, `/settings/billing`, `/upgrade`).
 - **Phase 27**: Backoffice SuperAdmin (`/backoffice`, `/companies`, `/plans`, `/affiliate-prompts`).
 
+# Phase 28. SEO, Measurement & Organic Acquisition Foundation
+
+## 230. Objetivo
+
+Preparar tecnicamente o GeraFeed para descoberta, indexação, mensuração e aquisição orgânica.
+
+A fase deve tratar quatro camadas separadas:
+
+```text
+Crawling / Indexing
+        ↓
+Metadata / Entity
+        ↓
+Measurement / Attribution
+        ↓
+Landing Pages / Blog
+```
+
+O foco é a infraestrutura. Conteúdo editorial em escala será operado depois sobre esta base.
+
+## 231. Contexto atual
+
+O produto usa Next.js App Router, TypeScript, Prisma, PostgreSQL, Tailwind CSS v4, Vercel e Auth.js.
+
+A identidade visual oficial já existe e deve ser preservada:
+
+- Primary Blue: #2563EB
+- Primary Purple: #7C3AED
+- Accent Teal: #00C2A8
+- Dark / Ink: #0F172A
+- Sora para títulos
+- Inter para textos e interface
+- gradiente de marca Blue → Purple
+
+As telas públicas já passaram por migração para o Design System na Phase 23. Esta fase não recria o Design System.
+
+## 232. Política de indexação
+
+Criar uma política explícita de rotas.
+
+### Indexáveis
+
+Inicialmente:
+
+```text
+/
+/como-funciona
+/automacao-wordpress
+/rss-para-wordpress
+/curadoria-de-conteudo-com-ia
+/para-agencias
+/para-portais-de-noticias
+/blog
+/blog/[slug]
+/termos
+/privacidade
+```
+
+Observação: termos e privacidade podem ser indexáveis, mas não devem competir com landing pages. Não precisam entrar como prioridade comercial.
+
+### Não indexáveis
+
+Rotas de autenticação, aplicação e Backoffice não devem competir no Google:
+
+```text
+/login
+/register
+/settings/*
+/dashboard
+/articles/*
+/publishing/*
+/affiliates/*
+/backoffice/*
+/api/*
+```
+
+Usar `noindex` em páginas HTML que podem ser rastreadas. Não depender somente de `robots.txt` para retirar uma URL do índice.
+
+Rotas privadas continuam protegidas por autenticação/autorização. SEO não é mecanismo de segurança.
+
+## 233. Metadata
+
+Definir metadata base no App Router com URL canônica do produto:
+
+```text
+https://www.gerafeed.com.br
+```
+
+A home deve ter metadata própria, não herdada por login/register.
+
+Baseline sugerido para home:
+
+### Title
+
+```text
+GeraFeed | Automação de Conteúdo com IA para WordPress
+```
+
+### H1
+
+```text
+Automatize a Curadoria e Publicação de Conteúdo no WordPress com IA
+```
+
+### Description
+
+```text
+Monitore feeds RSS, transforme pautas em artigos, revise com IA e publique em múltiplos sites WordPress. Automatize sua operação editorial com o GeraFeed.
+```
+
+Todas as futuras landing pages devem possuir title, description, canonical, Open Graph e social image coerentes com a intenção da página.
+
+## 234. Sitemap
+
+Implementar sitemap usando convenções do Next.js App Router.
+
+Regras:
+
+- conter apenas URLs indexáveis e canônicas;
+- nunca listar login, registro, área autenticada, APIs ou Backoffice;
+- refletir novas landing pages e posts do blog automaticamente;
+- usar `lastModified` apenas quando houver valor real ou derivável;
+- não inventar atualização diária para páginas que não mudaram;
+- manter URL absoluta com HTTPS e host canônico `www.gerafeed.com.br`.
+
+## 235. Robots
+
+Implementar robots usando convenções do Next.js App Router.
+
+Objetivos:
+
+- declarar sitemap;
+- permitir crawling das áreas públicas;
+- evitar crawling inútil de APIs e áreas administrativas;
+- nunca tratar robots.txt como proteção de dados;
+- evitar bloquear páginas que precisam ser lidas pelo crawler para processar um `noindex`, especialmente páginas públicas de autenticação se elas já estiverem conhecidas pelo Google.
+
+## 236. Canonical
+
+Todo conteúdo público indexável deve possuir canonical consistente.
+
+Regras:
+
+- uma URL canônica por documento;
+- sem parâmetros de tracking no canonical;
+- preferir host oficial com `www`;
+- não canonicalizar páginas diferentes para a home por conveniência;
+- páginas do blog canonicalizam para seu próprio slug.
+
+## 237. Dados estruturados
+
+A home deve emitir JSON-LD válido para as entidades apropriadas.
+
+Baseline:
+
+- `Organization`
+- `WebSite`
+- `SoftwareApplication`
+
+Regras:
+
+- usar apenas dados factuais;
+- não emitir `aggregateRating`, `review`, número de clientes ou estatísticas sem fonte real e verificável no produto;
+- `sameAs` usa somente perfis sociais oficiais existentes;
+- logo deve apontar para asset público estável;
+- `applicationCategory` deve refletir software/SaaS de produtividade/editorial;
+- preço em schema só deve existir se houver uma oferta pública clara e coerente com a página.
+
+Posts do blog devem suportar `Article` ou `BlogPosting` quando a fundação do blog estiver pronta.
+
+## 238. Google Tag Manager
+
+O código da aplicação deve carregar um único container GTM em produção quando configurado.
+
+Variável sugerida:
+
+```text
+NEXT_PUBLIC_GTM_ID=GTM-XXXXXXX
+```
+
+Regras:
+
+- não hardcodar ID;
+- sem falha quando variável estiver ausente em desenvolvimento;
+- evitar instalação duplicada;
+- GA4 deve ser configurado dentro do GTM, não em uma segunda implementação direta paralela;
+- carregar scripts de maneira compatível com performance do Next.js;
+- validar via Tag Assistant/Preview externamente.
+
+## 239. Consentimento
+
+Criar fundação de preferências de consentimento para analytics.
+
+Escopo inicial:
+
+```text
+necessary = always true
+analytics = user choice
+marketing = false / reservado para futuro
+```
+
+Antes de consentimento de analytics, estado padrão deve ser negado para armazenamento analítico quando a estratégia escolhida assim exigir.
+
+A implementação deve:
+
+- não quebrar navegação;
+- ser acessível por teclado;
+- usar Design System GeraFeed;
+- persistir escolha de maneira adequada;
+- permitir reabrir preferências;
+- não usar dark patterns;
+- integrar estado com GTM/Google Consent Mode quando GTM estiver configurado.
+
+A adequação jurídica final à LGPD depende da política de privacidade e orientação jurídica da operação. O código não deve declarar conformidade legal absoluta.
+
+## 240. Eventos de aquisição orgânica
+
+Criar helper central de analytics baseado em `dataLayer`.
+
+Proibir envio de PII.
+
+Eventos mínimos:
+
+```text
+cta_click
+sign_up_completed
+wordpress_connected
+rss_source_added
+first_article_generated
+first_article_published
+begin_checkout
+```
+
+`purchase` ou `subscription_confirmed` só deve ser emitido de forma confiável quando existir um ponto real de confirmação financeira. Callback visual de checkout não é confirmação de pagamento.
+
+Propriedades permitidas devem ser categóricas e não sensíveis, por exemplo:
+
+```text
+cta_location
+page_path
+plan_code_public
+content_type
+source_channel
+```
+
+Não enviar:
+
+```text
+email
+name
+cpfCnpj
+userId
+workspaceId
+article body
+affiliateUrl
+API keys
+```
+
+## 241. Landing pages
+
+Criar arquitetura pública SEO reaproveitando o Design System existente.
+
+Landing pages iniciais:
+
+1. `/como-funciona`
+2. `/automacao-wordpress`
+3. `/rss-para-wordpress`
+4. `/curadoria-de-conteudo-com-ia`
+5. `/para-agencias`
+6. `/para-portais-de-noticias`
+
+Cada página precisa:
+
+- intenção de busca própria;
+- title próprio;
+- H1 único;
+- descrição clara;
+- blocos escaneáveis;
+- links internos naturais;
+- CTA para cadastro/teste;
+- FAQ somente quando houver perguntas úteis, sem fabricar FAQ apenas para schema;
+- screenshots/provas do produto quando disponíveis;
+- sem alegações de resultados não comprovados.
+
+Não criar páginas doorway com texto quase idêntico trocando uma keyword.
+
+## 242. Linguagem de posicionamento
+
+Evitar posicionamento centrado em "anti-plágio" ou promessa de tornar conteúdo de terceiros automaticamente original.
+
+Preferir:
+
+```text
+curadoria editorial assistida por IA
+monitoramento de fontes
+transformação de pautas
+contextualização
+revisão humana
+publicação multissite WordPress
+operação editorial
+```
+
+Imagens devem ser tratadas como processamento/otimização e atribuição conforme regras do produto. Não prometer que crop/filtro elimina direitos autorais.
+
+## 243. Blog
+
+Criar `/blog` e `/blog/[slug]` com fundação estática/SSG compatível com Vercel.
+
+Requisitos:
+
+- escolher a solução mais simples compatível com dependências atuais;
+- preferir solução filesystem Markdown/MDX se não houver CMS;
+- não introduzir CMS externo nesta fase;
+- frontmatter mínimo: title, description, slug, publishedAt, updatedAt opcional, author, category, tags, image opcional, draft;
+- drafts não entram em sitemap;
+- lista do blog com cards usando Design System;
+- página de artigo com HTML semântico;
+- heading hierarchy correta;
+- canonical;
+- Open Graph;
+- JSON-LD BlogPosting/Article;
+- links internos;
+- imagens com alt significativo;
+- data de publicação verdadeira;
+- `updatedAt` somente quando realmente revisado.
+
+## 244. Conteúdos iniciais
+
+A infraestrutura deve ficar preparada para os cinco primeiros briefs:
+
+1. Como automatizar um blog WordPress com RSS + IA sem prejudicar o SEO
+2. Conteúdo com IA é penalizado pelo Google? Guia para WordPress
+3. RSS para WordPress: como transformar feeds em posts completos
+4. Como criar um portal de notícias no WordPress com automação editorial
+5. Autoblogging WordPress: plugin, n8n ou plataforma SaaS?
+
+A Phase 28 pode criar placeholders/drafts apenas se explicitamente solicitado. Não publicar conteúdo superficial automaticamente para completar a task.
+
+## 245. Performance
+
+Novas implementações não devem degradar a landing page de forma desnecessária.
+
+Regras:
+
+- scripts de terceiros controlados;
+- imagens responsivas;
+- sem JS client-side quando Server Component resolve;
+- evitar dependências pesadas só para SEO;
+- preservar acessibilidade;
+- usar semantic HTML;
+- validar build final.
+
+## 246. Definition of Done Phase 28
+
+- [ ] Política de indexação explícita.
+- [ ] Metadata base corrigida.
+- [ ] Home com title/description/OG próprios.
+- [ ] Login/Register e áreas privadas não indexáveis.
+- [ ] Canonicals consistentes.
+- [ ] sitemap.xml funcional.
+- [ ] robots.txt funcional e referenciando sitemap.
+- [ ] Organization JSON-LD factual.
+- [ ] WebSite JSON-LD factual.
+- [ ] SoftwareApplication JSON-LD factual.
+- [ ] GTM integrado por env, sem duplicação.
+- [ ] Consent foundation implementada.
+- [ ] Helper dataLayer central.
+- [ ] Eventos orgânicos mínimos instrumentados.
+- [ ] Seis landing pages públicas implementadas.
+- [ ] Blog foundation implementada.
+- [ ] Blog entra dinamicamente no sitemap.
+- [ ] Rotas privadas não entram no sitemap.
+- [ ] Nenhuma PII enviada ao analytics.
+- [ ] Design System preservado.
+- [ ] Light/Dark preservados onde aplicável.
+- [ ] TypeScript PASS.
+- [ ] Lint PASS.
+- [ ] Tests PASS quando aplicável.
+- [ ] Build PASS.
+- [ ] Evidence registrada por task.
 

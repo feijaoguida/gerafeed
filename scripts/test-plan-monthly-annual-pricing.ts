@@ -134,7 +134,7 @@ async function runTests() {
       where: { slug: "starter" },
     });
 
-    if (!starterPlan || Number(starterPlan.monthlyPrice) !== 47.0) {
+    if (!starterPlan || Number(starterPlan.monthlyPrice) !== 39.9) {
       throw new Error("FAIL: BillingService não inicializou o plano Starter com monthlyPrice.");
     }
 

@@ -1,13 +1,234 @@
 # PROGRESS.md
 
 ## Current Phase
-Phase 27. Migração de Telas - Backoffice SuperAdmin (Concluída)
+Phase 28. SEO, Measurement & Organic Acquisition Foundation
 
 ## Current Task
-229-migrate-backoffice-screens
+238-technical-seo-validation-hardening
 
 ## Status
 DONE
+
+## Phase 28. SEO, Measurement & Organic Acquisition Foundation
+- [x] 230-seo-public-route-policy-metadata
+- [x] 231-sitemap-robots-canonical
+- [x] 232-structured-data-brand-entity
+- [x] 233-gtm-consent-foundation
+- [x] 234-organic-conversion-events
+- [x] 235-public-seo-landing-architecture
+- [x] 236-seo-landing-pages
+- [x] 237-blog-foundation
+- [x] 238-technical-seo-validation-hardening
+
+## Phase 28 Final Evidence
+
+### Technical SEO
+- **Base Canônica e Configuração**: Centralizada em `src/lib/site-config.ts` com host oficial estrito `https://www.gerafeed.com.br` e locale `pt_BR`.
+- **Rotas Públicas vs Privadas**:
+  - Públicas indexáveis (`robots: index, follow`): `/`, `/como-funciona`, `/automacao-wordpress`, `/rss-para-wordpress`, `/curadoria-de-conteudo-com-ia`, `/para-agencias`, `/para-portais-de-noticias`, `/blog`, `/blog/[slug]`.
+  - Autenticação e internas desindexadas (`robots: noindex, follow/false`): `/login`, `/register`, `/(app)/*` (dashboard, publishing, settings, articles), `/(backoffice)/*`, `/design-system`.
+- **Sitemap XML (`/sitemap.xml`)**: App Router dinâmico em `src/app/sitemap.ts`. Contém exclusivamente as URLs públicas canônicas e posts publicados do blog. Exclui 100% de rotas privadas, endpoints de API e rascunhos.
+- **Robots.txt (`/robots.txt`)**: App Router em `src/app/robots.ts`. Permite `/`, desautoriza explicitamente `/api/` e `/backoffice/`, e referencia `https://www.gerafeed.com.br/sitemap.xml`.
+- **Metadados & Hierarquia**: Todas as páginas possuem `<title>` exclusivo no formato `%s | GeraFeed`, `<meta name="description">` factual e única, tag `<link rel="canonical">`, OpenGraph / Twitter tags e exatamente um `<h1>` semântico.
+- **Structured Data**: Schemas JSON-LD factuais gerados em `src/lib/seo/structured-data.ts` (`Organization`, `WebSite`, `SoftwareApplication` e `BlogPosting`), sem schemas proibidos ou ratings inventados.
+
+### Measurement
+- **Google Tag Manager & Consent Mode v2**: Implementado em `src/components/analytics/google-tag-manager.tsx`. Inicializa estado padrão `analytics_storage: 'denied'` antes de scripts interativos e injeta container somente com `NEXT_PUBLIC_GTM_ID` válido.
+- **Gerenciamento de Consentimento**: Componente `src/components/analytics/consent-banner.tsx` e persistência local versionada em `src/lib/consent.ts`. Suporta novos visitantes, aceite explícito, continuação sem analytics e reabertura de preferências a qualquer momento via evento customizado acionado no rodapé.
+- **Eventos de Conversão Orgânica**: Módulo central `src/lib/analytics.ts` instrumentado com tipagem forte e tolerância a falhas:
+  - `cta_click` (header, hero, pricing, footer_cta)
+  - `sign_up_completed` (cadastro concluído no banco)
+  - `wordpress_connected` (site WordPress conectado com sucesso)
+  - `rss_source_added` (fonte RSS cadastrada)
+  - `article_generated` (reescrita de IA concluída)
+  - `article_published` (artigo aprovado e publicado no WP)
+  - `begin_checkout` (início de checkout do plano)
+
+### Landing Pages
+- 6 landing pages indexáveis implementadas com arquitetura modular de blocos (`src/components/landing/`):
+  1. `/como-funciona`: Fluxo editorial ponta a ponta (Fontes → Captura → Seleção → IA → Revisão → WordPress).
+  2. `/automacao-wordpress`: Escale a publicação com a REST API nativa do WP mantendo controle humano.
+  3. `/rss-para-wordpress`: Diferença essencial entre agregação mecânica e curadoria factual profunda.
+  4. `/curadoria-de-conteudo-com-ia`: IA assistida alinhada às diretrizes People-First do Google.
+  5. `/para-agencias`: Gestão multissite B2B e padronização operacional para portais de clientes.
+  6. `/para-portais-de-noticias`: Agilidade no plantão de notícias e cobertura de comunicados em tempo real.
+- **Menu do Rodapé Unificado (`PublicFooter`)**: As novas páginas, o Blog e os pontos de acesso à conta foram organizados em colunas temáticas (*Soluções*, *Segmentos*, *Recursos & Conta*) no rodapé de todas as páginas públicas e da Home `/`, preservando o menu superior com as âncoras originais da landing page.
+
+### Blog
+- **Engine Markdown Filesystem**: Criada em `src/lib/blog.ts` operando sobre `content/blog/` com parser seguro de frontmatter YAML sem dependências pesadas externas.
+- **Controle de Rascunhos**: Filtragem automática de `draft: boolean`. Rascunhos não aparecem na listagem, retornam 404 em rotas públicas e nunca entram no sitemap.
+- **Renderizador de Markdown Seguro**: `src/components/blog/markdown-content.tsx` converte elementos para nós React nativos e links via `next/link`, sem `dangerouslySetInnerHTML`.
+- **5 Briefs Editoriais Estruturados**: Preparados em `content/blog/*.md` com status `draft: true`.
+
+### Privacy / PII
+- **Sanitização Ativa de Payloads**: Função `sanitizeProperties` em `src/lib/analytics.ts` com lista de negação estrita para chaves sensíveis (`email`, `name`, `password`, `cpf`, `cnpj`, `tokens`, `secrets`, `articleContent`, etc.). Somente chaves permitidas e tipos primitivos chegam ao `window.dataLayer`.
+
+### Validation Commands
+- `npx tsc --noEmit`: PASS (0 erros).
+- `npm run lint`: PASS (0 erros, 7 warnings não-bloqueantes pré-existentes).
+- `npm run build`: PASS (83/83 rotas compiladas com sucesso: estáticas, dinâmicas e SSG).
+- `scripts/test-blog.ts`: PASS (6/6 asserções de isolamento de drafts e inclusão no sitemap).
+- `scripts/validate-phase28.ts`: PASS (6/6 auditorias de sitemap, robots, structured data e PII).
+
+### External Validations Pending
+- [ ] Search Console domain verified (PENDING EXTERNAL: requer acesso ao DNS/painel do Search Console)
+- [ ] Sitemap submitted and accepted (PENDING EXTERNAL: requer login no Google Search Console)
+- [ ] URL Inspection home (PENDING EXTERNAL: requer acesso ao Search Console da propriedade)
+- [ ] Rich Results / Schema validation live (PENDING EXTERNAL: requer deploy público para execução no Rich Results Test)
+- [ ] GTM Preview & Tag Assistant (PENDING EXTERNAL: requer container GTM configurado com tags ativas)
+- [ ] GA4 Realtime verification (PENDING EXTERNAL: requer fluxo de tráfego de produção com ID GA4)
+- [ ] Search Console linked to GA4 (PENDING EXTERNAL: requer vínculo administrativo no GA4)
+
+### Discovered Work
+- [ ] Criar páginas públicas aprovadas de Termos de Uso (`/termos`) e Política de Privacidade (`/privacidade`) para substituir placeholders visuais, sem inventar texto legal sem validação jurídica.
+- [ ] Injetar container oficial do GTM no ambiente de produção através da variável de ambiente `NEXT_PUBLIC_GTM_ID` assim que a conta for liberada pelo time de marketing.
+
+## Last Evidence
+Phase 28 / Task 238 concluída com sucesso: validação técnica completa, endurecimento de SEO e auditoria de mensuração.
+
+
+## Last Evidence
+Phase 28 / Task 237 concluída com sucesso:
+- `src/lib/blog.ts`: Engine de conteúdo Markdown orientada a arquivos em `content/blog/` com parser seguro de frontmatter YAML sem dependências pesadas externas. Suporta tipagem estrita (`BlogPostFrontmatter`, `BlogPost`) e controle de rascunhos (`draft: boolean`), garantindo que apenas matérias aprovadas apareçam publicamente.
+- `src/components/blog/markdown-content.tsx`: Componente de renderização Markdown seguro que converte títulos H1-H4, listas (ul/ol), citações e formatação inline (bold, italic, code, links internos via `next/link`) diretamente para nós React nativos, sem uso de `dangerouslySetInnerHTML`.
+- `src/lib/seo/structured-data.ts`: Adicionado helper `buildArticleJsonLd` que produz dados estruturados factuais no schema `BlogPosting` com autor, datas de publicação/modificação e entidade publicadora oficial.
+- `src/app/(public)/blog/page.tsx`: Listagem indexável com H1, metadados semânticos, cards de artigos publicados e `EmptyState` nativo quando não há posts ativos.
+- `src/app/(public)/blog/[slug]/page.tsx`: Página dinâmica de artigo com `generateStaticParams`, canonical individual, breadcrumb, Article JSON-LD e comportamento 404 estrito para slugs inexistentes ou rascunhos.
+- `content/blog/`: Estrutura com 5 briefs editoriais cadastrados como rascunhos (`draft: true`):
+  1. `como-automatizar-blog-wordpress-rss-ia-seo.md`
+  2. `conteudo-com-ia-e-penalizado-pelo-google.md`
+  3. `rss-para-wordpress-transformar-feeds-em-posts.md`
+  4. `como-criar-portal-noticias-wordpress-automacao.md`
+  5. `autoblogging-wordpress-plugin-n8n-ou-saas.md`
+- `src/app/sitemap.ts`: Atualizado para incluir `/blog` e mapear dinamicamente apenas posts com `draft: false`.
+- Validação automatizada (`scripts/test-blog.ts`): Testou exclusão de drafts no blog e sitemap, busca por slug público vs autenticado, retorno 404 para slugs inexistentes, e injeção/remoção temporária de fixture publicada. Todos os 6 cenários aprovados.
+- `npx tsc --noEmit`: PASS.
+- `npm run lint`: PASS (0 erros).
+- `npm run build`: PASS (83/83 rotas compiladas com sucesso, `/blog` como estática e `/blog/[slug]` como SSG).
+
+
+## Last Evidence
+Phase 28 / Task 236 concluída com sucesso:
+- 6 landing pages implementadas com intenções editoriais distintas, metadados canônicos, hierarquia de cabeçalhos semântica e inclusão dinâmica no sitemap:
+
+| URL | Intent | Title | H1 | Canonical | In Sitemap | CTA |
+| :--- | :--- | :--- | :--- | :--- | :---: | :--- |
+| `/como-funciona` | Entender o fluxo do GeraFeed | Como funciona o GeraFeed \| Curadoria e Publicação no WordPress | Da fonte RSS à publicação no WordPress em um fluxo editorial controlado | `https://www.gerafeed.com.br/como-funciona` | Sim | `cta_click` (`hero_como_funciona`, `footer_como_funciona`) |
+| `/automacao-wordpress` | automatizar blog wordpress | Automação de Conteúdo para WordPress com IA \| GeraFeed | Automação Editorial com IA para Sites e Blogs WordPress | `https://www.gerafeed.com.br/automacao-wordpress` | Sim | `cta_click` (`hero_automacao_wordpress`, `footer_automacao_wordpress`) |
+| `/rss-para-wordpress` | RSS para post WordPress | RSS para WordPress: Transforme Feeds em Posts com IA \| GeraFeed | Transforme Feeds RSS em Artigos Completos no WordPress | `https://www.gerafeed.com.br/rss-para-wordpress` | Sim | `cta_click` (`hero_rss_para_wordpress`, `footer_rss_para_wordpress`) |
+| `/curadoria-de-conteudo-com-ia` | Curadoria assistida com IA | Curadoria de Conteúdo com IA para WordPress \| GeraFeed | Curadoria de Conteúdo com IA: Qualidade Editorial em Escala | `https://www.gerafeed.com.br/curadoria-de-conteudo-com-ia` | Sim | `cta_click` (`hero_curadoria_ia`, `footer_curadoria_ia`) |
+| `/para-agencias` | Gestão multissite para agências | GeraFeed para Agências: Gestão e Publicação Multissite com IA | Escale a Operação Editorial de Múltiplos Clientes WordPress | `https://www.gerafeed.com.br/para-agencias` | Sim | `cta_click` (`hero_para_agencias`, `footer_para_agencias`) |
+| `/para-portais-de-noticias` | Cobertura ágil para portais | GeraFeed para Portais de Notícias: Agilidade e Cobertura Contínua | Agilidade na Cobertura de Pautas para Portais de Notícias | `https://www.gerafeed.com.br/para-portais-de-noticias` | Sim | `cta_click` (`hero_para_portais`, `footer_para_portais`) |
+
+- `src/app/sitemap.ts`: Atualizado para conter as 6 rotas estáticas indexáveis.
+- `npx tsc --noEmit`: PASS.
+- `npm run lint`: PASS (0 erros).
+- `npm run build`: PASS (82/82 rotas geradas estaticamente com sucesso).
+
+
+## Last Evidence
+Phase 28 / Task 235 concluída com sucesso:
+- Arquitetura de blocos modulares para landing pages públicas criada em `src/components/landing/`:
+  - `public-header.tsx`: Cabeçalho unificado com links institucionais, alternador de tema e CTA rastreado.
+  - `public-footer.tsx`: Rodapé com links semânticos, copyright e acionador de preferências de cookies.
+  - `seo-hero.tsx`: Bloco de topo com badge, H1 semântico exclusivo, subtítulo, bullet points, CTA e garantias.
+  - `problem-section.tsx`: Comparativo de desafios manuais versus curadoria automatizada GeraFeed.
+  - `workflow-steps.tsx`: Grid visual de progressão editorial de 4 etapas numeradas.
+  - `feature-grid.tsx`: Vitrine de diferenciais tecnológicos com tags de benefício.
+  - `use-case-section.tsx`: Módulos voltados a personas específicas (agências, portais e afiliados).
+  - `faq-section.tsx`: Seção interativa e acessível de perguntas frequentes sem fabricação indevida de schemas.
+  - `seo-cta.tsx`: Banner de alta conversão de fechamento de página com gradientes de marca.
+  - `related-links.tsx`: Interlinking semântico interno entre páginas e guias.
+  - `landing-layout.tsx`: Shell estrutural unificado que provê iluminação ambiente e invólucro completo.
+- `npx tsc --noEmit`: PASS.
+- `npm run lint`: PASS (0 erros).
+- `npm run build`: PASS (76/76 rotas compiladas).
+
+
+## Last Evidence
+Phase 28 / Task 234 concluída com sucesso:
+- `src/lib/analytics.ts`: Módulo seguro de mensuração encapsulando `window.dataLayer` com tipagem estrita de eventos (`ConversionEventName`, `EventPropertiesMap`) e filtragem rigorosa de PII (`sanitizeProperties` com lista de negação de chaves sensíveis como `email`, `name`, `password`, `cpf`, `cnpj`, `tokens`, etc.). Falhas silenciosas garantem que operações de produto nunca sejam bloqueadas por telemetria.
+- Matriz de Eventos de Conversão Instrumentados:
+
+| Evento | Ponto de disparo | Propriedades | Sem PII? | Validado |
+| :--- | :--- | :--- | :---: | :---: |
+| `cta_click` | Cliques em "Comece Grátis" e planos (`landing-view.tsx`) | `cta_location`, `page_path` | Sim | Sim |
+| `sign_up_completed` | Sucesso em `fetch("/api/auth/register")` (`register-view.tsx`) | `page_path` | Sim | Sim |
+| `wordpress_connected` | Sucesso no cadastro de WordPress (`settings/wordpress/page.tsx`) | `site_type` | Sim | Sim |
+| `rss_source_added` | Sucesso na criação de Source RSS (`settings/sources/page.tsx`) | Nenhuma (evento puro) | Sim | Sim |
+| `article_generated` | Reescrita por IA concluída (`rss-publishing-queue.tsx`, `articles/[id]/page.tsx`) | `content_type` | Sim | Sim |
+| `article_published` | Artigo aprovado e publicado no WP (`articles/[id]/page.tsx`) | `destination_type` | Sim | Sim |
+| `begin_checkout` | Início de contratação de plano no Asaas (`billing/upgrade/page.tsx`) | `plan_code_public`, `cycle` | Sim | Sim |
+
+- `npx tsc --noEmit`: PASS.
+- `npm run lint`: PASS (0 erros).
+- `npm run build`: PASS (76/76 rotas compiladas).
+
+
+## Last Evidence
+Phase 28 / Task 233 concluída com sucesso:
+- `src/lib/consent.ts`: Camada central de gerenciamento de consentimento de privacidade e cookies. Persiste preferências versionadas no `localStorage` sob chave `gerafeed_consent_preferences` (`necessary: true`, `analytics: boolean`, `marketing: false`, `updatedAt`).
+- `src/components/analytics/google-tag-manager.tsx`: Provedor único de GTM compatível com Next.js App Router e Google Consent Mode v2. Inicializa o estado default com `analytics_storage: 'denied'` e tags de ads `denied` antes da execução de scripts externos. Injeta o script de container apenas quando `NEXT_PUBLIC_GTM_ID` é informado e sintaticamente válido.
+- `src/components/analytics/consent-banner.tsx`: Banner de preferências acessível (`role="region"`, `aria-label`), responsivo, integrado ao Design System nos modos Claro e Escuro, com botões explícitos de opt-in ("Aceitar Analytics") e opt-out ("Continuar sem Analytics"). Ouve evento `open-consent-preferences` para permitir reabertura da escolha pelo usuário a qualquer momento.
+- `src/app/(public)/landing-view.tsx`: Adicionado botão no rodapé ("Preferências de Cookies") que reabre o banner de consentimento sem recarregar a página.
+- `src/app/layout.tsx`: Integrado `GoogleTagManager` e `ConsentBanner` dentro do shell global sob `ThemeProvider`.
+- `.env.example`: Documentada variável `NEXT_PUBLIC_GTM_ID`.
+- `npx tsc --noEmit`: PASS.
+- `npm run lint`: PASS (0 erros).
+- `npm run build`: PASS (76/76 rotas compiladas).
+
+
+## Last Evidence
+Phase 28 / Task 232 concluída com sucesso:
+- `src/components/seo/json-ld.tsx`: Componente de renderização segura de application/ld+json com sanitização de caracteres para prevenção contra injeções.
+- `src/lib/seo/structured-data.ts`: Gerador de dados estruturados com 3 entidades factuais oficiais:
+  - `Organization`: Nome GeraFeed, URL oficial canônica (`https://www.gerafeed.com.br`) e logo público oficial (`/brand/logo.png`). Redes sociais e dados cadastrais omitidos por ausência de comprovação prévia no repositório.
+  - `WebSite`: Nome GeraFeed, URL oficial canônica e descrição institucional do produto.
+  - `SoftwareApplication`: Categoria `BusinessApplication`, sistema operacional `All`, URL oficial e descrição de produto condizente com a proposta de valor. Sem avaliações, contagens de instalação ou notas fabricadas.
+- `src/app/(public)/page.tsx`: Injeta `<JsonLd data={getHomeJsonLd()} />` no HTML da página inicial.
+- Verificação do HTML estático gerado: JSON-LD renderizado perfeitamente no `<head>/<body>` com parse 100% válido.
+- `npx tsc --noEmit`: PASS.
+- `npm run lint`: PASS (0 erros).
+- `npm run build`: PASS (76/76 rotas compiladas).
+
+
+## Last Evidence
+Phase 28 / Task 231 concluída com sucesso:
+- `src/app/sitemap.ts`: Gerador de sitemap oficial em conformidade com o App Router do Next.js. Lista estritamente a URL canônica pública indexável existente (`https://www.gerafeed.com.br`), excluindo qualquer rota privada, administrativa, login ou registro. Datas falsas foram estritamente omitidas.
+- `src/app/robots.ts`: Diretivas de robots geradas apontando para `https://www.gerafeed.com.br/sitemap.xml`, liberando rastreamento público (`allow: /`) para permitir leitura de `noindex` em páginas de login/register, e desestimulando crawling de `/api/` e `/backoffice/`.
+- Verificação do build estático:
+  - `/robots.txt`: Retorna User-Agent: *, Allow: /, Disallow: /api/, Disallow: /backoffice/, Sitemap: https://www.gerafeed.com.br/sitemap.xml.
+  - `/sitemap.xml`: XML válido com namespace `http://www.sitemaps.org/schemas/sitemap/0.9` e loc `https://www.gerafeed.com.br`.
+- `npx tsc --noEmit`: PASS.
+- `npm run lint`: PASS (0 erros).
+- `npm run build`: PASS (76/76 rotas compiladas).
+
+
+## Last Evidence
+Phase 28 / Task 230 concluída com sucesso:
+- `src/lib/site-config.ts`: Módulo central criado exportando `siteConfig` com nome, slogan, URL canônica (`https://www.gerafeed.com.br`), locale `pt_BR`, titles e descriptions padronizados.
+- `src/app/layout.tsx`: Configurado com `metadataBase: new URL(siteConfig.url)`, template de título `%s | GeraFeed`, descrição default da marca, preservando `lang="pt-BR"` e ícones oficiais.
+- `src/app/(public)/page.tsx`: Transformado em Server Component com metadata exclusiva da home (`GeraFeed | Automação de Conteúdo com IA para WordPress`), canonical oficial, OpenGraph e Twitter cards.
+- `src/app/(public)/landing-view.tsx`: Componente de cliente com o H1 comercial atualizado para `Automatize a Curadoria e Publicação de Conteúdo no WordPress com IA` mantendo a tagline de apoio.
+- `src/app/(public)/login/page.tsx` e `login-view.tsx`: Server Component com título `Entrar | GeraFeed` e diretiva `robots: { index: false, follow: true }`.
+- `src/app/(public)/register/page.tsx` e `register-view.tsx`: Server Component com título `Criar conta | GeraFeed` e diretiva `robots: { index: false, follow: true }`.
+- `src/app/(app)/layout.tsx`: Configurado com `robots: { index: false, follow: false }` para impedir indexação da área logada.
+- `src/app/(backoffice)/backoffice/layout.tsx`: Configurado com `robots: { index: false, follow: false }` para proteger áreas do superadmin.
+- `src/app/design-system/page.tsx`: Configurado com `robots: { index: false, follow: false }`.
+- Verificação do HTML compilado:
+  - Home (`/`): `<title>GeraFeed | Automação de Conteúdo com IA para WordPress</title>`, canonical `https://www.gerafeed.com.br`, sem robots noindex.
+  - Login (`/login`): `<title>Entrar | GeraFeed</title>`, `<meta name="robots" content="noindex, follow">`.
+  - Register (`/register`): `<title>Criar conta | GeraFeed</title>`, `<meta name="robots" content="noindex, follow">`.
+  - Design System (`/design-system`): `<meta name="robots" content="noindex, nofollow">`.
+- `npx tsc --noEmit`: PASS.
+- `npm run lint`: PASS (0 erros).
+- `npm run build`: PASS (74/74 rotas compiladas).
+
+## Discovered Work
+- Descrição: Criar páginas públicas de Termos de Uso e Política de Privacidade com conteúdo aprovado (`/termos` e `/privacidade`).
+- Motivo: Links no cadastro e rodapé necessitam apontar para documentos legais reais sem inventar termos fictícios.
+- Impacto: Confiança institucional, compliance com LGPD e completude de SEO.
+
 
 ## Completed
 - Phase 1. Core MVP
@@ -246,3 +467,4 @@ Concluída correção de bugs e melhorias de UX fora do escopo principal:
 
 ## Previous Evidence
 Publicação de Artigos de Afiliados no WordPress e Seleção de Categoria/Site concluídas na Phase 19, com TypeScript e Lint PASS conforme histórico anterior.
+

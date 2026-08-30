@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Alert } from "@/components/ui/alert";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Skeleton } from "@/components/ui/skeleton";
+import { trackEvent } from "@/lib/analytics";
 
 interface Source {
   id: string;
@@ -112,6 +113,7 @@ export default function SettingsSourcesPage() {
       setNewSourceUrl("");
       setNewDefaultPromptType("");
       setSuccessMessage("Fonte RSS cadastrada com sucesso!");
+      trackEvent("rss_source_added");
       await refreshSources();
     } catch (err) {
       setErrorMessage(err instanceof Error ? err.message : "Erro ao adicionar fonte.");

@@ -30,6 +30,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
+import { trackEvent } from "@/lib/analytics";
 
 interface Category {
   id: string;
@@ -245,6 +246,7 @@ export default function ReviewArticlePage({ params }: { params: Promise<{ id: st
         setArticle((prev) => (prev ? { ...prev, ...updated } : null));
       }
       setSuccessMessage("Conteúdo e mídia reescritos com sucesso pela IA!");
+      trackEvent("article_generated", { content_type: "rss_rewrite" });
     } catch (err) {
       setErrorMessage(err instanceof Error ? err.message : "Erro na IA.");
     } finally {
@@ -308,6 +310,7 @@ export default function ReviewArticlePage({ params }: { params: Promise<{ id: st
       if (!res.ok) throw new Error(data.error || "Erro ao aprovar e publicar no WordPress.");
 
       setSuccessMessage("Artigo APROVADO e publicado com sucesso no WordPress!");
+      trackEvent("article_published", { destination_type: "wordpress" });
       setArticle((prev) => (prev ? { ...prev, status: "PUBLISHED" } : null));
 
       setTimeout(() => {

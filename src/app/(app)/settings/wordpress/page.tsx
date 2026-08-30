@@ -27,6 +27,7 @@ import { Input } from "@/components/ui/input";
 import { Alert } from "@/components/ui/alert";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Skeleton } from "@/components/ui/skeleton";
+import { trackEvent } from "@/lib/analytics";
 
 interface WordPressSiteItem {
   id: string;
@@ -205,6 +206,7 @@ export default function SettingsWordPressPage() {
       if (!res.ok) throw new Error(data.error || "Erro ao adicionar site.");
 
       setSuccessMessage("Site WordPress cadastrado com sucesso!");
+      trackEvent("wordpress_connected", { site_type: "wordpress" });
       setIsCreatingSite(false);
       setNewSiteName("");
       setNewSiteUrl("");

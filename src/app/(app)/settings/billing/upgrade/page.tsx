@@ -18,6 +18,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Alert } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton";
+import { trackEvent } from "@/lib/analytics";
 
 interface FeatureItem {
   id: string;
@@ -227,6 +228,11 @@ export default function UpgradePage() {
       }
 
       // 2. Call checkout API
+      trackEvent("begin_checkout", {
+        plan_code_public: plan.slug,
+        cycle,
+      });
+
       const res = await fetch("/api/billing/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },

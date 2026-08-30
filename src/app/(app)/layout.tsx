@@ -1,7 +1,15 @@
 import { Suspense } from "react";
+import type { Metadata } from "next";
 import { Sidebar } from "@/components/sidebar";
 import { auth, DEFAULT_WORKSPACE_ID } from "@/auth";
 import { BillingService, AFFILIATE_FEATURES } from "@/lib/billing";
+
+export const metadata: Metadata = {
+  robots: {
+    index: false,
+    follow: false,
+  },
+};
 
 /**
  * Layout da área autenticada.

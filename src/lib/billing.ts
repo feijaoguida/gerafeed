@@ -79,18 +79,74 @@ export class BillingService {
   }
 
   /**
-   * Ensures default plans and features exist in the database.
-   * Only creates default plans if they do not exist; never overwrites user customizations.
+   * Ensures default plans and features exist in the database and are kept in sync with SEED_PLANS.
+   * Synchronizes plan attributes and links corresponding features.
    */
   static async ensureDefaultPlans() {
     await this.ensureDefaultFeatures();
-    for (const plan of SEED_PLANS) {
-      const existing = await prisma.plan.findUnique({
-        where: { slug: plan.slug },
+
+    const allFeatures = await prisma.feature.findMany();
+    const featureMap = new Map(allFeatures.map((f) => [f.key, f]));
+
+    for (const seedPlan of SEED_PLANS) {
+      const { features: planFeaturesSeed, ...planData } = seedPlan;
+
+      const plan = await prisma.plan.upsert({
+        where: { slug: seedPlan.slug },
+        update: {
+          name: planData.name,
+          description: planData.description,
+          price: planData.price,
+          monthlyPrice: planData.monthlyPrice,
+          annualDiscountPercent: planData.annualDiscountPercent,
+          periodicity: planData.periodicity ?? "MONTHLY",
+          active: planData.active ?? true,
+          highlight: planData.highlight ?? false,
+          maxArticles: planData.maxArticles,
+          maxDailyArticles: planData.maxDailyArticles,
+          maxSources: planData.maxSources,
+          maxWordPressSites: planData.maxWordPressSites,
+        },
+        create: {
+          slug: planData.slug,
+          name: planData.name,
+          description: planData.description,
+          price: planData.price,
+          monthlyPrice: planData.monthlyPrice,
+          annualDiscountPercent: planData.annualDiscountPercent,
+          periodicity: planData.periodicity ?? "MONTHLY",
+          active: planData.active ?? true,
+          highlight: planData.highlight ?? false,
+          maxArticles: planData.maxArticles,
+          maxDailyArticles: planData.maxDailyArticles,
+          maxSources: planData.maxSources,
+          maxWordPressSites: planData.maxWordPressSites,
+        },
       });
-      if (!existing) {
-        await prisma.plan.create({
-          data: plan,
+
+      // Synchronize plan features
+      for (const [key, dbFeature] of featureMap.entries()) {
+        const seedFeatureConfig = planFeaturesSeed?.find((f) => f.featureKey === key);
+        const isEnabled = seedFeatureConfig?.enabled !== undefined ? seedFeatureConfig.enabled : false;
+        const limit = seedFeatureConfig?.limit ?? null;
+
+        await prisma.planFeature.upsert({
+          where: {
+            planId_featureId: {
+              planId: plan.id,
+              featureId: dbFeature.id,
+            },
+          },
+          update: {
+            enabled: isEnabled,
+            limit: limit,
+          },
+          create: {
+            planId: plan.id,
+            featureId: dbFeature.id,
+            enabled: isEnabled,
+            limit: limit,
+          },
         });
       }
     }

@@ -27,6 +27,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { FormField } from "@/components/design-system/form-field";
 import { Select } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
+import { trackEvent } from "@/lib/analytics";
 
 interface Article {
   id: string;
@@ -292,6 +293,7 @@ function RssPublishingQueueContent() {
       if (!res.ok) throw new Error(data.message || data.error || "Erro no processamento de IA.");
 
       setSuccessMessage("Artigo processado e reescrito com IA com sucesso!");
+      trackEvent("article_generated", { content_type: "rss_rewrite" });
       fetchArticles();
     } catch (err) {
       setErrorMessage((err as Error).message);

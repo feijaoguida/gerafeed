@@ -15,9 +15,15 @@ const inter = Inter({
   weight: ["400", "500", "600", "700"],
 });
 
+import { siteConfig } from "@/lib/site-config";
+
 export const metadata: Metadata = {
-  title: "GeraFeed - Conteúdo que flui. Inteligência que publica.",
-  description: "Curadoria inteligente de notícias RSS, reescrita assistida por IA e publicação automática no WordPress",
+  metadataBase: new URL(siteConfig.url),
+  title: {
+    default: siteConfig.defaultTitle,
+    template: `%s | ${siteConfig.name}`,
+  },
+  description: siteConfig.defaultDescription,
   icons: {
     icon: [
       { url: "/favicon.ico" },
@@ -31,6 +37,9 @@ export const metadata: Metadata = {
     ],
   },
 };
+
+import { GoogleTagManager } from "@/components/analytics/google-tag-manager";
+import { ConsentBanner } from "@/components/analytics/consent-banner";
 
 /**
  * Root layout — shell global: fontes oficiais Sora & Inter, tema claro/escuro e ThemeProvider.
@@ -56,7 +65,9 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
+          <GoogleTagManager />
           {children}
+          <ConsentBanner />
         </ThemeProvider>
       </body>
     </html>
