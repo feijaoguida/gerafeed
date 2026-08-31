@@ -97,6 +97,13 @@ function RssPublishingQueueContent() {
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<React.ReactNode | null>(null);
   const [successMessage, setSuccessMessage] = useState<React.ReactNode | null>(null);
+  const [relevanceWarning, setRelevanceWarning] = useState<{
+    articleId: string;
+    message: string;
+    score: number;
+    aiResult?: unknown;
+  } | null>(null);
+  const [isProcessingAiId, setIsProcessingAiId] = useState<string | null>(null);
 
   // Load filter options
   useEffect(() => {
@@ -286,17 +293,54 @@ function RssPublishingQueueContent() {
     }
   };
 
-  const handleProcessAi = async (articleId: string) => {
-    try {
-      const res = await fetch(`/api/articles/${articleId}/process-ai`, { method: "POST" });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.message || data.error || "Erro no processamento de IA.");
+  const handleProcessAi = async (articleId: string, force = false, aiResult?: unknown) => {
+    setIsProcessingAiId(articleId);
+    setErrorMessage(null);
+    setSuccessMessage(null);
+    if (!force) {
+      setRelevanceWarning(null);
+    }
 
-      setSuccessMessage("Artigo processado e reescrito com IA com sucesso!");
+    try {
+      const payload: { force?: boolean; aiResult?: unknown } = {};
+      if (force) {
+        payload.force = true;
+        if (aiResult) {
+          payload.aiResult = aiResult;
+        }
+      }
+
+      const res = await fetch(`/api/articles/${articleId}/process-ai`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        if (data.notRelevant || data.message) {
+          setRelevanceWarning({
+            articleId,
+            message: data.message || "Notícia considerada irrelevante pela IA para a área de atuação do portal.",
+            score: data.score,
+            aiResult: data.aiResult,
+          });
+          return;
+        }
+        throw new Error(data.message || data.error || "Erro no processamento de IA.");
+      }
+
+      setRelevanceWarning(null);
+      setSuccessMessage(
+        force
+          ? "Artigo processado e campos atualizados com sucesso!"
+          : "Artigo processado e reescrito com IA com sucesso!"
+      );
       trackEvent("article_generated", { content_type: "rss_rewrite" });
       fetchArticles();
     } catch (err) {
       setErrorMessage((err as Error).message);
+    } finally {
+      setIsProcessingAiId(null);
     }
   };
 
@@ -362,6 +406,43 @@ function RssPublishingQueueContent() {
       />
 
       {/* Messages */}
+      {relevanceWarning && (
+        <Alert
+          variant="warning"
+          title="Classificação de Relevância Baixa pela IA"
+          onClose={() => setRelevanceWarning(null)}
+        >
+          <div className="space-y-3">
+            <p>{relevanceWarning.message}</p>
+            <div className="flex flex-wrap items-center gap-2 pt-1">
+              <Button
+                size="sm"
+                variant="default"
+                onClick={() =>
+                  handleProcessAi(
+                    relevanceWarning.articleId,
+                    true,
+                    relevanceWarning.aiResult
+                  )
+                }
+                isLoading={isProcessingAiId === relevanceWarning.articleId}
+                className="bg-amber-600 hover:bg-amber-700 text-white dark:bg-amber-500 dark:hover:bg-amber-600 border-none text-xs font-semibold"
+              >
+                Processar mesmo assim
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => setRelevanceWarning(null)}
+                className="text-xs"
+              >
+                Cancelar
+              </Button>
+            </div>
+          </div>
+        </Alert>
+      )}
+
       {successMessage && (
         <Alert variant="success" onClose={() => setSuccessMessage(null)}>
           {successMessage}
@@ -550,7 +631,8 @@ function RssPublishingQueueContent() {
                       <Button
                         variant="secondary"
                         size="sm"
-                        onClick={() => handleProcessAi(art.id)}
+                        onClick={() => handleProcessAi(art.id, false)}
+                        isLoading={isProcessingAiId === art.id}
                         leadingIcon={<Sparkles className="w-3.5 h-3.5 text-primary" />}
                       >
                         Processar com IA

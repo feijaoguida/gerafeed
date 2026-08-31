@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { getConfig } from "@/lib/config";
-import { PromptSettings } from "./ai/types";
+import { PromptSettings, GeneratedArticle } from "./ai/types";
 import { getActiveAIProvider } from "./ai/service";
 import { processAndStoreImage } from "./imageProcessor";
 import { scrapeArticleContent } from "@/lib/scraper";
@@ -26,7 +26,8 @@ export interface AiProcessResult {
  */
 export async function processArticleWithAi(
   articleId: string,
-  workspaceId?: string
+  workspaceId?: string,
+  options?: { force?: boolean }
 ) {
   const article = await prisma.article.findUnique({
     where: {
@@ -100,8 +101,11 @@ export async function processArticleWithAi(
     }
   }
 
+  const isLowScore = !aiResult.relevant || aiResult.score < 6;
+  const isEmptyContent = !aiResult.title?.trim() || !aiResult.content?.trim();
+
   // If AI determined article is NOT relevant for the portal area or returned empty text
-  if (!aiResult.relevant || aiResult.score < 6 || !aiResult.title?.trim() || !aiResult.content?.trim()) {
+  if ((isLowScore && !options?.force) || isEmptyContent) {
     const updatedArticle = await prisma.article.update({
       where: { id: articleId },
       data: {
@@ -123,6 +127,81 @@ export async function processArticleWithAi(
       article: updatedArticle,
       aiResult,
     };
+  }
+
+  const updatedArticle = await prisma.article.update({
+    where: { id: articleId },
+    data: {
+      aiScore: aiResult.score,
+      title: aiResult.title,
+      summary: aiResult.summary,
+      content: aiResult.content,
+      suggestedCategoryId: validCategoryId,
+      tags: aiResult.tags,
+      seoFocusKeyword: aiResult.seoFocusKeyword,
+      seoTitle: aiResult.seoTitle,
+      seoDescription: aiResult.seoDescription,
+      modifiedImageUrl,
+      selectedImage: defaultStrategy,
+      processedAt: new Date(),
+    },
+  });
+
+  return {
+    success: true,
+    article: updatedArticle,
+    aiResult,
+  };
+}
+
+/**
+ * Directly applies an already generated AI result to an article.
+ * Useful when the user confirms "Processar mesmo assim" after an initial low relevance score,
+ * avoiding duplicate AI provider API calls and double billing.
+ */
+export async function applyAiResultToArticle(
+  articleId: string,
+  aiResult: GeneratedArticle,
+  workspaceId?: string
+) {
+  const article = await prisma.article.findUnique({
+    where: {
+      id: articleId,
+      ...(workspaceId ? { workspaceId } : {}),
+    },
+  });
+
+  if (!article) {
+    throw new Error(`Artigo com ID ${articleId} não encontrado.`);
+  }
+
+  const effectiveWorkspaceId = workspaceId || article.workspaceId;
+
+  const categories = await prisma.wordPressCategory.findMany({
+    where: { workspaceId: effectiveWorkspaceId },
+    select: { id: true, name: true, slug: true },
+  });
+
+  let validCategoryId: string | null = null;
+  if (
+    aiResult.suggestedCategoryId &&
+    categories.some((c) => c.id === aiResult.suggestedCategoryId)
+  ) {
+    validCategoryId = aiResult.suggestedCategoryId;
+  }
+
+  const imageConfig = await getConfig<{ defaultStrategy: "ORIGINAL" | "MODIFIED" }>(
+    "imageSettings",
+    effectiveWorkspaceId
+  );
+  const defaultStrategy = imageConfig?.defaultStrategy || "ORIGINAL";
+
+  let modifiedImageUrl: string | null = article.modifiedImageUrl;
+  if (article.originalImageUrl && !modifiedImageUrl) {
+    const processedUrl = await processAndStoreImage(article.originalImageUrl, articleId);
+    if (processedUrl) {
+      modifiedImageUrl = processedUrl;
+    }
   }
 
   const updatedArticle = await prisma.article.update({

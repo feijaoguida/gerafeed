@@ -106,6 +106,11 @@ export default function ReviewArticlePage({ params }: { params: Promise<{ id: st
 
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [relevanceWarning, setRelevanceWarning] = useState<{
+    message: string;
+    score: number;
+    aiResult?: unknown;
+  } | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -213,22 +218,43 @@ export default function ReviewArticlePage({ params }: { params: Promise<{ id: st
   };
 
   // Action: Process with AI
-  const handleProcessAi = async () => {
+  const handleProcessAi = async (force = false) => {
     setIsProcessingAi(true);
     setErrorMessage(null);
     setSuccessMessage(null);
+    if (!force) {
+      setRelevanceWarning(null);
+    }
 
     try {
-      const res = await fetch(`/api/articles/${id}/process-ai`, { method: "POST" });
+      const payload: { force?: boolean; aiResult?: unknown } = {};
+      if (force) {
+        payload.force = true;
+        if (relevanceWarning?.aiResult) {
+          payload.aiResult = relevanceWarning.aiResult;
+        }
+      }
+
+      const res = await fetch(`/api/articles/${id}/process-ai`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
       const data = await res.json();
 
       if (!res.ok) {
         if (data.notRelevant || data.message) {
-          setErrorMessage(data.message || `Notícia considerada irrelevante para a área de atuação do portal. Os campos foram preservados.`);
+          setRelevanceWarning({
+            message: data.message || `Notícia considerada irrelevante para a área de atuação do portal. Os campos foram preservados.`,
+            score: data.score,
+            aiResult: data.aiResult,
+          });
           return;
         }
         throw new Error(data.error || "Erro no processamento da IA.");
       }
+
+      setRelevanceWarning(null);
 
       // API returns { success, article, aiResult }
       const updated = data.article;
@@ -245,7 +271,11 @@ export default function ReviewArticlePage({ params }: { params: Promise<{ id: st
 
         setArticle((prev) => (prev ? { ...prev, ...updated } : null));
       }
-      setSuccessMessage("Conteúdo e mídia reescritos com sucesso pela IA!");
+      setSuccessMessage(
+        force
+          ? "Notícia processada e campos atualizados com sucesso!"
+          : "Conteúdo e mídia reescritos com sucesso pela IA!"
+      );
       trackEvent("article_generated", { content_type: "rss_rewrite" });
     } catch (err) {
       setErrorMessage(err instanceof Error ? err.message : "Erro na IA.");
@@ -453,7 +483,7 @@ export default function ReviewArticlePage({ params }: { params: Promise<{ id: st
             <Button
               variant="outline"
               size="sm"
-              onClick={handleProcessAi}
+              onClick={() => handleProcessAi(false)}
               isLoading={isProcessingAi}
               leadingIcon={<Sparkles className="w-3.5 h-3.5 text-primary" />}
             >
@@ -496,6 +526,37 @@ export default function ReviewArticlePage({ params }: { params: Promise<{ id: st
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
         {/* Alerts */}
+        {relevanceWarning && (
+          <Alert
+            variant="warning"
+            title="Classificação de Relevância Baixa pela IA"
+            onClose={() => setRelevanceWarning(null)}
+          >
+            <div className="space-y-3">
+              <p>{relevanceWarning.message}</p>
+              <div className="flex flex-wrap items-center gap-2 pt-1">
+                <Button
+                  size="sm"
+                  variant="default"
+                  onClick={() => handleProcessAi(true)}
+                  isLoading={isProcessingAi}
+                  className="bg-amber-600 hover:bg-amber-700 text-white dark:bg-amber-500 dark:hover:bg-amber-600 border-none text-xs font-semibold"
+                >
+                  Processar mesmo assim
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => setRelevanceWarning(null)}
+                  className="text-xs"
+                >
+                  Cancelar
+                </Button>
+              </div>
+            </div>
+          </Alert>
+        )}
+
         {errorMessage && (
           <Alert variant="destructive" onClose={() => setErrorMessage(null)}>
             {errorMessage}

@@ -36,11 +36,18 @@ export const metadata: Metadata = {
   },
 };
 
-export default function HomePage() {
+import { getPublicPlans } from "@/lib/public-plans";
+
+// Revalidação ISR a cada 1 hora (3600s), permitindo revalidação imediata sob demanda via backoffice
+export const revalidate = 3600;
+
+export default async function HomePage() {
+  const plans = await getPublicPlans();
+
   return (
     <>
       <JsonLd data={getHomeJsonLd()} />
-      <LandingView />
+      <LandingView plans={plans} />
     </>
   );
 }

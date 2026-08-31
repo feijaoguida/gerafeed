@@ -15,7 +15,6 @@ import {
   ChevronDown,
   Cpu,
   Image as ImageIcon,
-  Check,
   Star,
   Sliders,
   Building2,
@@ -25,8 +24,14 @@ import { BrandDecoration } from "@/components/design-system/brand-decoration";
 import { Logo } from "@/components/brand/logo";
 import { trackEvent } from "@/lib/analytics";
 import { PublicFooter } from "@/components/landing/public-footer";
+import { PricingCarousel } from "@/components/landing/pricing-carousel";
+import type { PublicPlan } from "@/lib/public-plans";
 
-export function LandingView() {
+interface LandingViewProps {
+  plans?: PublicPlan[];
+}
+
+export function LandingView({ plans }: LandingViewProps) {
   const [openFaq, setOpenFaq] = useState<number | null>(0);
 
   const toggleFaq = (index: number) => {
@@ -515,161 +520,8 @@ export function LandingView() {
               </p>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-stretch max-w-6xl mx-auto">
-              {/* Plano Starter */}
-              <div className="p-8 rounded-3xl bg-surface border border-border shadow-xs flex flex-col justify-between space-y-8">
-                <div>
-                  <div className="inline-block px-3 py-1 rounded-full bg-surface-muted text-foreground text-xs font-semibold uppercase tracking-wider mb-4 border border-border">
-                    Starter
-                  </div>
-                  <h3 className="font-heading text-2xl font-bold text-foreground">Gratuito</h3>
-                  <p className="font-sans text-sm text-muted-foreground mt-2">
-                    Ideal para testar a curadoria automática em um blog individual.
-                  </p>
-
-                  <div className="mt-6 flex items-baseline gap-1">
-                    <span className="font-heading text-4xl font-black text-foreground">R$ 0</span>
-                    <span className="text-muted-foreground text-sm">/mês</span>
-                  </div>
-
-                  <ul className="mt-8 space-y-4 text-sm text-foreground/90">
-                    <li className="flex items-center gap-3">
-                      <Check className="w-4 h-4 text-[#00C2A8] shrink-0" />
-                      <span>Até <strong>10 artigos</strong> por mês</span>
-                    </li>
-                    <li className="flex items-center gap-3">
-                      <Check className="w-4 h-4 text-[#00C2A8] shrink-0" />
-                      <span><strong>1 portal</strong> WordPress conectado</span>
-                    </li>
-                    <li className="flex items-center gap-3">
-                      <Check className="w-4 h-4 text-[#00C2A8] shrink-0" />
-                      <span>Até <strong>3 fontes RSS</strong> ativas</span>
-                    </li>
-                    <li className="flex items-center gap-3">
-                      <Check className="w-4 h-4 text-[#00C2A8] shrink-0" />
-                      <span>Modelo BYOK (sua própria API Key)</span>
-                    </li>
-                  </ul>
-                </div>
-
-                <Link
-                  href="/register"
-                  onClick={() =>
-                    trackEvent("cta_click", {
-                      cta_location: "pricing_free",
-                      page_path: "/",
-                    })
-                  }
-                  className="w-full py-3.5 px-6 rounded-xl font-bold text-sm text-foreground bg-surface-muted hover:bg-muted text-center transition-colors block border border-border"
-                >
-                  Começar Gratuitamente
-                </Link>
-              </div>
-
-              {/* Plano Creator (Destaque Oficial) */}
-              <div className="p-8 rounded-3xl bg-surface border-2 border-primary flex flex-col justify-between space-y-8 relative shadow-xl shadow-primary/10">
-                <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 px-4 py-1 bg-gradient-to-r from-[#2563EB] to-[#7C3AED] text-white font-black text-[11px] uppercase tracking-widest rounded-full shadow-md">
-                  Mais Escolhido
-                </div>
-
-                <div>
-                  <div className="inline-block px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-semibold uppercase tracking-wider mb-4 border border-primary/20">
-                    Creator
-                  </div>
-                  <h3 className="font-heading text-2xl font-bold text-foreground">Profissional</h3>
-                  <p className="font-sans text-sm text-muted-foreground mt-2">
-                    Para criadores e portais que precisam de escala diária e IA inclusa.
-                  </p>
-
-                  <div className="mt-6 flex items-baseline gap-1">
-                    <span className="font-heading text-4xl font-black text-foreground">R$ 97</span>
-                    <span className="text-muted-foreground text-sm">/mês</span>
-                  </div>
-
-                  <ul className="mt-8 space-y-4 text-sm text-foreground/90">
-                    <li className="flex items-center gap-3">
-                      <Check className="w-4 h-4 text-[#00C2A8] shrink-0" />
-                      <span>Até <strong>150 artigos</strong> por mês</span>
-                    </li>
-                    <li className="flex items-center gap-3">
-                      <Check className="w-4 h-4 text-[#00C2A8] shrink-0" />
-                      <span>Até <strong>5 portais</strong> WordPress</span>
-                    </li>
-                    <li className="flex items-center gap-3">
-                      <Check className="w-4 h-4 text-[#00C2A8] shrink-0" />
-                      <span>Até <strong>20 fontes RSS</strong> ativas</span>
-                    </li>
-                    <li className="flex items-center gap-3">
-                      <Check className="w-4 h-4 text-[#00C2A8] shrink-0" />
-                      <span>Módulo de Afiliados incluído</span>
-                    </li>
-                  </ul>
-                </div>
-
-                <Link
-                  href="/register"
-                  onClick={() =>
-                    trackEvent("cta_click", {
-                      cta_location: "pricing_creator",
-                      page_path: "/",
-                    })
-                  }
-                  className="w-full py-3.5 px-6 rounded-xl font-bold text-sm text-white bg-gradient-to-r from-[#2563EB] to-[#7C3AED] hover:opacity-95 text-center transition-all duration-200 block shadow-md shadow-primary/25"
-                >
-                  Assinar Plano Creator
-                </Link>
-              </div>
-
-              {/* Plano Scale */}
-              <div className="p-8 rounded-3xl bg-surface border border-border shadow-xs flex flex-col justify-between space-y-8">
-                <div>
-                  <div className="inline-block px-3 py-1 rounded-full bg-surface-muted text-foreground text-xs font-semibold uppercase tracking-wider mb-4 border border-border">
-                    Scale
-                  </div>
-                  <h3 className="font-heading text-2xl font-bold text-foreground">Agência & Rede</h3>
-                  <p className="font-sans text-sm text-muted-foreground mt-2">
-                    Para redes de notícias e agências com alto fluxo editorial.
-                  </p>
-
-                  <div className="mt-6 flex items-baseline gap-1">
-                    <span className="font-heading text-4xl font-black text-foreground">R$ 297</span>
-                    <span className="text-muted-foreground text-sm">/mês</span>
-                  </div>
-
-                  <ul className="mt-8 space-y-4 text-sm text-foreground/90">
-                    <li className="flex items-center gap-3">
-                      <Check className="w-4 h-4 text-[#00C2A8] shrink-0" />
-                      <span>Até <strong>1.000 artigos</strong> por mês</span>
-                    </li>
-                    <li className="flex items-center gap-3">
-                      <Check className="w-4 h-4 text-[#00C2A8] shrink-0" />
-                      <span><strong>Portais ilimitados</strong> WordPress</span>
-                    </li>
-                    <li className="flex items-center gap-3">
-                      <Check className="w-4 h-4 text-[#00C2A8] shrink-0" />
-                      <span>Feeds RSS ilimitados</span>
-                    </li>
-                    <li className="flex items-center gap-3">
-                      <Check className="w-4 h-4 text-[#00C2A8] shrink-0" />
-                      <span>Suporte prioritário via WhatsApp</span>
-                    </li>
-                  </ul>
-                </div>
-
-                <Link
-                  href="/register"
-                  onClick={() =>
-                    trackEvent("cta_click", {
-                      cta_location: "pricing_scale",
-                      page_path: "/",
-                    })
-                  }
-                  className="w-full py-3.5 px-6 rounded-xl font-bold text-sm text-foreground bg-surface-muted hover:bg-muted text-center transition-colors block border border-border"
-                >
-                  Contratar Scale
-                </Link>
-              </div>
-            </div>
+            {/* Carrossel de Planos Dinâmicos do Banco de Dados */}
+            <PricingCarousel plans={plans || []} />
           </div>
         </section>
 

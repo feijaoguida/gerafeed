@@ -58,6 +58,13 @@ DONE
 - **Engine Markdown Filesystem**: Criada em `src/lib/blog.ts` operando sobre `content/blog/` com parser seguro de frontmatter YAML sem dependências pesadas externas.
 - **Controle de Rascunhos**: Filtragem automática de `draft: boolean`. Rascunhos não aparecem na listagem, retornam 404 em rotas públicas e nunca entram no sitemap.
 - **Renderizador de Markdown Seguro**: `src/components/blog/markdown-content.tsx` converte elementos para nós React nativos e links via `next/link`, sem `dangerouslySetInnerHTML`.
+
+### Planos Dinâmicos na Home (ISR & Gatilho Backoffice)
+- **Fonte da Verdade no Banco de Dados**: A Home (`/`) consome os planos ativos direto do Prisma (`prisma.plan.findMany({ where: { active: true }, ... })`) através de `src/lib/public-plans.ts`.
+- **Estratégia Híbrida de Cache (Quase Estático + Gatilho Imediato)**:
+  - **ISR Automático**: `export const revalidate = 3600;` garante que a home é renderizada estaticamente e revalida em segundo plano a cada 1 hora sem sobrecarregar o banco de dados.
+  - **Gatilho de Revalidação Imediata**: Qualquer criação (`POST`), edição (`PUT`) ou exclusão (`DELETE`) de planos no backoffice (`/api/backoffice/plans` e `/api/backoffice/plans/[id]`) dispara `revalidatePath("/")`, invalidando o cache instantaneamente para os visitantes da Home.
+  - **Apresentação Flexível e Responsiva**: `LandingView` formata dinamicamente os cards de planos (preços, limites de artigos/fontes/sites, features, badge de "Mais Escolhido" e CTAs).
 - **5 Briefs Editoriais Estruturados**: Preparados em `content/blog/*.md` com status `draft: true`.
 
 ### Privacy / PII

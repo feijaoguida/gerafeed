@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { BillingService } from "@/lib/billing";
 
+export const dynamic = "force-dynamic";
+
 export async function GET() {
   try {
     await BillingService.ensureDefaultPlans();

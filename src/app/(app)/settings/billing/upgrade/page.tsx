@@ -173,7 +173,14 @@ export default function UpgradePage() {
 
         if (plansRes.ok) {
           const pData = await plansRes.json();
-          setPlans(pData.plans || []);
+          const plansList = Array.isArray(pData)
+            ? pData
+            : Array.isArray(pData?.plans)
+            ? pData.plans
+            : [];
+          setPlans(plansList.filter((p: PlanData) => p.active !== false));
+        } else {
+          setErrorMessage("Erro ao carregar os planos disponíveis.");
         }
 
         if (subRes.ok) {
@@ -331,155 +338,161 @@ export default function UpgradePage() {
       )}
 
       {/* Plans Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-stretch">
-        {plans.map((plan) => {
-          const monthlyPrice =
-            plan.monthlyPrice !== undefined
-              ? Number(plan.monthlyPrice)
-              : plan.price;
-          const discountPercent =
-            plan.annualDiscountPercent !== undefined
-              ? Number(plan.annualDiscountPercent)
-              : 0;
-          const annualPrice = calculateAnnualPrice(
-            monthlyPrice,
-            discountPercent
-          );
-          const displayPrice =
-            cycle === "YEARLY" && monthlyPrice > 0
-              ? annualPrice
-              : monthlyPrice;
-          const periodLabel =
-            cycle === "YEARLY" && monthlyPrice > 0 ? "/ano" : "/mês";
+      {plans.length === 0 ? (
+        <div className="text-center py-12 text-sm text-muted-foreground border border-dashed border-border rounded-xl">
+          Nenhum plano disponível no momento.
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-stretch">
+          {plans.map((plan) => {
+            const monthlyPrice =
+              plan.monthlyPrice !== undefined
+                ? Number(plan.monthlyPrice)
+                : plan.price;
+            const discountPercent =
+              plan.annualDiscountPercent !== undefined
+                ? Number(plan.annualDiscountPercent)
+                : 0;
+            const annualPrice = calculateAnnualPrice(
+              monthlyPrice,
+              discountPercent
+            );
+            const displayPrice =
+              cycle === "YEARLY" && monthlyPrice > 0
+                ? annualPrice
+                : monthlyPrice;
+            const periodLabel =
+              cycle === "YEARLY" && monthlyPrice > 0 ? "/ano" : "/mês";
 
-          const isCurrent = plan.slug === currentPlanSlug;
-          const isHighlight = Boolean(plan.highlight);
-          const isPro = plan.slug === "pro";
-          const features = getPlanFeatureList(plan);
+            const isCurrent = plan.slug === currentPlanSlug;
+            const isHighlight = Boolean(plan.highlight);
+            const isPro = plan.slug === "pro";
+            const features = getPlanFeatureList(plan);
 
-          return (
-            <Card
-              key={plan.id}
-              className={`relative flex flex-col justify-between p-6 space-y-6 transition-all ${
-                isHighlight
-                  ? "border-2 border-primary shadow-lg ring-1 ring-primary/20"
-                  : "shadow-xs hover:border-primary/40"
-              }`}
-            >
-              {isHighlight && (
-                <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-                  <Badge variant="purple" size="sm" className="shadow-md uppercase tracking-wider font-bold">
-                    Mais Escolhido
-                  </Badge>
-                </div>
-              )}
-
-              <div className="space-y-4">
-                {/* Plan Header */}
-                <CardHeader className="p-0 flex flex-row items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <div
-                      className={`p-2 rounded-xl ${
-                        isPro
-                          ? "bg-amber-500/10 text-amber-600 dark:text-amber-400"
-                          : isHighlight
-                          ? "bg-primary/10 text-primary"
-                          : "bg-surface-muted text-muted-foreground"
-                      }`}
-                    >
-                      {isPro ? (
-                        <Crown className="w-4 h-4" />
-                      ) : isHighlight ? (
-                        <Sparkles className="w-4 h-4" />
-                      ) : (
-                        <Zap className="w-4 h-4" />
-                      )}
-                    </div>
-                    <CardTitle className="text-base font-bold">
-                      {plan.name}
-                    </CardTitle>
-                  </div>
-                  {isCurrent && (
-                    <Badge variant="success" size="sm">
-                      Plano Atual
+            return (
+              <Card
+                key={plan.id}
+                className={`relative flex flex-col justify-between p-6 space-y-6 transition-all ${
+                  isHighlight
+                    ? "border-2 border-primary shadow-lg ring-1 ring-primary/20"
+                    : "shadow-xs hover:border-primary/40"
+                }`}
+              >
+                {isHighlight && (
+                  <div className="absolute -top-3 left-1/2 -translate-x-1/2">
+                    <Badge variant="purple" size="sm" className="shadow-md uppercase tracking-wider font-bold">
+                      Mais Escolhido
                     </Badge>
-                  )}
-                </CardHeader>
-
-                {/* Price */}
-                <CardContent className="p-0 space-y-4">
-                  <div className="flex items-baseline gap-1">
-                    <span className="font-heading text-3xl font-extrabold text-foreground tracking-tight">
-                      {formatCurrency(displayPrice)}
-                    </span>
-                    <span className="text-sm text-muted-foreground">
-                      {periodLabel}
-                    </span>
                   </div>
+                )}
 
-                  {cycle === "YEARLY" && monthlyPrice > 0 && discountPercent > 0 && (
-                    <p className="text-[11px] text-[#00C2A8] font-semibold">
-                      Economia de {discountPercent}% no faturamento anual
-                    </p>
-                  )}
-
-                  {/* Features */}
-                  <ul className="space-y-2.5 pt-3 border-t border-border">
-                    {features.map((feat, i) => (
-                      <li
-                        key={i}
-                        className="flex items-start gap-2 text-xs text-foreground/90 font-medium"
+                <div className="space-y-4">
+                  {/* Plan Header */}
+                  <CardHeader className="p-0 flex flex-row items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div
+                        className={`p-2 rounded-xl ${
+                          isPro
+                            ? "bg-amber-500/10 text-amber-600 dark:text-amber-400"
+                            : isHighlight
+                            ? "bg-primary/10 text-primary"
+                            : "bg-surface-muted text-muted-foreground"
+                        }`}
                       >
-                        <Check className="w-3.5 h-3.5 text-[#00C2A8] shrink-0 mt-0.5" />
-                        <span>{feat}</span>
-                      </li>
-                    ))}
-                  </ul>
-
-                  {/* Limits Summary */}
-                  <div className="grid grid-cols-2 gap-2 pt-3 border-t border-border">
-                    <div className="text-center p-2.5 bg-surface-muted/50 rounded-xl border border-border">
-                      <div className="font-heading text-base font-bold text-foreground">
-                        {plan.maxArticles === -1 ? "∞" : plan.maxArticles}
+                        {isPro ? (
+                          <Crown className="w-4 h-4" />
+                        ) : isHighlight ? (
+                          <Sparkles className="w-4 h-4" />
+                        ) : (
+                          <Zap className="w-4 h-4" />
+                        )}
                       </div>
-                      <div className="text-[10px] text-muted-foreground">
-                        artigos/mês
+                      <CardTitle className="text-base font-bold">
+                        {plan.name}
+                      </CardTitle>
+                    </div>
+                    {isCurrent && (
+                      <Badge variant="success" size="sm">
+                        Plano Atual
+                      </Badge>
+                    )}
+                  </CardHeader>
+
+                  {/* Price */}
+                  <CardContent className="p-0 space-y-4">
+                    <div className="flex items-baseline gap-1">
+                      <span className="font-heading text-3xl font-extrabold text-foreground tracking-tight">
+                        {formatCurrency(displayPrice)}
+                      </span>
+                      <span className="text-sm text-muted-foreground">
+                        {periodLabel}
+                      </span>
+                    </div>
+
+                    {cycle === "YEARLY" && monthlyPrice > 0 && discountPercent > 0 && (
+                      <p className="text-[11px] text-[#00C2A8] font-semibold">
+                        Economia de {discountPercent}% no faturamento anual
+                      </p>
+                    )}
+
+                    {/* Features */}
+                    <ul className="space-y-2.5 pt-3 border-t border-border">
+                      {features.map((feat, i) => (
+                        <li
+                          key={i}
+                          className="flex items-start gap-2 text-xs text-foreground/90 font-medium"
+                        >
+                          <Check className="w-3.5 h-3.5 text-[#00C2A8] shrink-0 mt-0.5" />
+                          <span>{feat}</span>
+                        </li>
+                      ))}
+                    </ul>
+
+                    {/* Limits Summary */}
+                    <div className="grid grid-cols-2 gap-2 pt-3 border-t border-border">
+                      <div className="text-center p-2.5 bg-surface-muted/50 rounded-xl border border-border">
+                        <div className="font-heading text-base font-bold text-foreground">
+                          {plan.maxArticles === -1 ? "∞" : plan.maxArticles}
+                        </div>
+                        <div className="text-[10px] text-muted-foreground">
+                          artigos/mês
+                        </div>
+                      </div>
+                      <div className="text-center p-2.5 bg-surface-muted/50 rounded-xl border border-border">
+                        <div className="font-heading text-base font-bold text-foreground">
+                          {plan.maxSources === -1 ? "∞" : plan.maxSources}
+                        </div>
+                        <div className="text-[10px] text-muted-foreground">
+                          fontes RSS
+                        </div>
                       </div>
                     </div>
-                    <div className="text-center p-2.5 bg-surface-muted/50 rounded-xl border border-border">
-                      <div className="font-heading text-base font-bold text-foreground">
-                        {plan.maxSources === -1 ? "∞" : plan.maxSources}
-                      </div>
-                      <div className="text-[10px] text-muted-foreground">
-                        fontes RSS
-                      </div>
-                    </div>
-                  </div>
-                </CardContent>
-              </div>
+                  </CardContent>
+                </div>
 
-              {/* CTA Button */}
-              <CardFooter className="p-0 pt-4">
-                <Button
-                  variant={isCurrent ? "secondary" : isHighlight ? "gradient" : isPro ? "default" : "outline"}
-                  size="lg"
-                  className="w-full"
-                  onClick={() => handleSelectPlan(plan)}
-                  disabled={isCurrent || isCheckingOut !== null}
-                  isLoading={isCheckingOut === plan.id}
-                  leadingIcon={!isCurrent && plan.slug !== "free" ? <Lock className="w-3.5 h-3.5" /> : undefined}
-                >
-                  {isCurrent
-                    ? "Plano Atual"
-                    : plan.slug === "free"
-                    ? "Downgrade para Gratuito"
-                    : `Assinar ${plan.name}`}
-                </Button>
-              </CardFooter>
-            </Card>
-          );
-        })}
-      </div>
+                {/* CTA Button */}
+                <CardFooter className="p-0 pt-4">
+                  <Button
+                    variant={isCurrent ? "secondary" : isHighlight ? "gradient" : isPro ? "default" : "outline"}
+                    size="lg"
+                    className="w-full"
+                    onClick={() => handleSelectPlan(plan)}
+                    disabled={isCurrent || isCheckingOut !== null}
+                    isLoading={isCheckingOut === plan.id}
+                    leadingIcon={!isCurrent && plan.slug !== "free" ? <Lock className="w-3.5 h-3.5" /> : undefined}
+                  >
+                    {isCurrent
+                      ? "Plano Atual"
+                      : plan.slug === "free"
+                      ? "Downgrade para Gratuito"
+                      : `Assinar ${plan.name}`}
+                  </Button>
+                </CardFooter>
+              </Card>
+            );
+          })}
+        </div>
+      )}
 
       {/* Footer note */}
       <div className="text-center text-[11px] text-muted-foreground pt-4">

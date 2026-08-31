@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { requireSuperAdmin } from "@/lib/superadmin";
 import { validatePlanPricing, toDecimal } from "@/lib/pricing";
@@ -145,6 +146,13 @@ export async function PATCH(
       },
     });
 
+    // Invalida o cache da Home para sincronizar os planos imediatamente
+    try {
+      revalidatePath("/");
+    } catch {
+      // Falha graciosa caso ocorra fora do contexto de request
+    }
+
     return NextResponse.json(fullPlan);
   } catch (error) {
     const message = error instanceof Error ? error.message : "Erro ao atualizar plano";
@@ -175,6 +183,13 @@ export async function DELETE(
     await prisma.plan.delete({
       where: { id },
     });
+
+    // Invalida o cache da Home para sincronizar os planos imediatamente
+    try {
+      revalidatePath("/");
+    } catch {
+      // Falha graciosa caso ocorra fora do contexto de request
+    }
 
     return NextResponse.json({ success: true, message: "Plano excluído com sucesso." });
   } catch (error) {
