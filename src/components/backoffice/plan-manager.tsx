@@ -589,13 +589,15 @@ export function PlanManager({ initialPlans, initialFeatures }: PlanManagerProps)
                           <span className="font-medium text-foreground truncate">{f.name}</span>
                         </label>
                         {f.valueType === "QUANTITY" && featData.enabled && (
-                          <Input
-                            type="number"
-                            value={featData.limit ?? ""}
-                            onChange={(e) => handleFeatureLimitChange(f.id, e.target.value)}
-                            placeholder="Limite"
-                            className="w-20 h-7 text-xs"
-                          />
+                          <div className="w-24 shrink-0 ml-3">
+                            <Input
+                              type="number"
+                              value={featData.limit ?? ""}
+                              onChange={(e) => handleFeatureLimitChange(f.id, e.target.value)}
+                              placeholder="Limite"
+                              className="h-7 text-xs"
+                            />
+                          </div>
                         )}
                       </div>
                     );

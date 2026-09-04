@@ -153,10 +153,24 @@ export default function SettingsAiPage() {
 
         if (billingRes.ok) {
           const billingData = await billingRes.json();
-          const features = billingData.features || [];
-          setUnlimitedNiches(features.includes("unlimited_ai_niches"));
-          setUnlimitedStyles(features.includes("unlimited_ai_styles"));
-          setAdvancedProviders(features.includes("advanced_ai_providers"));
+          const aiFeats = billingData.aiFeatures || {};
+          const features: string[] = billingData.features || [];
+
+          setUnlimitedNiches(
+            Boolean(aiFeats.unlimitedNiches) ||
+            features.includes("ai_unlimited_niches") ||
+            features.includes("unlimited_ai_niches")
+          );
+          setUnlimitedStyles(
+            Boolean(aiFeats.unlimitedStyles) ||
+            features.includes("ai_unlimited_styles") ||
+            features.includes("unlimited_ai_styles")
+          );
+          setAdvancedProviders(
+            Boolean(aiFeats.advancedProviders) ||
+            features.includes("ai_advanced_providers") ||
+            features.includes("advanced_ai_providers")
+          );
         }
       } catch (err) {
         if (!active) return;

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { prisma } from "@/lib/prisma";
 import { getSessionWorkspaceId } from "@/lib/workspace";
 import { BillingService, AI_FEATURES } from "@/lib/billing";
 
@@ -16,6 +17,16 @@ export async function GET() {
       BillingService.hasFeature(workspaceId, AI_FEATURES.UNLIMITED_STYLES),
       BillingService.hasFeature(workspaceId, AI_FEATURES.ADVANCED_PROVIDERS),
     ]);
+
+    // In addition to aiFeatures, return active feature keys for consistency
+    const planFeatures = await prisma.planFeature.findMany({
+      where: {
+        planId: subscription.planId,
+        enabled: true,
+      },
+      include: { feature: true },
+    });
+    const features = planFeatures.map((pf) => pf.feature.key);
 
     return NextResponse.json({
       subscription: {
@@ -38,6 +49,7 @@ export async function GET() {
           allowed: sourcesCheck.allowed,
         },
       },
+      features,
       aiFeatures: {
         unlimitedNiches,
         unlimitedStyles,

@@ -33,6 +33,57 @@ function cleanRawHtml(html: string): string {
 }
 
 /**
+ * Recursively inspects a JSON-LD object/graph to find articleBody string.
+ */
+function findArticleBodyInJson(obj: unknown): string | null {
+  if (!obj || typeof obj !== "object") return null;
+
+  if (Array.isArray(obj)) {
+    for (const item of obj) {
+      const found = findArticleBodyInJson(item);
+      if (found) return found;
+    }
+    return null;
+  }
+
+  const record = obj as Record<string, unknown>;
+  if (typeof record.articleBody === "string" && record.articleBody.trim().length > 100) {
+    return record.articleBody.trim();
+  }
+
+  if (Array.isArray(record["@graph"])) {
+    for (const item of record["@graph"]) {
+      const found = findArticleBodyInJson(item);
+      if (found) return found;
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Extracts articleBody from JSON-LD (Schema.org) scripts before stripping HTML tags.
+ * Modern news portals (Next.js, paywalls, Gazeta do Povo, G1, UOL, etc.) often include
+ * the complete text in structured data graph.
+ */
+function extractJsonLdArticleBody(html: string): string | null {
+  const scriptRegex = /<script\b[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi;
+  let match: RegExpExecArray | null;
+  while ((match = scriptRegex.exec(html)) !== null) {
+    try {
+      const parsed = JSON.parse(match[1].trim());
+      const body = findArticleBodyInJson(parsed);
+      if (body && body.length > 100) {
+        return body;
+      }
+    } catch {
+      // Ignore JSON parse errors in malformed script tags
+    }
+  }
+  return null;
+}
+
+/**
  * Tries to locate main content container (<article>, <main>, or body).
  */
 function extractMainContainer(html: string): string {
@@ -144,6 +195,23 @@ export async function scrapeArticleContent(url: string): Promise<string | null> 
       return null;
     }
 
+    // 1. Try extracting structured article body from JSON-LD Schema.org metadata first
+    // (Used by modern portals such as Gazeta do Povo, G1, paywalled Next.js news sites, etc.)
+    const jsonLdBody = extractJsonLdArticleBody(rawHtml);
+    if (jsonLdBody && jsonLdBody.length >= 150) {
+      const normalized = jsonLdBody
+        .split("\n")
+        .map((line) => line.replace(/[ \t]+/g, " ").trim())
+        .filter((line) => line.length > 0)
+        .join("\n\n")
+        .trim();
+
+      return normalized.length > MAX_CONTENT_LENGTH
+        ? normalized.substring(0, MAX_CONTENT_LENGTH) + "..."
+        : normalized;
+    }
+
+    // 2. Fallback to extracting from HTML DOM containers
     const cleanedHtml = cleanRawHtml(rawHtml);
     const mainSection = extractMainContainer(cleanedHtml);
     const plainText = htmlToPlainText(mainSection);
