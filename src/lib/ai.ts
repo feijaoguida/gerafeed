@@ -104,8 +104,8 @@ export async function processArticleWithAi(
   const isLowScore = !aiResult.relevant || aiResult.score < 6;
   const isEmptyContent = !aiResult.title?.trim() || !aiResult.content?.trim();
 
-  // If AI determined article is NOT relevant for the portal area or returned empty text
-  if ((isLowScore && !options?.force) || isEmptyContent) {
+  // If AI determined article is below threshold and user did not choose to force it
+  if (isLowScore && !options?.force) {
     const updatedArticle = await prisma.article.update({
       where: { id: articleId },
       data: {
@@ -123,10 +123,14 @@ export async function processArticleWithAi(
       success: false,
       notRelevant: true,
       score: aiResult.score,
-      message: `A IA classificou esta notícia como irrelevante (Score: ${aiResult.score}/10) para a área de atuação do portal (${portalAreaName}). Nenhum campo foi alterado.`,
+      message: `A IA classificou esta notícia como abaixo da média (Score: ${aiResult.score}/10) para a área de atuação do portal (${portalAreaName}).`,
       article: updatedArticle,
       aiResult,
     };
+  }
+
+  if (isEmptyContent) {
+    throw new Error("A IA não retornou título ou conteúdo válidos para o artigo.");
   }
 
   const updatedArticle = await prisma.article.update({
@@ -173,6 +177,10 @@ export async function applyAiResultToArticle(
 
   if (!article) {
     throw new Error(`Artigo com ID ${articleId} não encontrado.`);
+  }
+
+  if (!aiResult.title?.trim() || !aiResult.content?.trim()) {
+    throw new Error("O resultado da IA não contém título ou conteúdo válidos para aplicar.");
   }
 
   const effectiveWorkspaceId = workspaceId || article.workspaceId;

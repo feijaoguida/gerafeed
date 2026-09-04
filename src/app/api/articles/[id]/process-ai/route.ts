@@ -14,11 +14,20 @@ export async function POST(
     const force = Boolean(body?.force);
     const existingAiResult = body?.aiResult;
 
-    // If the user chooses "Processar mesmo assim" and aiResult was already generated,
+    // If the user chooses "Processar mesmo assim" and aiResult was already generated with valid content,
     // apply it directly to save AI provider credits and eliminate redundant processing delay.
     if (force && existingAiResult && typeof existingAiResult === "object") {
-      const result = await applyAiResultToArticle(id, existingAiResult, workspaceId);
-      return NextResponse.json(result);
+      const hasValidContent = Boolean(
+        typeof (existingAiResult as { title?: unknown }).title === "string" &&
+        (existingAiResult as { title: string }).title.trim() &&
+        typeof (existingAiResult as { content?: unknown }).content === "string" &&
+        (existingAiResult as { content: string }).content.trim()
+      );
+
+      if (hasValidContent) {
+        const result = await applyAiResultToArticle(id, existingAiResult, workspaceId);
+        return NextResponse.json(result);
+      }
     }
 
     // Check daily article limit first (stricter)
