@@ -478,3 +478,29 @@ Não criar uma segunda biblioteca de UI para o blog ou landing pages.
 ## Harness
 
 Uma task por vez. Discovered Work fora do escopo deve ser registrado e não implementado automaticamente.
+
+# Phase 29. Regras de Funil de Aquisição, E-mail e Checkout
+
+## Camada de E-mail
+- O envio de e-mails transacionais é centralizado em `src/lib/mail/`.
+- Nunca acoplar chamadas diretas da SDK de terceiros nas telas ou rotas sem passar pelo `EmailAdapter`.
+- O chaveamento por `EMAIL_PROVIDER="resend" | "smtp" | "mock"` é obrigatório.
+- Em desenvolvimento local sem credenciais configuradas, o fallback `mock` deve exibir o código no console para não interromper testes.
+
+## Confirmação de E-mail e OTP
+- O código de verificação é numérico de 6 dígitos gerado com criptografia segura.
+- O tempo de expiração é de 15 minutos na tabela `VerificationToken`.
+- O usuário deve inserir o código na mesma tela de cadastro (inline), sem necessidade de abrir nova aba ou clicar em links externos.
+- Nenhuma conta pode ser ativada ou criada sem a validação do token no servidor.
+
+## Senhas e Credenciais
+- Senhas são armazenadas como hash seguro com SALT rounds = 10 (`bcryptjs`) em `User.passwordHash`.
+- Senhas em texto plano nunca são persistidas nem retornadas em responses de API.
+- O login de credenciais em `src/auth.ts` obrigatoriamente valida o hash com `bcrypt.compare`.
+
+## Onboarding de Checkout Asaas
+- A escolha do plano na Home (`PricingCarousel`) deve propagar `plan` e `cycle` para `/register`.
+- O plano gratuito segue diretamente para `/dashboard`.
+- Planos pagos exigem o preenchimento de dados fiscais (`BillingProfile`: CPF/CNPJ, Telefone, Endereço com CEP) e acionam `/api/billing/checkout`, redirecionando para a fatura oficial hospedada do Asaas.
+- Nenhuma informação de cartão de crédito/CVV trafega pela nossa aplicação.
+

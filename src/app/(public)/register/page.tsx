@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import { RegisterView } from "./register-view";
 
 export const metadata: Metadata = {
@@ -11,5 +12,10 @@ export const metadata: Metadata = {
 };
 
 export default function RegisterPage() {
-  return <RegisterView />;
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-background" />}>
+      <RegisterView />
+    </Suspense>
+  );
 }
+

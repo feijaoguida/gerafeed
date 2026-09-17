@@ -2,6 +2,7 @@ import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import { PrismaAdapter } from "@auth/prisma-adapter";
 import { prisma } from "@/lib/prisma";
+import { verifyPassword } from "@/lib/security/password";
 
 export const DEFAULT_WORKSPACE_ID = "default-workspace";
 
@@ -125,10 +126,16 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 
         // 3. Check if standard registered user exists in DB
         const regularUser = await prisma.user.findUnique({
-          where: { email },
+          where: { email: email.trim().toLowerCase() },
         });
 
         if (regularUser) {
+          if (regularUser.passwordHash) {
+            const isValid = await verifyPassword(password, regularUser.passwordHash);
+            if (!isValid) {
+              return null;
+            }
+          }
           const workspaceId = await ensureUserWorkspace(regularUser.id);
           return {
             id: regularUser.id,

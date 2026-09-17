@@ -421,3 +421,57 @@ Status: Accepted
 Comunicação pública deve priorizar automação e curadoria editorial assistida por IA.
 
 Evitar promessas de que simples reescrita ou modificação de imagem elimina plágio/direitos autorais.
+
+## ADR-085. Camada de E-mail Desacoplada com Adapter Pattern
+Status: Accepted
+
+O envio de e-mails transacionais não deve ficar acoplado a uma biblioteca ou fornecedor único.
+
+Criar abstração `EmailAdapter` em `src/lib/mail/` com factory central `getMailAdapter()`.
+
+Provedores suportados na primeira versão:
+- `resend`: Resend API (cota free de 100/dia e 3000/mês);
+- `smtp`: Nodemailer SMTP configurável por variáveis de ambiente;
+- `mock`: Saída em terminal para desenvolvimento local/testes sem credenciais ativas.
+
+Seleção configurável via variável de ambiente: `EMAIL_PROVIDER="resend" | "smtp" | "mock"`.
+Extensibilidade garantida para adição futura de Mailgun ou outros serviços sem quebrar código de domínio.
+
+Fallback Automático de Alta Disponibilidade:
+- Se `EMAIL_PROVIDER="resend"` e o envio falhar (ex: cota gratuita de 100/dia esgotada ou instabilidade de rede), o sistema tenta imediatamente enviar via `SmtpAdapter` se as credenciais SMTP estiverem preenchidas no `.env`.
+- Caso `RESEND_API_KEY` esteja ausente no ambiente, mas credenciais SMTP estejam disponíveis, o sistema assume o SMTP diretamente como fallback inicial.
+
+## ADR-086. Verificação de E-mail via Código OTP (6 dígitos) na Própria Tela
+Status: Accepted
+
+Para evitar cadastros com e-mails falsos (ex: teste@teste.com.br) e garantir a entrega de comunicações sem prejudicar a taxa de conversão:
+- O usuário recebe um código numérico de 6 dígitos gerado de forma criptográfica;
+- O código é validado diretamente na tela de cadastro, sem que o usuário precise trocar de aba ou clicar em links externos;
+- O token é armazenado no modelo existente `VerificationToken` com validade estrita de 15 minutos;
+- Tentativas de reenvio são rate-limited com contador regressivo (anti-flood).
+
+## ADR-087. Armazenamento Seguro de Senhas (bcrypt + SALT)
+Status: Accepted
+
+Contas criadas por credenciais devem possuir hash seguro de senha no banco de dados.
+
+Adicionar campo opcional `passwordHash` no modelo `User` do Prisma.
+Utilizar `bcryptjs` com fator de custo (SALT rounds) configurado em 10.
+Autenticação no `src/auth.ts` (`authorize`) deve validar o hash via `bcrypt.compare` e rejeitar qualquer senha incorreta para usuários comuns.
+
+## ADR-088. Preservação da Intenção de Compra da Home ao Cadastro
+Status: Accepted
+
+A seleção de planos no `PricingCarousel` da Home deve propagar os parâmetros `plan` e `cycle` na URL (`/register?plan=pro&cycle=monthly`).
+O fluxo de cadastro deve persistir essa intenção no estado da aplicação e em armazenamento volátil (`sessionStorage`), garantindo que recarregamentos de página mantenham a seleção do usuário.
+
+## ADR-089. Onboarding de Faturamento e Checkout Hosted Asaas para Planos Pagos
+Status: Accepted
+
+Para planos por assinatura pagos:
+- O usuário conclui o cadastro básico e confirma o e-mail;
+- Antes de liberar o acesso direto ao painel com plano pago, a aplicação solicita os dados de faturamento (`BillingProfile`: CPF/CNPJ, Telefone, CEP/Endereço);
+- Ao enviar os dados fiscais, a API `/api/billing/checkout` registra a sessão, sincroniza o cliente e cria a assinatura no Asaas, retornando a `checkoutUrl` (fatura/checkout hospedado do Asaas);
+- O usuário é redirecionado para concluir o pagamento com segurança;
+- A liberação final de limites e ativação da assinatura é conduzida pelo Webhook do Asaas de forma assíncrona e auditável.
+

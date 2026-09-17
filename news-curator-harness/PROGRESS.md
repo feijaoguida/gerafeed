@@ -1,13 +1,96 @@
 # PROGRESS.md
 
 ## Current Phase
-Phase 28. SEO, Measurement & Organic Acquisition Foundation
+Phase 29. Funil de Aquisição, Verificação de E-mail (OTP) e Onboarding de Checkout Asaas
 
 ## Current Task
-238-technical-seo-validation-hardening
+246-acquisition-funnel-hardening-e2e
 
 ## Status
 DONE
+
+## Phase 29. Funil de Aquisição, Verificação de E-mail (OTP) e Onboarding de Checkout Asaas
+- [x] 240-email-adapter-foundation
+- [x] 241-user-password-hash-security
+- [x] 242-otp-verification-api
+- [x] 243-home-pricing-plan-selection
+- [x] 244-register-stepper-otp-flow
+- [x] 245-billing-onboarding-and-asaas-checkout
+- [x] 246-acquisition-funnel-hardening-e2e
+
+## Phase 29 Final Evidence
+
+### Resumo da Entrega da Phase 29
+- **Email Service Desacoplado (Adapter Pattern)**: Módulo `src/lib/mail/` com contratos fortemente tipados, adapters para **Resend** (API oficial), **SMTP** (`nodemailer`) e **Mock** (logs amigáveis em dev/testes), com seleção via `EMAIL_PROVIDER="resend" | "smtp" | "mock"`.
+- **Segurança Criptográfica de Credenciais**: Adicionado campo `passwordHash` ao modelo `User` do Prisma, utilitário `src/lib/security/password.ts` aplicando bcrypt com SALT rounds = 10, e validação no provedor `Credentials` do Auth.js.
+- **Verificação OTP Anti-Fake**: Geração criptográfica de códigos numéricos de 6 dígitos válidos por 15 minutos em `VerificationToken`, template visual de e-mail responsivo em `src/lib/mail/templates/verification-code.ts` e rotas `/api/auth/send-verification-code` (com anti-flood de 60s) e `/api/auth/verify-code`.
+- **Preservação de Escolha da Home**: `PricingCarousel` atualizado para direcionar para `/register?plan={slug}&cycle=monthly` (ou `plan=free`), utilitário `src/lib/plan-intent.ts` para persistência em `sessionStorage` e badge de destaque na tela de cadastro.
+- **Cadastro em Stepper com OTP Inline**: Refatoração da interface de `/register` em 3 passos limpos (1. Identificação → 2. Digitação do código de 6 dígitos com temporizador de reenvio → 3. Senha segura e criação da conta com `emailVerified`), prevenindo cadastros com e-mails falsos como `teste@teste.com.br`.
+- **Onboarding de Faturamento e Checkout Asaas**: Tela `/checkout/billing` coletando dados fiscais com validação matemática de CPF/CNPJ (`src/lib/validation/cpf-cnpj.ts`), busca automática de CEP via ViaCEP, persistência no `BillingProfile` e acionamento da rota `/api/billing/checkout` com redirecionamento para o gateway hospedado do Asaas.
+- **Auditoria e Validação Automatizada**:
+  - `scripts/validate-phase29.ts`: PASS (100% de sucesso em 5 baterias de testes).
+  - `scripts/test-mail-adapters.ts`: PASS.
+  - `scripts/test-password-security.ts`: PASS.
+  - `scripts/test-otp-verification.ts`: PASS.
+  - `scripts/test-plan-intent.ts`: PASS.
+  - `scripts/test-billing-validation.ts`: PASS.
+  - `scripts/test-register-otp-flow.ts`: PASS.
+  - `npx tsc --noEmit`: PASS (0 erros de tipagem).
+  - `npm run lint`: PASS (0 erros de lint).
+  - `npm run build`: PASS (85/85 rotas estáticas, dinâmicas e SSG geradas com sucesso).
+
+### Task 245: Billing Onboarding & Asaas Hosted Checkout Redirection
+- `src/lib/validation/cpf-cnpj.ts`: Validador matemático de CPF e CNPJ (com cálculo e conferência de dígitos verificadores) e máscaras para CPF, CNPJ, telefone celular e CEP.
+- `src/components/checkout/billing-onboarding-view.tsx`: Componente de onboarding para planos pagos coletando dados fiscais com pré-preenchimento, busca automática de CEP no ViaCEP, salvamento em `/api/billing/profile` e acionamento de `/api/billing/checkout` com redirecionamento ao Asaas.
+- `src/app/(public)/checkout/billing/page.tsx`: Rota `/checkout/billing` envolvida em `<Suspense>` e desindexada para robôs de busca.
+- `scripts/test-billing-validation.ts`: Teste automatizado validando rejeição de CPFs/CNPJs inválidos ou repetidos, validação de documentos legítimos e formatação de máscaras.
+- `npx tsc --noEmit`: PASS.
+- `npm run lint`: PASS (0 erros).
+
+### Task 244: Register Stepper & Inline OTP Verification Flow
+- `src/app/api/auth/register/route.ts`: Atualizado para exigir token OTP de 6 dígitos válido antes de criar o usuário, salvar `emailVerified: new Date()`, gerar `passwordHash` e consumir o token.
+- `src/app/(public)/register/register-view.tsx`: Formulário refatorado em 3 etapas (Passo 1: Identificação -> Passo 2: Digitação e confirmação de código OTP inline de 6 dígitos com contador regressivo de reenvio -> Passo 3: Criação de senha segura e bifurcação de plano free vs pago).
+- `src/app/(public)/register/page.tsx`: Envolvido em `<Suspense>` para suporte estrito a App Router e `useSearchParams`.
+- `scripts/test-register-otp-flow.ts`: Teste automatizado validando rejeição de código incorreto, criação de usuário com e-mail verificado, persistência de senha com hash e consumo do token.
+- `npx tsc --noEmit`: PASS.
+- `npm run lint`: PASS (0 erros).
+
+### Task 243: Home Pricing Plan Selection & Purchase Intent
+- `src/lib/plan-intent.ts`: Módulo com tipagem `PlanIntent` e funções para salvar, recuperar e limpar a intenção de plano em `sessionStorage`.
+- `src/components/landing/pricing-carousel.tsx`: Atualizado CTA de cada card para direcionar para `/register?plan=free` ou `/register?plan=${plan.slug}&cycle=monthly`, preservando a intenção de contratação sem perder tracking analítico.
+- `scripts/test-plan-intent.ts`: Teste automatizado validando a formatação das URLs e os contratos de `PlanIntent`.
+- `npx tsc --noEmit`: PASS.
+- `npm run lint`: PASS (0 erros).
+
+### Task 242: OTP Verification API & Email Template
+- `src/lib/security/otp.ts`: Criado gerador criptográfico de código OTP de 6 dígitos numéricos via `crypto.randomInt`.
+- `src/lib/mail/templates/verification-code.ts`: Implementado template HTML responsivo com identidade visual escura premium GeraFeed, caixa destacada para o código e versão de texto plano.
+- `src/app/api/auth/send-verification-code/route.ts`: Endpoint com validação de formato, rejeição de e-mails duplicados, proteção anti-flood (60s), limpeza de tokens antigos, expiração de 15 minutos em `VerificationToken` e envio pelo adapter configurado.
+- `src/app/api/auth/verify-code/route.ts`: Endpoint para conferência e validação de tokens com bloqueio de expiração.
+- `scripts/test-otp-verification.ts`: Teste automatizado validando geração, integridade do template, gravação no banco, acerto, rejeição de código incorreto e expiração.
+- `npx tsc --noEmit`: PASS.
+- `npm run lint`: PASS (0 erros).
+
+### Task 241: User Password Hash & Credentials Security
+- `prisma/schema.prisma`: Adicionado campo `passwordHash String?` ao modelo `User`.
+- `npx prisma db push` e `npx prisma generate`: Banco de dados sincronizado e tipos atualizados.
+- `src/lib/security/password.ts`: Criado módulo utilitário com `hashPassword` (SALT rounds = 10 com bcryptjs) e `verifyPassword`.
+- `src/auth.ts`: Atualizado bloco de `regularUser` no provedor Credentials para validar o hash com `verifyPassword` e rejeitar senhas incorretas.
+- `src/app/api/auth/register/route.ts`: Atualizado para receber `password` (mínimo de 6 caracteres), gerar o `passwordHash` e salvar no banco sem expor o hash na resposta.
+- `scripts/test-password-security.ts`: Teste automatizado cobrindo validação de tamanho mínimo, formato bcrypt `$2b$10$...`, correspondência correta, rejeição de senha incorreta e casos nulos/vazios.
+- `npx tsc --noEmit`: PASS.
+- `npm run lint`: PASS (0 erros).
+
+### Task 240: Email Adapter Foundation
+- `src/lib/mail/types.ts`: Criadas as interfaces `EmailOptions`, `SendMailResult` e `EmailAdapter`.
+- `src/lib/mail/adapters/mock-adapter.ts`: Implementado `MockAdapter` para log legível de e-mails em dev/testes.
+- `src/lib/mail/adapters/resend-adapter.ts`: Implementado `ResendAdapter` integrando o SDK oficial `resend`.
+- `src/lib/mail/adapters/smtp-adapter.ts`: Implementado `SmtpAdapter` utilizando `nodemailer`.
+- `src/lib/mail/index.ts`: Criada factory `getMailAdapter()` com chaveamento por `EMAIL_PROVIDER="resend" | "smtp" | "mock"` e helper de alto nível `sendEmail()`.
+- `.env.example`: Atualizado com as variáveis de configuração dos provedores.
+- `scripts/test-mail-adapters.ts`: Teste automatizado executado com sucesso validando o MockAdapter, a Factory e a instanciação de todos os adapters.
+- `npx tsc --noEmit`: PASS.
+- `npm run lint`: PASS (0 erros).
 
 ## Phase 28. SEO, Measurement & Organic Acquisition Foundation
 - [x] 230-seo-public-route-policy-metadata

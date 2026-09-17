@@ -372,3 +372,23 @@ A contratação de planos no Asaas deve ser feita gerando a assinatura (`POST /v
 - Evitar promessa de "anti-plágio" como eixo de SEO/marketing.
 - Landing pages iniciais: como-funciona, automacao-wordpress, rss-para-wordpress, curadoria-de-conteudo-com-ia, para-agencias, para-portais-de-noticias.
 - Blog usa fundação simples compatível com Vercel, preferencialmente filesystem Markdown/MDX se não existir CMS.
+
+# Phase 29. Funil de Aquisição, Email OTP & Checkout Asaas
+
+- **Email Service Desacoplado**:
+  - `src/lib/mail/` centraliza todo envio de e-mails via `EmailAdapter`.
+  - A aplicação suporta `resend`, `smtp` (Nodemailer) e `mock` via `EMAIL_PROVIDER`.
+  - Mecanismo de Fallback Automático: se `EMAIL_PROVIDER="resend"` e o envio falhar (ex: cota excedida), tenta automaticamente via SMTP como contingência de alta disponibilidade.
+  - Novos provedores (ex: Mailgun) só exigem uma nova classe que implementa o contrato `EmailAdapter`.
+- **Validação de E-mail Anti-Fake (OTP 6 dígitos)**:
+  - O código numérico OTP de 6 dígitos é gerado de forma criptográfica e gravado em `VerificationToken` com 15 minutos de validade.
+  - A verificação é inline (na própria tela de cadastro), evitando perda de conversão e mantendo a aba aberta.
+  - Nenhuma conta é criada sem validação prévia de e-mail.
+- **Segurança de Credenciais**:
+  - Senhas são armazenadas como hash seguro via `bcryptjs` com fator de custo (SALT) de 10 rounds em `User.passwordHash`.
+  - O `authorize` em `src/auth.ts` valida via `bcrypt.compare`.
+- **Funil de Compra e Onboarding de Cobrança**:
+  - O carrossel de planos na Home propaga parâmetros de plano (`plan` e `cycle`).
+  - Plano Free: segue direto para `/dashboard` após cadastro.
+  - Planos Pagos: o usuário preenche dados fiscais (`BillingProfile`) e é redirecionado para a `checkoutUrl` retornada pela rota `/api/billing/checkout` integrada ao Asaas.
+

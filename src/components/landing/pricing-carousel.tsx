@@ -223,26 +223,34 @@ export function PricingCarousel({ plans }: PricingCarouselProps) {
                   </ul>
                 </div>
 
-                <Link
-                  href="/register"
-                  onClick={() =>
-                    trackEvent("cta_click", {
-                      cta_location: `pricing_${plan.slug}`,
-                      page_path: "/",
-                    })
-                  }
-                  className={`w-full py-3.5 px-6 rounded-xl font-bold text-sm text-center transition-all duration-200 block ${
-                    plan.highlight
-                      ? "text-white bg-gradient-to-r from-[#2563EB] to-[#7C3AED] hover:opacity-95 shadow-md shadow-primary/25 active:scale-98"
-                      : "text-foreground bg-surface-muted hover:bg-muted border border-border active:scale-98"
-                  }`}
-                >
-                  {isFree
-                    ? "Começar Gratuitamente"
-                    : plan.highlight
-                    ? `Assinar ${plan.name}`
-                    : `Contratar ${plan.name}`}
-                </Link>
+                {(() => {
+                  const registerHref = isFree
+                    ? "/register?plan=free"
+                    : `/register?plan=${encodeURIComponent(plan.slug)}&cycle=monthly`;
+
+                  return (
+                    <Link
+                      href={registerHref}
+                      onClick={() =>
+                        trackEvent("cta_click", {
+                          cta_location: `pricing_${plan.slug}`,
+                          page_path: "/",
+                        })
+                      }
+                      className={`w-full py-3.5 px-6 rounded-xl font-bold text-sm text-center transition-all duration-200 block ${
+                        plan.highlight
+                          ? "text-white bg-gradient-to-r from-[#2563EB] to-[#7C3AED] hover:opacity-95 shadow-md shadow-primary/25 active:scale-98"
+                          : "text-foreground bg-surface-muted hover:bg-muted border border-border active:scale-98"
+                      }`}
+                    >
+                      {isFree
+                        ? "Começar Gratuitamente"
+                        : plan.highlight
+                        ? `Assinar ${plan.name}`
+                        : `Contratar ${plan.name}`}
+                    </Link>
+                  );
+                })()}
               </div>
             );
           })}

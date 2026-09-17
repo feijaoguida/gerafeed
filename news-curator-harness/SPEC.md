@@ -2822,3 +2822,95 @@ Regras:
 - [ ] Build PASS.
 - [ ] Evidence registrada por task.
 
+---
+
+# Phase 29. Funil de Aquisição, Verificação de E-mail (OTP) e Onboarding de Checkout Asaas
+
+## 1. Objetivo
+
+Implementar a jornada completa de conversão do visitante desde a Home Page até a ativação da conta:
+1. Conectar os botões do carrossel de planos na Home à página de cadastro, preservando a escolha do plano (`plan` e `cycle`).
+2. Criar camada modular de envio de e-mails transacionais via Adapter Pattern (`resend`, `smtp` e `mock`), configurável via `.env`.
+3. Validar a veracidade do e-mail do usuário através de um código numérico de 6 dígitos (OTP) inserido na própria tela de cadastro antes da criação definitiva da conta, prevenindo e-mails descartáveis ou forjados (como `teste@teste.com.br`).
+4. Armazenar credenciais de acesso com hash criptográfico seguro (`bcryptjs`) e fator de trabalho (SALT rounds = 10) no banco de dados.
+5. Conduzir o usuário cadastrado com plano pago para uma etapa de preenchimento de dados de faturamento (`BillingProfile`: CPF/CNPJ, Telefone, CEP/Endereço) e direcioná-lo automaticamente ao checkout hospedado do **Asaas**.
+6. Manter o fluxo do plano gratuito simplificado (vai diretamente para o Dashboard após confirmação de e-mail e senha).
+
+---
+
+## 2. Motivação
+
+Atualmente:
+- Os cards de planos na Home apontam para `/register` sem nenhum parâmetro de contexto, descartando o plano que o usuário escolheu.
+- A rota `/api/auth/register` cria usuários imediatamente sem qualquer comprovação de que o e-mail digitado existe e pertence ao usuário.
+- O modelo `User` não armazena hash de senha, e o provedor de credenciais não autentica senhas de usuários comuns de forma segura.
+- Usuários que desejam assinar um plano pago caem no plano gratuito por padrão e não são direcionados para preencher dados fiscais e pagar a assinatura no gateway Asaas.
+
+A Phase 29 fecha o ciclo de aquisição com integridade de dados e alta conversão.
+
+---
+
+## 3. Regras de Arquitetura
+
+### A. Camada de E-mail (Adapter Pattern)
+- Localização: `src/lib/mail/`.
+- Contrato: Interface `EmailAdapter` com método `sendMail(options: EmailOptions): Promise<SendMailResult>`.
+- Provedores suportados:
+  - `ResendAdapter`: consome a API do Resend via SDK oficial (`resend`), ideal para o limite free de 100 envios/dia.
+  - `SmtpAdapter`: utiliza `nodemailer` para envio via servidores SMTP tradicionais.
+  - `MockAdapter`: exibe o e-mail e o código OTP no terminal quando em ambiente local de desenvolvimento ou testes.
+- Seleção: Controlada exclusivamente pela variável de ambiente `EMAIL_PROVIDER="resend" | "smtp" | "mock"`.
+- Extensibilidade: A adição de provedores futuros (como Mailgun ou SendGrid) deve ocorrer criando uma nova classe que implementa `EmailAdapter`, sem alterações nas regras de negócio.
+
+### B. Confirmação de E-mail via OTP de 6 Dígitos
+- Reutilizar a tabela nativa `VerificationToken` no Prisma (`identifier`, `token`, `expires`).
+- O código gerado deve ser numérico (6 dígitos) gerado via `crypto.randomInt(100000, 999999).toString()`.
+- O hash do código (ou código seguro com expiração curta) tem validade de 15 minutos.
+- A tela de cadastro deve validar o código inline, sem redirecionar o usuário para fora da aplicação.
+- Mecanismo anti-flood: reenvio só é permitido após contagem regressiva de 60 segundos.
+
+### C. Persistência de Senha com Salt
+- O modelo `User` deve conter o campo `passwordHash String?`.
+- Criptografia executada exclusivamente no servidor com `bcryptjs` (rounds = 10).
+- Em `src/auth.ts`, o `authorize(credentials)` deve validar `await bcrypt.compare(password, user.passwordHash)`.
+- Senhas fracas (menos de 6 caracteres) devem ser rejeitadas tanto no frontend quanto na API.
+
+### D. Onboarding de Faturamento e Checkout Asaas
+- Ao concluir a criação da conta:
+  - Se `plan === "free"` ou ausente: sessão criada e redireciona para `/dashboard`.
+  - Se plano pago (ex: `plan === "pro"`): exibe etapa de dados fiscais (CPF/CNPJ, Telefone celular, CEP com preenchimento automático, Logradouro, Número, Bairro, Cidade, Estado).
+- Os dados são salvos em `BillingProfile`.
+- A API `/api/billing/checkout` é invocada com `planId` e `cycle`.
+- O usuário é redirecionado para a `checkoutUrl` retornada pelo gateway Asaas.
+
+---
+
+## 4. Tasks da Phase 29
+
+- `240-email-adapter-foundation`: Camada de abstração de e-mails com Adapter Pattern (Resend, SMTP, Mock).
+- `241-user-password-hash-security`: Migração do schema Prisma para `passwordHash`, rotinas de hash e validação no Auth.js.
+- `242-otp-verification-api`: Geração criptográfica do código OTP de 6 dígitos, expiração no `VerificationToken` e endpoints de envio e checagem.
+- `243-home-pricing-plan-selection`: Propagação do plano na Home (`pricing-carousel.tsx`) e memorização de intenção de compra.
+- `244-register-stepper-otp-flow`: Interface de cadastro em passos com verificação OTP inline na mesma tela e criação segura da conta.
+- `245-billing-onboarding-and-asaas-checkout`: Formulário de dados fiscais (`BillingProfile`) e redirecionamento para o checkout hospedado do Asaas.
+- `246-acquisition-funnel-hardening-e2e`: Testes automatizados, validação de limites, auditoria de segurança (sem vazamento de senha/tokens), TypeScript, lint e build.
+
+---
+
+## 5. Definition of Done Phase 29
+
+- [ ] Adapter de e-mail funcional com suporte a Resend, SMTP e Mock em desenvolvimento.
+- [ ] Chaveamento por `EMAIL_PROVIDER` no `.env`.
+- [ ] Código OTP de 6 dígitos gerado e enviado por e-mail com template responsivo do GeraFeed.
+- [ ] Bloqueio de cadastros com e-mails inválidos, não verificados ou inexistentes.
+- [ ] Modelo `User` com `passwordHash` e validação com salt rounds no login de credenciais.
+- [ ] Home Page propagando plano e ciclo escolhidos para a página de registro.
+- [ ] Cadastro com plano gratuito acessando o Dashboard imediatamente após criação.
+- [ ] Cadastro com plano pago solicitando dados de cobrança e redirecionando para o Asaas.
+- [ ] Proteção contra PII em logs e analytics.
+- [ ] TypeScript PASS (`npx tsc --noEmit`).
+- [ ] Lint PASS (`npm run lint`).
+- [ ] Build PASS (`npm run build`).
+- [ ] Evidências registradas em `PROGRESS.md`.
+
+

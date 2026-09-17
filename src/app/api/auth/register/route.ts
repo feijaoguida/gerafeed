@@ -1,20 +1,47 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { BillingService } from "@/lib/billing";
+import { hashPassword } from "@/lib/security/password";
 
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { name, email } = body;
+    const { name, email, password, code } = body;
 
     if (!email || typeof email !== "string") {
       return NextResponse.json({ error: "E-mail válido é obrigatório." }, { status: 400 });
     }
 
+    if (!password || typeof password !== "string" || password.length < 6) {
+      return NextResponse.json({ error: "A senha deve conter no mínimo 6 caracteres." }, { status: 400 });
+    }
+
+    if (!code || typeof code !== "string" || code.trim().length !== 6) {
+      return NextResponse.json({ error: "Código de confirmação de 6 dígitos é obrigatório." }, { status: 400 });
+    }
+
     const cleanEmail = email.trim().toLowerCase();
     const cleanName = typeof name === "string" && name.trim() ? name.trim() : "Usuário";
+    const cleanCode = code.trim();
 
-    // Check if user already exists
+    // 1. Validar Token de Verificação
+    const tokenRecord = await prisma.verificationToken.findUnique({
+      where: {
+        identifier_token: {
+          identifier: cleanEmail,
+          token: cleanCode,
+        },
+      },
+    });
+
+    if (!tokenRecord || tokenRecord.expires < new Date()) {
+      return NextResponse.json(
+        { error: "Código de confirmação inválido ou expirado. Por favor, solicite um novo código." },
+        { status: 400 }
+      );
+    }
+
+    // 2. Check if user already exists
     const existingUser = await prisma.user.findUnique({
       where: { email: cleanEmail },
     });
@@ -23,12 +50,22 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Este e-mail já está cadastrado. Faça login." }, { status: 409 });
     }
 
-    // 1. Create User
+    // 3. Hash Password with SALT rounds
+    const passwordHash = await hashPassword(password);
+
+    // 4. Create User com e-mail verificado
     const user = await prisma.user.create({
       data: {
         name: cleanName,
         email: cleanEmail,
+        passwordHash,
+        emailVerified: new Date(),
       },
+    });
+
+    // 5. Consumir/limpar token de verificação utilizado
+    await prisma.verificationToken.deleteMany({
+      where: { identifier: cleanEmail },
     });
 
     // 2. Create dedicated Workspace
