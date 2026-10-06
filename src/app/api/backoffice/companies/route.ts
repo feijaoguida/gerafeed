@@ -131,7 +131,7 @@ export async function POST(request: Request) {
   try {
     await requireSuperAdmin();
     const body = await request.json();
-    const { name, slug, planSlug } = body;
+    const { name, slug, planSlug, website, phone } = body;
 
     if (!name || typeof name !== "string" || !name.trim()) {
       return NextResponse.json({ error: "Nome da empresa é obrigatório." }, { status: 400 });
@@ -149,6 +149,12 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Já existe uma empresa cadastrada com este slug." }, { status: 409 });
     }
 
+    let cleanWebsite = typeof website === "string" && website.trim() ? website.trim() : null;
+    if (cleanWebsite && !cleanWebsite.startsWith("http://") && !cleanWebsite.startsWith("https://")) {
+      cleanWebsite = `https://${cleanWebsite}`;
+    }
+    const cleanPhone = typeof phone === "string" && phone.trim() ? phone.trim() : null;
+
     // Resolve plan
     let targetPlan = null;
     if (planSlug) {
@@ -163,6 +169,8 @@ export async function POST(request: Request) {
       data: {
         name: name.trim(),
         slug: cleanSlug,
+        website: cleanWebsite,
+        phone: cleanPhone,
         active: true,
         ...(targetPlan
           ? {

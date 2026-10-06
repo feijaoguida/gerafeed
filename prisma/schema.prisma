@@ -17,6 +17,7 @@ model User {
   emailVerified DateTime?
   passwordHash  String?
   image         String?
+  phone         String?
   isSuperAdmin  Boolean   @default(false)
   accounts      Account[]
   sessions      Session[]
@@ -79,6 +80,8 @@ model Workspace {
   asaasCustomerId  String?
   stripeCustomerId String?
   active           Boolean         @default(true)
+  website          String?
+  phone            String?
   createdAt        DateTime        @default(now())
   updatedAt        DateTime        @updatedAt
 

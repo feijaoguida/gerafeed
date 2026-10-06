@@ -25,6 +25,7 @@ export async function GET(
                 id: true,
                 name: true,
                 email: true,
+                phone: true,
                 createdAt: true,
               },
             },
@@ -95,6 +96,8 @@ export async function GET(
       id: workspace.id,
       name: workspace.name,
       slug: workspace.slug,
+      website: workspace.website,
+      phone: workspace.phone,
       active: workspace.active,
       createdAt: workspace.createdAt,
       updatedAt: workspace.updatedAt,
@@ -129,7 +132,7 @@ export async function PATCH(
     await requireSuperAdmin();
     const { id } = await params;
     const body = await request.json();
-    const { name, slug, active, planId } = body;
+    const { name, slug, active, planId, website, phone } = body;
 
     const data: Record<string, unknown> = {};
     if (typeof name === "string" && name.trim()) data.name = name.trim();
@@ -137,6 +140,16 @@ export async function PATCH(
       data.slug = slug.trim().toLowerCase().replace(/[^a-z0-9_-]/g, "-");
     }
     if (typeof active === "boolean") data.active = active;
+    if (typeof website === "string") {
+      let cleanWebsite = website.trim();
+      if (cleanWebsite && !cleanWebsite.startsWith("http://") && !cleanWebsite.startsWith("https://")) {
+        cleanWebsite = `https://${cleanWebsite}`;
+      }
+      data.website = cleanWebsite || null;
+    }
+    if (typeof phone === "string") {
+      data.phone = phone.trim() || null;
+    }
 
     await prisma.workspace.update({
       where: { id },

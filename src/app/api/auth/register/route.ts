@@ -6,7 +6,7 @@ import { hashPassword } from "@/lib/security/password";
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { name, email, password, code } = body;
+    const { name, companyName, website, phone, email, password, code } = body;
 
     if (!email || typeof email !== "string") {
       return NextResponse.json({ error: "E-mail válido é obrigatório." }, { status: 400 });
@@ -22,6 +22,12 @@ export async function POST(request: Request) {
 
     const cleanEmail = email.trim().toLowerCase();
     const cleanName = typeof name === "string" && name.trim() ? name.trim() : "Usuário";
+    const cleanCompanyName = typeof companyName === "string" && companyName.trim() ? companyName.trim() : "";
+    let cleanWebsite = typeof website === "string" && website.trim() ? website.trim() : "";
+    if (cleanWebsite && !cleanWebsite.startsWith("http://") && !cleanWebsite.startsWith("https://")) {
+      cleanWebsite = `https://${cleanWebsite}`;
+    }
+    const cleanPhone = typeof phone === "string" && phone.trim() ? phone.trim() : "";
     const cleanCode = code.trim();
 
     // 1. Validar Token de Verificação
@@ -60,6 +66,7 @@ export async function POST(request: Request) {
         email: cleanEmail,
         passwordHash,
         emailVerified: new Date(),
+        phone: cleanPhone || null,
       },
     });
 
@@ -68,12 +75,23 @@ export async function POST(request: Request) {
       where: { identifier: cleanEmail },
     });
 
-    // 2. Create dedicated Workspace
-    const slugBase = cleanName.toLowerCase().replace(/[^a-z0-9]/g, "-").slice(0, 20) || "workspace";
+    // 6. Create dedicated Workspace
+    const workspaceName = cleanCompanyName || `Workspace de ${cleanName}`;
+    const slugBase = (cleanCompanyName || cleanName)
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/[^a-z0-9]/g, "-")
+      .replace(/-+/g, "-")
+      .replace(/^-|-$/g, "")
+      .slice(0, 24) || "workspace";
+
     const workspace = await prisma.workspace.create({
       data: {
-        name: `Workspace de ${cleanName}`,
+        name: workspaceName,
         slug: `${slugBase}-${Date.now().toString().slice(-4)}`,
+        website: cleanWebsite || null,
+        phone: cleanPhone || null,
         members: {
           create: {
             userId: user.id,

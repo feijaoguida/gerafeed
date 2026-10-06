@@ -43,6 +43,7 @@ export interface WorkspaceMember {
     id: string;
     name: string | null;
     email: string;
+    phone?: string | null;
     createdAt: string;
   };
 }
@@ -112,6 +113,8 @@ export interface WorkspaceDetailData {
   name: string;
   slug: string;
   active: boolean;
+  website?: string | null;
+  phone?: string | null;
   createdAt: string;
   updatedAt: string;
   subscription?: {
@@ -175,6 +178,8 @@ export function CompanyDetails({ initialWorkspace, availablePlans }: CompanyDeta
   const [name, setName] = useState(workspace.name);
   const [slug, setSlug] = useState(workspace.slug);
   const [active, setActive] = useState(workspace.active);
+  const [website, setWebsite] = useState(workspace.website || "");
+  const [phone, setPhone] = useState(workspace.phone || "");
 
   // Plan change form
   const [selectedPlanId, setSelectedPlanId] = useState(
@@ -235,13 +240,20 @@ export function CompanyDetails({ initialWorkspace, availablePlans }: CompanyDeta
       const res = await fetch(`/api/backoffice/companies/${workspace.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, slug, active }),
+        body: JSON.stringify({ name, slug, active, website, phone }),
       });
 
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Erro ao atualizar dados.");
 
-      setWorkspace((prev) => ({ ...prev, name: data.name, slug: data.slug, active: data.active }));
+      setWorkspace((prev) => ({
+        ...prev,
+        name: data.name,
+        slug: data.slug,
+        active: data.active,
+        website: data.website,
+        phone: data.phone,
+      }));
       setMessage({ type: "success", text: "Dados da empresa atualizados com sucesso!" });
     } catch (err) {
       setMessage({ type: "error", text: err instanceof Error ? err.message : "Erro ao atualizar." });
@@ -884,6 +896,9 @@ export function CompanyDetails({ initialWorkspace, availablePlans }: CompanyDeta
                         {member.user?.name || "Sem nome"}
                       </span>
                       <span className="text-zinc-500 ml-2 font-mono">({member.user?.email})</span>
+                      {member.user?.phone && (
+                        <span className="text-zinc-400 ml-2 font-mono">• {member.user.phone}</span>
+                      )}
                     </div>
                     <div className="flex items-center gap-3">
                       <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-zinc-900 border border-zinc-800 text-zinc-400">
@@ -1608,6 +1623,32 @@ export function CompanyDetails({ initialWorkspace, availablePlans }: CompanyDeta
                   required
                   value={slug}
                   onChange={(e) => setSlug(e.target.value)}
+                  className="w-full px-3 py-2 rounded-lg bg-zinc-900 border border-zinc-800 text-xs text-white focus:outline-none focus:border-amber-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-zinc-400 mb-1">
+                  Site / Endereço do Site
+                </label>
+                <input
+                  type="text"
+                  value={website}
+                  onChange={(e) => setWebsite(e.target.value)}
+                  placeholder="https://exemplo.com.br"
+                  className="w-full px-3 py-2 rounded-lg bg-zinc-900 border border-zinc-800 text-xs text-white focus:outline-none focus:border-amber-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-zinc-400 mb-1">
+                  Telefone / WhatsApp
+                </label>
+                <input
+                  type="text"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  placeholder="(11) 99999-9999"
                   className="w-full px-3 py-2 rounded-lg bg-zinc-900 border border-zinc-800 text-xs text-white focus:outline-none focus:border-amber-500"
                 />
               </div>

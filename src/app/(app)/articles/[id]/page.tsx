@@ -739,51 +739,11 @@ export default function ReviewArticlePage({ params }: { params: Promise<{ id: st
                 />
               </FormField>
             </Card>
-          </div>
-
-          {/* SEO & Reference Column (1/3) */}
-          <div className="space-y-6">
-            {/* SEO Settings Panel */}
-            <Card className="p-6 space-y-5 shadow-xs">
-              <CardHeader className="p-0 border-b border-border pb-3">
-                <CardTitle className="text-sm font-semibold text-foreground flex items-center gap-1.5">
-                  <Search className="w-4 h-4 text-primary" />
-                  Configurações de SEO (Yoast)
-                </CardTitle>
-              </CardHeader>
-
-              <FormField label="Palavra-Chave Foco (Focus Keyword)">
-                <Input
-                  type="text"
-                  value={seoFocusKeyword}
-                  onChange={(e) => setSeoFocusKeyword(e.target.value)}
-                  placeholder="Palavra-chave principal..."
-                />
-              </FormField>
-
-              <FormField label="Título SEO (Meta Title)">
-                <Input
-                  type="text"
-                  value={seoTitle}
-                  onChange={(e) => setSeoTitle(e.target.value)}
-                  placeholder="Título para ferramentas de busca..."
-                />
-              </FormField>
-
-              <FormField label="Meta Descrição">
-                <Textarea
-                  rows={4}
-                  value={seoDescription}
-                  onChange={(e) => setSeoDescription(e.target.value)}
-                  placeholder="Descrição exibida no Google (120-155 caracteres)..."
-                />
-              </FormField>
-            </Card>
 
             {/* Featured Media Selection Panel */}
             <Card className="p-6 space-y-4 shadow-xs">
-              <CardHeader className="p-0 border-b border-border pb-3 flex flex-row items-center justify-between">
-                <div className="flex items-center gap-2">
+              <CardHeader className="p-0 border-b border-border pb-3 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                <div className="flex items-center gap-2 flex-wrap">
                   <CardTitle className="text-sm font-semibold text-foreground flex items-center gap-2">
                     <ImageIcon className="w-4 h-4 text-primary" />
                     Mídia Destacada
@@ -804,7 +764,7 @@ export default function ReviewArticlePage({ params }: { params: Promise<{ id: st
                 </Button>
               </CardHeader>
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 {/* Option 1: Original Image */}
                 {article.originalImageUrl ? (
                   <div
@@ -815,8 +775,8 @@ export default function ReviewArticlePage({ params }: { params: Promise<{ id: st
                         : "bg-surface border-border hover:border-muted-foreground/40"
                     }`}
                   >
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-semibold flex items-center gap-1.5 text-foreground">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-xs font-semibold flex items-center gap-1.5 text-foreground truncate">
                         <input
                           type="radio"
                           name="selectedImage"
@@ -827,7 +787,7 @@ export default function ReviewArticlePage({ params }: { params: Promise<{ id: st
                         Original (RSS)
                       </span>
                       {selectedImage === "ORIGINAL" && (
-                        <Badge variant="outline" size="sm">
+                        <Badge variant="outline" size="sm" className="shrink-0">
                           ATIVA
                         </Badge>
                       )}
@@ -857,8 +817,8 @@ export default function ReviewArticlePage({ params }: { params: Promise<{ id: st
                         : "bg-surface border-border hover:border-muted-foreground/40"
                     }`}
                   >
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-semibold flex items-center gap-1.5 text-foreground">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-xs font-semibold flex items-center gap-1.5 text-foreground truncate">
                         <input
                           type="radio"
                           name="selectedImage"
@@ -869,7 +829,7 @@ export default function ReviewArticlePage({ params }: { params: Promise<{ id: st
                         Invertida (Sharp)
                       </span>
                       {selectedImage === "MODIFIED" && (
-                        <Badge variant="outline" size="sm">
+                        <Badge variant="outline" size="sm" className="shrink-0">
                           ATIVA
                         </Badge>
                       )}
@@ -901,8 +861,8 @@ export default function ReviewArticlePage({ params }: { params: Promise<{ id: st
                         : "bg-surface border-border hover:border-muted-foreground/40"
                     }`}
                   >
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-semibold flex items-center gap-1.5 text-foreground">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-xs font-semibold flex items-center gap-1.5 text-foreground truncate">
                         <input
                           type="radio"
                           name="selectedImage"
@@ -913,11 +873,11 @@ export default function ReviewArticlePage({ params }: { params: Promise<{ id: st
                         Gerada por IA
                       </span>
                       {selectedImage === "AI_GENERATED" ? (
-                        <Badge variant="purple" size="sm">
+                        <Badge variant="purple" size="sm" className="shrink-0">
                           ATIVA
                         </Badge>
                       ) : (
-                        <Badge variant="outline" size="sm">
+                        <Badge variant="outline" size="sm" className="shrink-0">
                           IA
                         </Badge>
                       )}
@@ -974,6 +934,46 @@ export default function ReviewArticlePage({ params }: { params: Promise<{ id: st
                   </p>
                 </div>
               )}
+            </Card>
+          </div>
+
+          {/* SEO & Reference Column (1/3) */}
+          <div className="space-y-6">
+            {/* SEO Settings Panel */}
+            <Card className="p-6 space-y-5 shadow-xs">
+              <CardHeader className="p-0 border-b border-border pb-3">
+                <CardTitle className="text-sm font-semibold text-foreground flex items-center gap-1.5">
+                  <Search className="w-4 h-4 text-primary" />
+                  Configurações de SEO (Yoast)
+                </CardTitle>
+              </CardHeader>
+
+              <FormField label="Palavra-Chave Foco (Focus Keyword)">
+                <Input
+                  type="text"
+                  value={seoFocusKeyword}
+                  onChange={(e) => setSeoFocusKeyword(e.target.value)}
+                  placeholder="Palavra-chave principal..."
+                />
+              </FormField>
+
+              <FormField label="Título SEO (Meta Title)">
+                <Input
+                  type="text"
+                  value={seoTitle}
+                  onChange={(e) => setSeoTitle(e.target.value)}
+                  placeholder="Título para ferramentas de busca..."
+                />
+              </FormField>
+
+              <FormField label="Meta Descrição">
+                <Textarea
+                  rows={4}
+                  value={seoDescription}
+                  onChange={(e) => setSeoDescription(e.target.value)}
+                  placeholder="Descrição exibida no Google (120-155 caracteres)..."
+                />
+              </FormField>
             </Card>
 
             {/* Original RSS Reference Panel */}

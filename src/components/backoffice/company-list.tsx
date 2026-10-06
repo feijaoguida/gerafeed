@@ -81,6 +81,8 @@ export function CompanyList({
   const [newName, setNewName] = useState("");
   const [newSlug, setNewSlug] = useState("");
   const [newPlanSlug, setNewPlanSlug] = useState("free");
+  const [newWebsite, setNewWebsite] = useState("");
+  const [newPhone, setNewPhone] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [alertMsg, setAlertMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
@@ -161,6 +163,8 @@ export function CompanyList({
           name: newName.trim(),
           slug: newSlug.trim(),
           planSlug: newPlanSlug,
+          website: newWebsite.trim(),
+          phone: newPhone.trim(),
         }),
       });
 
@@ -172,6 +176,8 @@ export function CompanyList({
         setIsCreateOpen(false);
         setNewName("");
         setNewSlug("");
+        setNewWebsite("");
+        setNewPhone("");
         setNewPlanSlug("free");
         setRefreshKey((k) => k + 1);
       } else {
@@ -482,6 +488,24 @@ export function CompanyList({
                     </option>
                   ))}
                 </Select>
+              </FormField>
+
+              <FormField label="Site / Endereço do Site">
+                <Input
+                  type="text"
+                  value={newWebsite}
+                  onChange={(e) => setNewWebsite(e.target.value)}
+                  placeholder="https://meuportal.com.br"
+                />
+              </FormField>
+
+              <FormField label="Telefone / WhatsApp">
+                <Input
+                  type="text"
+                  value={newPhone}
+                  onChange={(e) => setNewPhone(e.target.value)}
+                  placeholder="(11) 99999-9999"
+                />
               </FormField>
 
               <CardFooter className="p-0 flex items-center justify-end gap-3 pt-3 border-t border-border">

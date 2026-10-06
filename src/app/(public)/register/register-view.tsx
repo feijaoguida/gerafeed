@@ -17,6 +17,10 @@ import {
   KeyRound,
   ShieldCheck,
   RotateCcw,
+  User,
+  Building2,
+  Globe,
+  Phone,
 } from "lucide-react";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Button } from "@/components/ui/button";
@@ -56,6 +60,9 @@ export function RegisterView() {
   // Estados do Formulário
   const [step, setStep] = useState<RegisterStep>("email_step");
   const [name, setName] = useState("");
+  const [companyName, setCompanyName] = useState("");
+  const [website, setWebsite] = useState("");
+  const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
   const [otpCode, setOtpCode] = useState("");
   const [password, setPassword] = useState("");
@@ -91,13 +98,33 @@ export function RegisterView() {
     setError(null);
     setSuccessMessage(null);
 
-    if (!agreeTerms) {
-      setError("Você deve concordar com os Termos de Uso e Política de Privacidade.");
+    if (!name.trim()) {
+      setError("Por favor, informe seu nome completo.");
+      return;
+    }
+
+    if (!companyName.trim()) {
+      setError("Por favor, informe o nome da empresa.");
+      return;
+    }
+
+    if (!website.trim()) {
+      setError("Por favor, informe o site ou endereço do portal.");
+      return;
+    }
+
+    if (!phone.trim()) {
+      setError("Por favor, informe o telefone ou WhatsApp para contato.");
       return;
     }
 
     if (!email || !email.includes("@")) {
       setError("Por favor, informe um endereço de e-mail profissional válido.");
+      return;
+    }
+
+    if (!agreeTerms) {
+      setError("Você deve concordar com os Termos de Uso e Política de Privacidade.");
       return;
     }
 
@@ -214,8 +241,11 @@ export function RegisterView() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          name,
-          email,
+          name: name.trim(),
+          companyName: companyName.trim(),
+          website: website.trim(),
+          phone: phone.trim(),
+          email: email.trim().toLowerCase(),
           password,
           code: otpCode.trim(),
         }),
@@ -399,7 +429,7 @@ export function RegisterView() {
             </div>
           )}
 
-          {/* ETAPA 1: Nome, E-mail e Termos */}
+          {/* ETAPA 1: Dados do Membro e Empresa, E-mail e Termos */}
           {step === "email_step" && (
             <form onSubmit={handleSendCode} className="space-y-4">
               <FormField label="Nome completo" required>
@@ -410,6 +440,43 @@ export function RegisterView() {
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   placeholder="Seu nome completo"
+                  leadingIcon={<User className="w-4 h-4 text-muted-foreground" />}
+                />
+              </FormField>
+
+              <FormField label="Nome da empresa" required>
+                <Input
+                  type="text"
+                  required
+                  autoComplete="organization"
+                  value={companyName}
+                  onChange={(e) => setCompanyName(e.target.value)}
+                  placeholder="Ex: Portal Notícias Tech ou Agência Digital"
+                  leadingIcon={<Building2 className="w-4 h-4 text-muted-foreground" />}
+                />
+              </FormField>
+
+              <FormField label="Site / Endereço do site" required>
+                <Input
+                  type="text"
+                  required
+                  autoComplete="url"
+                  value={website}
+                  onChange={(e) => setWebsite(e.target.value)}
+                  placeholder="https://seusite.com.br"
+                  leadingIcon={<Globe className="w-4 h-4 text-muted-foreground" />}
+                />
+              </FormField>
+
+              <FormField label="Telefone / WhatsApp" required>
+                <Input
+                  type="tel"
+                  required
+                  autoComplete="tel"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  placeholder="(11) 99999-9999"
+                  leadingIcon={<Phone className="w-4 h-4 text-muted-foreground" />}
                 />
               </FormField>
 
