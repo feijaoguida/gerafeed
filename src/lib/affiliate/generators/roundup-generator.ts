@@ -1,3 +1,4 @@
+import { enrichGeneratedBlocks } from "./enrich-document";
 import { prisma } from "@/lib/prisma";
 import { BillingService, AFFILIATE_FEATURES } from "@/lib/billing";
 import { getActiveAIProvider } from "@/lib/ai";
@@ -111,7 +112,7 @@ export class BestProductsGenerator {
 - Especificações: ${formattedSpecs}
 - Pontos Fortes: ${product.pros.join(", ") || "Nenhum informado"}
 - Pontos Fracos: ${product.cons.join(", ") || "Nenhum informado"}
-- Avaliação: ${product.rating !== null ? product.rating : "4.5"}`;
+- Avaliação: ${product.rating !== null ? product.rating : "Não informada"}`;
     }).join("\n\n");
 
     const promptContext: Record<string, unknown> = {
@@ -197,8 +198,8 @@ export class BestProductsGenerator {
           type: "PROS_CONS",
           data: {
             productId: prod.id,
-            pros: prod.pros.length > 0 ? prod.pros : ["Excelente escolha"],
-            cons: prod.cons.length > 0 ? prod.cons : ["Disponibilidade sujeita a estoque"],
+            pros: prod.pros,
+            cons: prod.cons,
           },
         });
       }
@@ -215,7 +216,8 @@ export class BestProductsGenerator {
       },
     });
 
-    const canonicalDoc = CanonicalDocumentService.createDocument(canonicalBlocks, {
+    const canonicalDoc = CanonicalDocumentService.createDocument(enrichGeneratedBlocks(canonicalBlocks, products), {
+      baseProductIds: products.map(p => p.id),
       wordCount: (aiResponse.content || "").split(/\s+/).length,
       readingTimeMinutes: Math.max(1, Math.ceil(((aiResponse.content || "").split(/\s+/).length) / 200)),
     });
@@ -228,6 +230,7 @@ export class BestProductsGenerator {
         content: aiResponse.content || `<p>Guia dos melhores produtos.</p>`,
         commercialType: "BEST_PRODUCTS",
         canonicalContent: canonicalDoc as object,
+        originalImageUrl: products[0]?.imageUrl || products[0]?.images?.[0] || null,
         seoFocusKeyword: aiResponse.seoFocusKeyword || focusKeyword?.trim() || `melhores ${categoryName || "produtos"}`,
         seoTitle: aiResponse.seoTitle || aiResponse.title || `Melhores Produtos: Guia Completo`,
         seoDescription: aiResponse.seoDescription || aiResponse.summary,
@@ -248,7 +251,7 @@ export class BestProductsGenerator {
       offerId: offerIds?.[prod.id] || prod.offers[0]?.id || null,
       position: index,
       badge: badges[index] || `Destaque #${index + 1}`,
-      score: prod.rating || 4.5,
+      score: prod.rating,
       recommendation: index === 0 ? "Top 1 Recomendado" : "Opção de Alto Nível",
     }));
 
@@ -282,6 +285,8 @@ export class BuyingGuideGenerator {
       pros: string[];
       cons: string[];
       rating: number | null;
+      imageUrl?: string | null;
+      images?: string[];
       specs: unknown;
       offers: Array<{ id: string; price: number | null; currency: string; seller: string | null }>;
     }> = [];
@@ -402,7 +407,8 @@ export class BuyingGuideGenerator {
       });
     }
 
-    const canonicalDoc = CanonicalDocumentService.createDocument(canonicalBlocks, {
+    const canonicalDoc = CanonicalDocumentService.createDocument(enrichGeneratedBlocks(canonicalBlocks, products), {
+      baseProductIds: products.map(p => p.id),
       wordCount: (aiResponse.content || "").split(/\s+/).length,
       readingTimeMinutes: Math.max(1, Math.ceil(((aiResponse.content || "").split(/\s+/).length) / 200)),
     });
@@ -415,6 +421,7 @@ export class BuyingGuideGenerator {
         content: aiResponse.content || `<p>Guia de compra de ${categoryName}.</p>`,
         commercialType: "BUYING_GUIDE",
         canonicalContent: canonicalDoc as object,
+        originalImageUrl: products[0]?.imageUrl || products[0]?.images?.[0] || null,
         seoFocusKeyword: aiResponse.seoFocusKeyword || focusKeyword?.trim() || `como escolher ${categoryName}`,
         seoTitle: aiResponse.seoTitle || aiResponse.title || `Guia de Compra: ${categoryName}`,
         seoDescription: aiResponse.seoDescription || aiResponse.summary,
@@ -436,7 +443,7 @@ export class BuyingGuideGenerator {
         offerId: offerIds?.[prod.id] || prod.offers[0]?.id || null,
         position: index,
         badge: `Recomendação #${index + 1}`,
-        score: prod.rating || 4.5,
+        score: prod.rating,
         recommendation: "Modelo recomendado no guia",
       }));
 

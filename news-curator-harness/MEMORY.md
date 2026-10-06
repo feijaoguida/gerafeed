@@ -392,3 +392,64 @@ A contratação de planos no Asaas deve ser feita gerando a assinatura (`POST /v
   - Plano Free: segue direto para `/dashboard` após cadastro.
   - Planos Pagos: o usuário preenche dados fiscais (`BillingProfile`) e é redirecionado para a `checkoutUrl` retornada pela rota `/api/billing/checkout` integrada ao Asaas.
 
+
+# Phase 30 — Shopee e edição de afiliados (Concluída)
+
+- **Escopo e Arquitetura Entregues**:
+  - Integração Shopee com parsing resiliente de shortlinks/URLs canônicas, preview read-only e importação com fallback manual quando a extração for parcial (`PARTIAL`).
+  - Cinco layouts visuais de afiliados (`PRODUCT_CARD`, `PRODUCT_GROUP` [GRID e LIST], `COMPARISON_TABLE`, `BADGE`, `BUTTON_ONLY`) compartilhados entre preview e publicação WordPress.
+  - Tabela de comparação renderizada em HTML semântico com colunas responsivas e safe sponsored links (`rel="sponsored nofollow noopener"`).
+  - Preservação de imagens originais de produtos nos templates comerciais com cards posicionados deterministicamente no meio e final do artigo.
+  - Inserção de blocos de recomendação no cursor do editor com split seguro de HTML sem quebrar tags inline ou parágrafos, modal intuitivo e round-trip sem perdas.
+  - Aba de gestão "Conteúdo & Pesquisa" no catálogo com atalho direto para geração de reviews com produto pré-selecionado (`/publishing/affiliate?productId=...`).
+- **Persistência Atômica e Entitlements (`ArticlePersistenceService`)**:
+  - Salva em transação atômica (`prisma.$transaction`), sincronizando `canonicalContent` JSON, marcadores HTML `<!-- gerafeed-block:... -->` e relações `ArticleProduct`.
+  - Produtos-base de geração são preservados via `meta.baseProductIds`, mesmo se blocos forem removidos do corpo.
+  - Produtos adicionados manualmente via editor de blocos criam vínculos em `ArticleProduct` e são removidos quando o último bloco do produto for excluído.
+  - Bloqueio rígido em salvamentos com blocos de afiliados para planos sem `AFFILIATE_MODULE` (HTTP 403 Forbidden). Leitura permanece permitida; salvamento após remoção de todos os blocos é permitido.
+  - Validação estrita de tenant (HTTP 404 para produtos/artigos de outro workspace) e integridade de ofertas (HTTP 409 para ofertas que não pertencem ao produto).
+- **Publicação e Ciclo de Vida WordPress**:
+  - Injeção obrigatória de um único bloco de disclosure de afiliados no topo do post (`nc-affiliate-disclosure`).
+  - Script não-bloqueante de rastreamento de cliques com tokens seguros HMAC por ocorrência e deduplicação (`__nc_tracking_initialized`).
+  - Edição posterior de artigos publicados marca `needsRepublish: true` sem republicar automaticamente.
+  - Republicação via `PublicationSyncService.republishArticle` regenera o HTML, envia ao WordPress e limpa a flag `needsRepublish`.
+- **Ambiente de Testes**:
+  - Testes Phase 30 usam dados temporários no PostgreSQL local com rollback/cleanup próprio.
+  - Variável `process.env.TEST_WORKSPACE_ID` permite execução de rotas e serviços em rotinas de teste automatizadas fora da sessão HTTP de cookies do NextAuth.
+
+# Phase 31 — Sistema de Log de Erros, Diagnóstico e Auditoria no Backoffice
+
+- **Modelos de Diagnóstico no Banco de Dados**:
+  - `SystemErrorLog`: armazena `id`, `workspaceId` (opcional), `userId`, `userEmail`, `userName`, `screen`, `path`, `method`, `query` (JSON sanitizado sem credenciais), `module` (enum/string: AI, RSS, BILLING, WORDPRESS, AFFILIATES, AUTH, BACKOFFICE, GENERAL), `errorMessage` (bruta original), `errorStack` (stack trace completo), `statusCode`, `ipAddress`, `userAgent` e `createdAt`.
+  - `SystemSetting`: tabela global para chave/valor do sistema (`error_log_retention_days = 180` por padrão).
+- **Diretriz de Mascaramento e Logging**:
+  - Usuários finais recebem mensagens amigáveis mascaradas e notificação popup pequena no canto da tela (toast minimalista).
+  - Desenvolvedor e suporte acessam os dados brutos e stack trace completo no Backoffice para simulação e reprodução de incidentes.
+  - Logging no servidor é não-bloqueante: uma falha ao persistir o log nunca derruba a requisição.
+
+# Phase 32 — Recuperação de Senha ("Esqueceu a Senha") com Código de Segurança via E-mail
+
+- **Isolamento de Escopo e Segurança de Tokens**:
+  - `VerificationToken` é reutilizado com prefixo de propósito: `identifier: password-reset:${cleanEmail}` para evitar colisão ou reuso cruzado com tokens de cadastro.
+  - O código numérico OTP de 6 dígitos gerado via `generateOtpCode()` possui validade estrita de 15 minutos e expiração atômica após o uso (`single-use`).
+- **Resistência contra User Enumeration**:
+  - A rota `POST /api/auth/forgot-password/send-code` retorna HTTP 200 e resposta idêntica independentemente do e-mail existir ou não na base de dados, prevenindo enumeração de contas.
+  - Proteção anti-flood impõe cooldown de 60 segundos entre solicitações para o mesmo e-mail (HTTP 429).
+- **Interface e Rotas Públicas**:
+  - Rota `/forgot-password` liberada no matcher do Next.js Proxy (`src/proxy.ts`).
+  - Tela de login possui link direto "Esqueceu a senha?".
+  - A página `/forgot-password` opera com layout split Dark Mode, fluxo em 2 passos (solicitação de e-mail e validação de OTP + nova senha com confirmação), timer regressivo de reenvio e feedback visual de conclusão.
+
+
+
+
+## Prompts de afiliados — Review e Comparativo (Task 266)
+- Instruções padrão ficam em `src/lib/affiliate/editorial-prompts.ts`; o template
+  global ativo no banco continua tendo precedência sobre o default em código.
+- Geradores de review/comparativo enviam `GenerateArticleInput.systemPrompt`
+  resolvido no servidor. `buildArticlePrompts` preserva RSS quando ele está ausente.
+- Alterar defaults não atualiza registros existentes. No banco local, usar
+  `scripts/update-affiliate-editorial-prompts.ts --apply` para versionar somente
+  esses dois formatos; demais ambientes via Backoffice SuperAdmin.
+- Referências visuais são exemplos de estrutura, não evidência de teste físico.
+  Notas, selos e vencedores não devem ser atribuídos automaticamente.

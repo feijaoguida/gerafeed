@@ -36,8 +36,20 @@ export class SafeUrlResolver {
     initialUrl: string,
     options: SafeResolverOptions = {}
   ): Promise<SafeResolverResult> {
+    const controller = new AbortController();
+    let timer: ReturnType<typeof setTimeout>;
+    const timeout = new Promise<never>((_, reject) => {
+      timer = setTimeout(() => {
+        controller.abort();
+        reject(new ResolverTimeoutError("Tempo limite ao consultar o marketplace."));
+      }, options.timeoutMs ?? 8000);
+    });
+    try { return await Promise.race([this.resolveWithinDeadline(initialUrl, options, controller.signal), timeout]); }
+    finally { clearTimeout(timer!); controller.abort(); }
+  }
+
+  private static async resolveWithinDeadline(initialUrl: string, options: SafeResolverOptions, signal: AbortSignal): Promise<SafeResolverResult> {
     const maxRedirects = options.maxRedirects ?? 5;
-    const timeoutMs = options.timeoutMs ?? 8000;
     const maxBodyBytes = options.maxBodyBytes ?? 2 * 1024 * 1024;
     const method = options.method ?? "GET";
 
@@ -60,6 +72,10 @@ export class SafeUrlResolver {
         );
       }
 
+      if (parsed.username || parsed.password || (parsed.port && !["80", "443"].includes(parsed.port))) {
+        throw new ResolverError("Credenciais ou porta não permitidas na URL.", "INVALID_URL");
+      }
+      signal.throwIfAborted();
       // SSRF & Host Allowlist Validation on every hop
       await validateHostForSSRF(parsed.hostname, options.allowedHosts);
 
@@ -72,14 +88,12 @@ export class SafeUrlResolver {
 
       // Perform request with timeout
       let response: Response;
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
       try {
         response = await fetch(currentUrl, {
           method,
           redirect: "manual", // Do NOT follow automatically, validate each step
-          signal: controller.signal,
+          signal,
           headers: {
             "User-Agent": userAgent,
             Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
@@ -87,18 +101,17 @@ export class SafeUrlResolver {
           },
         });
       } catch (error) {
-        if ((error as Error).name === "AbortError" || controller.signal.aborted) {
-          throw new ResolverTimeoutError(`Tempo limite de ${timeoutMs}ms excedido ao resolver '${currentUrl}'.`);
+        if ((error as Error).name === "AbortError" || signal.aborted) {
+          throw new ResolverTimeoutError("Tempo limite ao consultar o marketplace.");
         }
         throw new ResolverError(`Erro de rede ao acessar '${currentUrl}': ${(error as Error).message}`, "NETWORK_ERROR");
-      } finally {
-        clearTimeout(timeoutId);
       }
 
       const status = response.status;
       const isRedirect = [301, 302, 303, 307, 308].includes(status);
 
       if (isRedirect) {
+        await response.body?.cancel();
         const location = response.headers.get("location");
         if (!location) {
           throw new ResolverError(
@@ -142,6 +155,7 @@ export class SafeUrlResolver {
           let receivedBytes = 0;
 
           while (true) {
+            signal.throwIfAborted();
             const { done, value } = await reader.read();
             if (done) break;
             if (value) {

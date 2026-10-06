@@ -1,3 +1,4 @@
+import { AffiliateContentError } from "./block-contract";
 import { prisma } from "@/lib/prisma";
 import { BillingService, AFFILIATE_FEATURES } from "@/lib/billing";
 import { AffiliateProviderFactory } from "./factory";
@@ -103,18 +104,19 @@ export class AffiliateService {
         where: {
           workspaceId,
           externalProductId: metadata.externalProductId,
+          affiliateProgram: { code: provider.code },
         },
         include: { product: true },
       });
     }
 
-    if (!existingOffer && metadata.resolvedUrl) {
+    if (!existingOffer) {
       existingOffer = await prisma.productOffer.findFirst({
         where: {
           workspaceId,
           OR: [
-            { affiliateUrl: input.affiliateUrl },
-            { resolvedUrl: metadata.resolvedUrl },
+            { affiliateUrl: metadata.affiliateUrl },
+            ...(metadata.resolvedUrl ? [{ resolvedUrl: metadata.resolvedUrl }] : []),
           ],
         },
         include: { product: true },
@@ -198,6 +200,21 @@ export class AffiliateService {
       throw new Error(`Programa de afiliados '${providerCode}' não encontrado.`);
     }
 
+    const provider = AffiliateProviderFactory.getProvider(providerCode);
+    const validation = await provider.validateAffiliateUrl(input.affiliateUrl);
+    if (!validation.valid || !validation.normalizedUrl) throw new AffiliateContentError(validation.error || "URL inválida.");
+    input.affiliateUrl = validation.normalizedUrl;
+    for (const url of [input.resolvedUrl, input.canonicalUrl].filter(Boolean)) {
+      if (!(await provider.validateAffiliateUrl(url!)).valid) throw new AffiliateContentError("URL de destino inválida para o marketplace.");
+    }
+    // Revalidate safety server-side; a forged FAILED preview must never be confirmed.
+    const checked = await provider.fetchProductMetadata({ affiliateUrl: input.affiliateUrl });
+    if (checked.status === "FAILED") throw new AffiliateContentError(checked.warnings.join(" "));
+    input.resolvedUrl = checked.resolvedUrl || input.resolvedUrl;
+    input.externalProductId = checked.externalProductId || input.externalProductId;
+    for (const value of [input.price, input.oldPrice]) if (value != null && (!Number.isFinite(value) || value < 0)) throw new AffiliateContentError("Preço inválido.");
+    if (input.categoryId && !(await prisma.productCategory.findFirst({where:{id:input.categoryId,workspaceId}}))) throw new AffiliateContentError("Categoria não encontrada.",404);
+
     // Check quantity limit if creating a new product
     if (!input.overwriteExistingProductId) {
       const currentProductsCount = await prisma.product.count({
@@ -211,11 +228,26 @@ export class AffiliateService {
       );
     }
 
+    const [productLimit, programLimit] = await Promise.all([
+      BillingService.getFeatureLimit(workspaceId, AFFILIATE_FEATURES.MAX_PRODUCTS),
+      BillingService.getFeatureLimit(workspaceId, AFFILIATE_FEATURES.MAX_PROGRAMS),
+    ]);
     const trimmedName = input.name.trim();
     let baseSlug = input.slug ? generateSlug(input.slug) : generateSlug(trimmedName);
     if (!baseSlug) baseSlug = `produto-${Date.now()}`;
 
     const result = await prisma.$transaction(async (tx) => {
+      // Serialize imports per workspace to enforce dedupe and catalog limits across concurrent confirmations.
+      await tx.$queryRaw`SELECT id FROM "Workspace" WHERE id = ${workspaceId} FOR UPDATE`;
+      const duplicate = await tx.productOffer.findFirst({where:{workspaceId,affiliateProgramId:program.id,OR:[
+        {affiliateUrl:input.affiliateUrl},
+        ...(input.externalProductId ? [{externalProductId:input.externalProductId}] : []),
+        ...(input.resolvedUrl ? [{resolvedUrl:input.resolvedUrl}] : []),
+      ]}});
+      if (duplicate && duplicate.productId !== input.overwriteExistingProductId) throw new AffiliateContentError("Produto já importado. Atualize o preview e escolha atualizar o existente.",409);
+      if (!input.overwriteExistingProductId && (!productLimit.enabled || (productLimit.limit !== null && await tx.product.count({where:{workspaceId}}) >= productLimit.limit))) throw new AffiliateContentError("Limite de produtos atingido.",403);
+      const usedPrograms = await tx.productOffer.findMany({where:{workspaceId},select:{affiliateProgramId:true},distinct:['affiliateProgramId']});
+      if (!usedPrograms.some(p => p.affiliateProgramId === program.id) && (!programLimit.enabled || (programLimit.limit !== null && usedPrograms.length >= programLimit.limit))) throw new AffiliateContentError("Limite de marketplaces atingido.",403);
       let productId: string;
       let finalSlug = baseSlug;
 
@@ -236,11 +268,11 @@ export class AffiliateService {
           data: {
             name: trimmedName,
             brand: input.brand !== undefined ? input.brand?.trim() || null : existing.brand,
-            description: input.description !== undefined ? input.description?.trim() || null : existing.description,
+            description: existing.description,
             sourceDescription: input.sourceDescription !== undefined ? input.sourceDescription?.trim() || null : existing.sourceDescription,
             imageUrl: input.imageUrl !== undefined ? input.imageUrl?.trim() || null : existing.imageUrl,
             images: input.images !== undefined ? input.images : (existing as { images?: string[] }).images || [],
-            specs: input.specs !== undefined ? input.specs : (existing.specs || undefined),
+            specs: existing.specs || undefined,
             sourceSpecs: input.sourceSpecs !== undefined ? input.sourceSpecs : existing.sourceSpecs || undefined,
             marketplaceCategoryId: input.marketplaceCategoryId !== undefined ? input.marketplaceCategoryId?.trim() || null : existing.marketplaceCategoryId,
             marketplaceCategoryName: input.marketplaceCategoryName !== undefined ? input.marketplaceCategoryName?.trim() || null : existing.marketplaceCategoryName,
@@ -333,7 +365,7 @@ export class AffiliateService {
       });
 
       return { product, offer };
-    });
+    }, { timeout: 15000 });
 
     // Sync review samples if present
     if (input.reviewSamples && input.reviewSamples.length > 0) {

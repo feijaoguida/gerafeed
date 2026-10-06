@@ -49,6 +49,7 @@ async function ensureUserWorkspace(userId: string): Promise<string> {
  * Injects workspaceId into JWT and Session.
  */
 export const { handlers, auth, signIn, signOut } = NextAuth({
+  trustHost: true,
   adapter: PrismaAdapter(prisma),
   session: { strategy: "jwt" },
 

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { processArticleWithAi, applyAiResultToArticle } from "@/lib/ai";
 import { getSessionWorkspaceId } from "@/lib/workspace";
 import { BillingService } from "@/lib/billing";
+import { handleApiError } from "@/lib/errors/service";
 
 export async function POST(
   request: Request,
@@ -57,8 +58,11 @@ export async function POST(
     return NextResponse.json(result);
   } catch (error) {
     const resolvedParams = await params;
-    console.error(`POST /api/articles/${resolvedParams.id}/process-ai error:`, error);
-    const message = error instanceof Error ? error.message : "Erro ao processar notícia com IA";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return handleApiError(error, request, {
+      module: "AI",
+      screen: "Artigos / Processamento IA",
+      query: { articleId: resolvedParams.id },
+      userFacingMessage: "Erro ao processar notícia com IA",
+    });
   }
 }

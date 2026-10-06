@@ -17,6 +17,7 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import { Logo } from "@/components/brand/logo";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { FormField } from "@/components/design-system/form-field";
 import { Heading1, Heading2, Text } from "@/components/design-system/typography";
 import { BrandDecoration } from "@/components/design-system/brand-decoration";
@@ -166,9 +167,21 @@ export function LoginView() {
               />
             </FormField>
 
-            <FormField label="Senha" required>
+            <div className="space-y-1.5 w-full">
+              <div className="flex items-center justify-between">
+                <Label htmlFor="login-password" required>
+                  Senha
+                </Label>
+                <Link
+                  href="/forgot-password"
+                  className="text-xs font-medium text-primary hover:underline transition-colors"
+                >
+                  Esqueceu a senha?
+                </Link>
+              </div>
               <div className="relative">
                 <Input
+                  id="login-password"
                   type={showPassword ? "text" : "password"}
                   required
                   autoComplete="current-password"
@@ -191,7 +204,7 @@ export function LoginView() {
                   }
                 />
               </div>
-            </FormField>
+            </div>
 
             <Button
               type="submit"

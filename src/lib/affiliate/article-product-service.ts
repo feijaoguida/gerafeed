@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { Prisma } from "@prisma/client";
 
 export interface AttachProductItemInput {
   productId: string;
@@ -172,11 +173,28 @@ export class ArticleProductService {
       throw new Error("Um artigo Comparativo não pode ter menos de 2 produtos vinculados.");
     }
 
-    await prisma.articleProduct.deleteMany({
-      where: {
-        articleId,
-        productId,
-      },
+    await prisma.$transaction(async (tx) => {
+      await tx.articleProduct.deleteMany({
+        where: {
+          articleId,
+          productId,
+        },
+      });
+
+      if (article.canonicalContent) {
+        try {
+          const doc = JSON.parse(JSON.stringify(article.canonicalContent)) as { meta?: { baseProductIds?: string[] } };
+          if (Array.isArray(doc.meta?.baseProductIds) && doc.meta.baseProductIds.includes(productId)) {
+            doc.meta.baseProductIds = doc.meta.baseProductIds.filter((id) => id !== productId);
+            await tx.article.update({
+              where: { id: articleId },
+              data: { canonicalContent: doc as unknown as Prisma.InputJsonValue },
+            });
+          }
+        } catch {
+          // ignore
+        }
+      }
     });
 
     return { success: true };

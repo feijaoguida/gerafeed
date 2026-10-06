@@ -2,9 +2,9 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSessionWorkspaceId } from "@/lib/workspace";
 import { BillingService } from "@/lib/billing";
+import { handleApiError } from "@/lib/errors/service";
 
-
-export async function GET() {
+export async function GET(request: Request) {
   try {
     const workspaceId = await getSessionWorkspaceId();
     const sources = await prisma.source.findMany({
@@ -13,8 +13,11 @@ export async function GET() {
     });
     return NextResponse.json(sources);
   } catch (error) {
-    console.error("GET /api/sources error:", error);
-    return NextResponse.json({ error: "Erro ao buscar fontes RSS" }, { status: 500 });
+    return handleApiError(error, request, {
+      module: "RSS",
+      screen: "Fontes RSS",
+      userFacingMessage: "Erro ao buscar fontes RSS",
+    });
   }
 }
 
@@ -53,9 +56,11 @@ export async function POST(request: Request) {
 
     return NextResponse.json(source, { status: 201 });
   } catch (error) {
-    console.error("POST /api/sources error:", error);
-    const message = error instanceof Error ? error.message : "Erro ao cadastrar fonte RSS";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return handleApiError(error, request, {
+      module: "RSS",
+      screen: "Fontes RSS",
+      userFacingMessage: "Erro ao cadastrar fonte RSS",
+    });
   }
 }
 

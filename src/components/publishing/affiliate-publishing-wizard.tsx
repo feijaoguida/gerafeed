@@ -63,22 +63,22 @@ const DISPLAY_TEMPLATES: CommercialArticleType[] = [
   "BUYING_GUIDE",
 ];
 
-export function AffiliatePublishingWizard() {
+export function AffiliatePublishingWizard({ initialProduct, initialError = "" }: { initialProduct?: ProductItem; initialError?: string }) {
   // Wizard Steps: 1: Template, 2: Products, 3: Details & SEO, 4: Preview/Publish
-  const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
+  const [step, setStep] = useState<1 | 2 | 3 | 4>(initialProduct || initialError ? 2 : 1);
 
   // Form State
   const [selectedTemplate, setSelectedTemplate] =
     useState<CommercialArticleType>("PRODUCT_REVIEW");
   const [selectedCategory, setSelectedCategory] = useState<string>("");
-  const [selectedProductIds, setSelectedProductIds] = useState<string[]>([]);
+  const [selectedProductIds, setSelectedProductIds] = useState<string[]>(initialProduct ? [initialProduct.id] : []);
   const [focusKeyword, setFocusKeyword] = useState("");
   const [customInstructions, setCustomInstructions] = useState("");
   const [titleOverride, setTitleOverride] = useState("");
 
   // Data State
   const [categories, setCategories] = useState<Category[]>([]);
-  const [products, setProducts] = useState<ProductItem[]>([]);
+  const [products, setProducts] = useState<ProductItem[]>(initialProduct ? [initialProduct] : []);
   const [searchFilter, setSearchFilter] = useState("");
   const [wpSites, setWpSites] = useState<Array<{ id: string; name: string; url: string }>>([]);
   const [wpCategories, setWpCategories] = useState<Array<{ id: string; name: string; wordpressId: number }>>([]);
@@ -89,7 +89,7 @@ export function AffiliatePublishingWizard() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [generatedArticleId, setGeneratedArticleId] = useState<string | null>(null);
   const [generatedTitle, setGeneratedTitle] = useState<string | null>(null);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(initialError || null);
 
   // Load Categories and Active Products
   useEffect(() => {
@@ -108,30 +108,23 @@ export function AffiliatePublishingWizard() {
         }
         if (prodRes.ok && !ignore) {
           const prodData = await prodRes.json();
-          setProducts(
-            Array.isArray(prodData.items)
-              ? prodData.items
-              : Array.isArray(prodData.products)
-              ? prodData.products
-              : Array.isArray(prodData)
-              ? prodData
-              : []
-          );
+          const loaded: ProductItem[] = Array.isArray(prodData.items) ? prodData.items : Array.isArray(prodData.products) ? prodData.products : Array.isArray(prodData) ? prodData : [];
+          setProducts(initialProduct && !loaded.some(p => p.id === initialProduct.id) ? [initialProduct, ...loaded] : loaded);
         }
         if (wpSitesRes.ok && !ignore) {
           const siteData = await wpSitesRes.json();
           const sitesList = Array.isArray(siteData.sites) ? siteData.sites : Array.isArray(siteData) ? siteData : [];
           setWpSites(sitesList);
-          if (sitesList.length > 0 && !selectedWpSiteId) {
-            setSelectedWpSiteId(sitesList[0].id);
+          if (sitesList.length > 0) {
+            setSelectedWpSiteId(prev => prev || sitesList[0].id);
           }
         }
         if (wpCatsRes.ok && !ignore) {
           const catData = await wpCatsRes.json();
           const catsList = Array.isArray(catData) ? catData : [];
           setWpCategories(catsList);
-          if (catsList.length > 0 && !selectedWpCategoryId) {
-            setSelectedWpCategoryId(catsList[0].id);
+          if (catsList.length > 0) {
+            setSelectedWpCategoryId(prev => prev || catsList[0].id);
           }
         }
       } catch (err) {
@@ -142,7 +135,7 @@ export function AffiliatePublishingWizard() {
     return () => {
       ignore = true;
     };
-  }, []);
+  }, [initialProduct]);
 
   const activeTemplateConfig =
     TEMPLATE_INPUT_RULES[selectedTemplate] ||

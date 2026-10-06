@@ -1,4 +1,8 @@
+import { renderCanonicalHtml } from "./render-document";
+import { AffiliateGroupData, validateAffiliateGroup } from "./block-contract";
+
 export type CanonicalBlockType =
+  | "PRODUCT_GROUP"
   | "RICH_TEXT"
   | "HEADING"
   | "PRODUCT_CARD"
@@ -84,7 +88,10 @@ export interface ImageBlock {
   };
 }
 
+export interface ProductGroupBlock { type: "PRODUCT_GROUP"; data: AffiliateGroupData; }
+
 export type CanonicalBlock =
+  | ProductGroupBlock
   | RichTextBlock
   | HeadingBlock
   | ProductCardBlock
@@ -97,6 +104,7 @@ export type CanonicalBlock =
 export interface CanonicalDocument {
   version: number;
   meta?: {
+    baseProductIds?: string[];
     generatedAt?: string;
     wordCount?: number;
     readingTimeMinutes?: number;
@@ -115,6 +123,7 @@ export class CanonicalDocumentService {
     const doc: CanonicalDocument = {
       version: 1,
       meta: {
+        baseProductIds: meta?.baseProductIds,
         generatedAt: meta?.generatedAt || new Date().toISOString(),
         wordCount: meta?.wordCount,
         readingTimeMinutes: meta?.readingTimeMinutes,
@@ -143,6 +152,8 @@ export class CanonicalDocumentService {
       throw new Error("O campo 'blocks' do documento canônico deve ser um array.");
     }
 
+    if (doc.blocks.length > 500 || JSON.stringify(input).length > 2_000_000) throw new Error("Documento muito grande.");
+    const occurrenceIds = new Set<string>();
     const validatedBlocks: CanonicalBlock[] = [];
 
     for (let i = 0; i < doc.blocks.length; i++) {
@@ -151,7 +162,15 @@ export class CanonicalDocumentService {
         throw new Error(`Bloco canônico na posição ${i} inválido.`);
       }
 
+      if (!block.data || typeof block.data !== "object") throw new Error("Dados de bloco inválidos.");
       switch (block.type) {
+        case "PRODUCT_GROUP": {
+          const data = validateAffiliateGroup(block.data);
+          if (occurrenceIds.has(data.id)) throw new Error("Identificador de ocorrência duplicado.");
+          occurrenceIds.add(data.id);
+          validatedBlocks.push({ type: "PRODUCT_GROUP", data });
+          break;
+        }
         case "RICH_TEXT": {
           const data = block.data as RichTextBlock["data"];
           if (typeof data.html !== "string" && typeof data.markdown !== "string") {
@@ -325,7 +344,9 @@ export class CanonicalDocumentService {
     const ids = new Set<string>();
 
     for (const block of doc.blocks) {
-      if (block.type === "PRODUCT_CARD" && block.data.productId) {
+      if (block.type === "PRODUCT_GROUP") {
+        block.data.products.forEach(p => ids.add(p.productId));
+      } else if (block.type === "PRODUCT_CARD" && block.data.productId) {
         ids.add(block.data.productId);
       } else if (block.type === "PRODUCT_COMPARISON" && Array.isArray(block.data.productIds)) {
         block.data.productIds.forEach((id) => ids.add(id));
@@ -346,7 +367,9 @@ export class CanonicalDocumentService {
     const ids = new Set<string>();
 
     for (const block of doc.blocks) {
-      if (block.type === "PRODUCT_CARD" && block.data.offerId) {
+      if (block.type === "PRODUCT_GROUP") {
+        block.data.products.forEach(p => { if (p.offerId) ids.add(p.offerId); });
+      } else if (block.type === "PRODUCT_CARD" && block.data.offerId) {
         ids.add(block.data.offerId);
       } else if (block.type === "CTA" && block.data.offerId) {
         ids.add(block.data.offerId);
@@ -388,113 +411,6 @@ export class CanonicalDocumentService {
       }>;
     }>
   ): string {
-    const productMap = new Map(products.map((p) => [p.id, p]));
-    const htmlParts: string[] = [];
-
-    for (const block of doc.blocks) {
-      switch (block.type) {
-        case "AFFILIATE_DISCLOSURE": {
-          const text =
-            block.data.text ||
-            "Transparência: Podemos receber uma comissão de afiliado sem custo adicional para você ao comprar através de nossos links.";
-          htmlParts.push(
-            `<div class="gerafeed-affiliate-disclosure" style="background-color: #f8fafc; border-left: 4px solid #6366f1; padding: 12px 16px; margin: 16px 0; font-size: 12px; color: #64748b; font-style: italic;"><p style="margin: 0;">${text}</p></div>`
-          );
-          break;
-        }
-
-        case "HEADING": {
-          const level = block.data.level || 2;
-          const idAttr = block.data.id ? ` id="${block.data.id}"` : "";
-          htmlParts.push(`<h${level}${idAttr}>${block.data.text}</h${level}>`);
-          break;
-        }
-
-        case "RICH_TEXT": {
-          if (block.data.html) {
-            htmlParts.push(block.data.html);
-          }
-          break;
-        }
-
-        case "PRODUCT_CARD": {
-          const p = productMap.get(block.data.productId);
-          if (p) {
-            const activeOffer =
-              p.offers.find((o) => o.id === block.data.offerId) || p.offers[0];
-            const url = activeOffer?.affiliateUrl || "#";
-            const price = activeOffer?.price
-              ? `R$ ${Number(activeOffer.price).toFixed(2).replace(".", ",")}`
-              : "";
-            const seller = activeOffer?.seller ? `Vendido por: ${activeOffer.seller}` : "";
-            const badge = block.data.highlightBadge
-              ? `<span style="font-size: 11px; font-weight: bold; background-color: #e0e7ff; color: #4338ca; padding: 2px 8px; border-radius: 4px; display: inline-block; margin-bottom: 8px;">${block.data.highlightBadge}</span>`
-              : "";
-
-            htmlParts.push(`
-<div class="gerafeed-product-card" style="border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px; margin: 24px 0; background-color: #ffffff; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
-  ${badge}
-  <h3 style="margin: 0 0 8px 0; font-size: 18px; color: #0f172a;">${p.name}</h3>
-  <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-top: 12px;">
-    <div>
-      ${price ? `<span style="font-size: 22px; font-weight: 800; color: #16a34a;">${price}</span>` : ""}
-      ${seller ? `<span style="font-size: 12px; color: #64748b; display: block;">${seller}</span>` : ""}
-    </div>
-    <a href="${url}" target="_blank" rel="sponsored nofollow" style="background-color: #2563eb; color: #ffffff; padding: 10px 20px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 14px;">${block.data.ctaText || "Ver Melhor Preço"}</a>
-  </div>
-</div>`);
-          }
-          break;
-        }
-
-        case "PROS_CONS": {
-          const prosList = block.data.pros
-            .map((p) => `<li style="color: #166534; margin-bottom: 4px;">✓ ${p}</li>`)
-            .join("");
-          const consList = block.data.cons
-            .map((c) => `<li style="color: #991b1b; margin-bottom: 4px;">✗ ${c}</li>`)
-            .join("");
-
-          htmlParts.push(`
-<div class="gerafeed-pros-cons" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; margin: 20px 0;">
-  <div style="background-color: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 16px;">
-    <h4 style="margin: 0 0 8px 0; color: #166534; font-size: 14px;">Pontos Fortes</h4>
-    <ul style="list-style: none; padding: 0; margin: 0; font-size: 13px;">${prosList}</ul>
-  </div>
-  <div style="background-color: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; padding: 16px;">
-    <h4 style="margin: 0 0 8px 0; color: #991b1b; font-size: 14px;">Pontos a Considerar</h4>
-    <ul style="list-style: none; padding: 0; margin: 0; font-size: 13px;">${consList}</ul>
-  </div>
-</div>`);
-          break;
-        }
-
-        case "CTA": {
-          const p = block.data.productId ? productMap.get(block.data.productId) : null;
-          const activeOffer = p
-            ? p.offers.find((o) => o.id === block.data.offerId) || p.offers[0]
-            : null;
-          const url = activeOffer?.affiliateUrl || "#";
-
-          htmlParts.push(`
-<div class="gerafeed-cta-box" style="text-align: center; margin: 28px 0; padding: 24px; background: linear-gradient(135deg, #4f46e5 0%, #3730a3 100%); border-radius: 12px; color: #ffffff;">
-  <a href="${url}" target="_blank" rel="sponsored nofollow" style="display: inline-block; background-color: #ffffff; color: #4338ca; padding: 12px 28px; border-radius: 8px; text-decoration: none; font-weight: 700; font-size: 15px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">${block.data.text}</a>
-  ${block.data.subtext ? `<p style="font-size: 12px; color: #e0e7ff; margin: 8px 0 0 0;">${block.data.subtext}</p>` : ""}
-</div>`);
-          break;
-        }
-
-        case "IMAGE": {
-          htmlParts.push(`
-<figure style="margin: 20px 0; text-align: center;">
-  <img src="${block.data.url}" alt="${block.data.alt || ""}" style="max-width: 100%; height: auto; border-radius: 8px;" />
-  ${block.data.caption ? `<figcaption style="font-size: 12px; color: #64748b; margin-top: 6px;">${block.data.caption}</figcaption>` : ""}
-</figure>`);
-          break;
-        }
-      }
-    }
-
-    return htmlParts.join("\n\n");
+    return renderCanonicalHtml(doc, products.map(p => ({ ...p, offers: p.offers.map(o => ({ ...o, status: o.status || "ACTIVE" })) })));
   }
 }

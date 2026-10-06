@@ -9,9 +9,9 @@ export { DEFAULT_WORKSPACE_ID };
 export async function getSessionWorkspaceId(): Promise<string> {
   try {
     const session = await auth();
-    return session?.user?.workspaceId || session?.workspaceId || DEFAULT_WORKSPACE_ID;
+    return session?.user?.workspaceId || session?.workspaceId || process.env.TEST_WORKSPACE_ID || DEFAULT_WORKSPACE_ID;
   } catch {
-    return DEFAULT_WORKSPACE_ID;
+    return process.env.TEST_WORKSPACE_ID || DEFAULT_WORKSPACE_ID;
   }
 }
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, use } from "react";
+import { useState, useEffect, useRef, use } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -20,7 +20,9 @@ import {
   AffiliateArticleEditor,
   ArticleProductItem,
 } from "@/components/affiliate/affiliate-article-editor";
+import { AffiliateBlockManager } from "@/components/affiliate/affiliate-block-manager";
 import { CanonicalDocument } from "@/lib/affiliate/canonical-document";
+import { documentToEditorHtml, editorHtmlToDocument } from "@/lib/affiliate/editor-document";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
@@ -89,6 +91,7 @@ export default function ReviewArticlePage({ params }: { params: Promise<{ id: st
   const [title, setTitle] = useState("");
   const [summary, setSummary] = useState("");
   const [content, setContent] = useState("");
+  const contentRef = useRef<HTMLTextAreaElement>(null);
   const [wordpressSiteId, setWordpressSiteId] = useState<string>("");
   const [categoryId, setCategoryId] = useState<string>("");
   const [tagsInput, setTagsInput] = useState("");
@@ -130,7 +133,13 @@ export default function ReviewArticlePage({ params }: { params: Promise<{ id: st
           setArticle(artData);
           setTitle(artData.title || artData.originalTitle || "");
           setSummary(artData.summary || "");
-          setContent(artData.content || "");
+          if (artData.content && artData.content.includes("gerafeed-block:")) {
+            setContent(artData.content);
+          } else if (artData.canonicalContent && Array.isArray(artData.canonicalContent.blocks)) {
+            setContent(documentToEditorHtml(artData.canonicalContent));
+          } else {
+            setContent(artData.content || "");
+          }
           setWordpressSiteId(artData.wordpressSiteId || "");
           setCategoryId(artData.categoryId || artData.suggestedCategoryId || "");
           setTagsInput((artData.tags || []).join(", "));
@@ -187,6 +196,16 @@ export default function ReviewArticlePage({ params }: { params: Promise<{ id: st
       .map((t) => t.trim())
       .filter(Boolean);
 
+    const hasBlocks = content.includes("gerafeed-block:");
+    let canonicalPayload: unknown = undefined;
+    if (hasBlocks) {
+      try {
+        canonicalPayload = editorHtmlToDocument(content);
+      } catch (err) {
+        console.warn("Falha ao gerar canonicalContent do HTML editado:", err);
+      }
+    }
+
     try {
       const res = await fetch(`/api/articles/${id}`, {
         method: "PATCH",
@@ -195,6 +214,7 @@ export default function ReviewArticlePage({ params }: { params: Promise<{ id: st
           title,
           summary,
           content,
+          canonicalContent: canonicalPayload,
           wordpressSiteId: wordpressSiteId || null,
           categoryId: categoryId || null,
           tags: tagsArray,
@@ -408,7 +428,13 @@ export default function ReviewArticlePage({ params }: { params: Promise<{ id: st
           articleId={article.id}
           initialTitle={article.title || article.originalTitle || ""}
           initialSummary={article.summary || ""}
-          initialContent={article.content || ""}
+          initialContent={
+            article.content && article.content.includes("gerafeed-block:")
+              ? article.content
+              : article.canonicalContent
+              ? documentToEditorHtml(article.canonicalContent)
+              : article.content || ""
+          }
           initialCommercialType={article.commercialType}
           initialStatus={article.status}
           initialSeoFocusKeyword={article.seoFocusKeyword || ""}
@@ -642,7 +668,14 @@ export default function ReviewArticlePage({ params }: { params: Promise<{ id: st
 
               {/* Content Input */}
               <FormField label="Corpo do Artigo (HTML)" required>
+                <AffiliateBlockManager
+                  content={content}
+                  onChangeContent={setContent}
+                  textareaRef={contentRef}
+                  articleProducts={article.articleProducts}
+                />
                 <Textarea
+                  ref={contentRef}
                   rows={12}
                   value={content}
                   onChange={(e) => setContent(e.target.value)}

@@ -16,10 +16,11 @@ export const config = {
      * - / (landing page pública)
      * - /login (página de login)
      * - /register (página de cadastro)
+     * - /forgot-password (recuperação de senha)
      * - /api/auth/* (rotas internas do Auth.js)
      * - _next/static, _next/image, favicon.ico, assets estáticos
      */
-    "/((?!$|login|register|api/auth|_next/static|_next/image|favicon\\.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)).*)",
+    "/((?!$|login|register|forgot-password|api/auth|_next/static|_next/image|favicon\\.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)).*)",
   ],
 };
 

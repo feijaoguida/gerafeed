@@ -5,7 +5,11 @@ import { getConfig, DEFAULT_WORKSPACE_ID } from "@/lib/config";
 import { decrypt } from "@/lib/crypto";
 import { getWordPressSiteConfig, getWordPressSites } from "@/lib/wordpress-sites";
 import { ArticlePlacementService } from "@/lib/affiliate/placement-service";
-import { CanonicalDocumentService } from "@/lib/affiliate/canonical-document";
+import { CanonicalDocument, CanonicalDocumentService } from "@/lib/affiliate/canonical-document";
+import { editorHtmlToDocument } from "@/lib/affiliate/editor-document";
+import { WordPressAffiliateRenderer } from "@/lib/publisher/wordpress-renderer";
+import { PublicationSyncService } from "@/lib/publisher/publication-sync";
+import { BillingService, AFFILIATE_FEATURES } from "@/lib/billing";
 
 export interface WpCategory {
   id: number;
@@ -450,29 +454,50 @@ export async function publishArticleToWordPress(
 
   // 1. Resolve content: Commercial Canonical Document OR RSS with Source Credit & Placements
   let finalContent = "";
+  let canonicalDoc: CanonicalDocument | null = null;
 
-  if (article.commercialType && article.canonicalContent) {
-    const canonicalDoc = CanonicalDocumentService.parse(article.canonicalContent);
-    const referencedProductIds = CanonicalDocumentService.extractReferencedProductIds(canonicalDoc);
-    const products = await prisma.product.findMany({
-      where: {
-        id: { in: referencedProductIds },
-        workspaceId: article.workspaceId,
-      },
-      include: {
-        offers: {
-          where: { status: "ACTIVE" },
-          orderBy: { price: "asc" },
-        },
-      },
-    });
+  if (article.canonicalContent) {
+    try {
+      canonicalDoc = CanonicalDocumentService.validateDocument(article.canonicalContent);
+    } catch {
+      canonicalDoc = null;
+    }
+  } else if (article.content && article.content.includes("<!-- gerafeed-block:")) {
+    try {
+      canonicalDoc = editorHtmlToDocument(article.content);
+    } catch {
+      canonicalDoc = null;
+    }
+  }
 
-    finalContent = CanonicalDocumentService.renderToHtml(canonicalDoc, products);
+  const referencedProductIds = canonicalDoc
+    ? CanonicalDocumentService.extractReferencedProductIds(canonicalDoc)
+    : [];
+
+  if (referencedProductIds.length > 0) {
+    // Assert AFFILIATE_MODULE, resolve current active offers, inject single disclosure and tracking
+    finalContent = await WordPressAffiliateRenderer.renderToHtml(
+      article.workspaceId,
+      canonicalDoc!,
+      { articleId: article.id }
+    );
+
+    const creditName = article.source?.creditName || article.source?.name;
+    if (creditName && !finalContent.toLowerCase().includes("fonte:")) {
+      finalContent += `<br><br><p><em>Fonte: ${creditName}</em></p>`;
+    }
+  } else if (canonicalDoc && article.commercialType) {
+    finalContent = CanonicalDocumentService.renderToHtml(canonicalDoc, []);
   } else {
     finalContent = (article.content || "").trim();
 
     // Inject active affiliate product placements if present
     if (article.affiliatePlacements && article.affiliatePlacements.length > 0) {
+      await BillingService.assertFeature(
+        article.workspaceId,
+        AFFILIATE_FEATURES.MODULE,
+        "O módulo de afiliados não está habilitado no seu plano."
+      );
       finalContent = ArticlePlacementService.renderPlacementsInHtml(
         finalContent,
         article.affiliatePlacements
@@ -547,13 +572,13 @@ export async function publishArticleToWordPress(
   const createdPost = await res.json();
   const wordpressPostId = createdPost.id;
 
-  const updatedArticle = await prisma.article.update({
-    where: { id: articleId },
-    data: {
-      status: "PUBLISHED",
-      wordpressPostId: wordpressPostId,
-      categoryId: categoryToUse.id,
-    },
+  const updatedArticle = await PublicationSyncService.recordPublication({
+    articleId,
+    workspaceId: article.workspaceId,
+    renderedHtml: finalContent,
+    wordpressPostId,
+    wordpressSiteId: article.wordpressSiteId,
+    categoryId: categoryToUse.id,
   });
 
   return {

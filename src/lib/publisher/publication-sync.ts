@@ -1,6 +1,7 @@
 import crypto from "crypto";
 import { prisma } from "@/lib/prisma";
-import { CanonicalDocument } from "@/lib/affiliate/canonical-document";
+import { CanonicalDocument, CanonicalDocumentService } from "@/lib/affiliate/canonical-document";
+import { editorHtmlToDocument } from "@/lib/affiliate/editor-document";
 import { WordPressAffiliateRenderer } from "./wordpress-renderer";
 import { PublisherFactory } from "./factory";
 
@@ -21,6 +22,7 @@ export class PublicationSyncService {
     renderedHtml: string;
     wordpressPostId?: number | null;
     wordpressSiteId?: string | null;
+    categoryId?: string | null;
   }) {
     const hash = this.computeContentHash(params.renderedHtml);
 
@@ -33,6 +35,7 @@ export class PublicationSyncService {
         lastPublishedAt: new Date(),
         wordpressPostId: params.wordpressPostId !== undefined ? params.wordpressPostId : undefined,
         wordpressSiteId: params.wordpressSiteId !== undefined ? params.wordpressSiteId : undefined,
+        categoryId: params.categoryId !== undefined ? params.categoryId : undefined,
       },
     });
   }
@@ -147,14 +150,24 @@ export class PublicationSyncService {
       throw new Error("O artigo precisa ter sido publicado previamente no WordPress para ser republicado.");
     }
 
-    if (!article.canonicalContent) {
-      throw new Error("Artigo comercial sem documento canônico estruturado.");
+    let canonicalDoc: CanonicalDocument | null = null;
+    if (article.canonicalContent) {
+      canonicalDoc = CanonicalDocumentService.validateDocument(article.canonicalContent);
+    } else if (article.content && article.content.includes("<!-- gerafeed-block:")) {
+      canonicalDoc = editorHtmlToDocument(article.content);
+    } else if (article.content) {
+      canonicalDoc = CanonicalDocumentService.convertLegacyHtmlToCanonical(article.content);
+    }
+
+    if (!canonicalDoc) {
+      throw new Error("Artigo sem documento canônico estruturado para republicação.");
     }
 
     // 1. Re-render fresh HTML with latest catalog offers
     const freshHtml = await WordPressAffiliateRenderer.renderToHtml(
       workspaceId,
-      article.canonicalContent as unknown as CanonicalDocument
+      canonicalDoc,
+      { articleId }
     );
 
     // 2. Resolve WordPress adapter and push update

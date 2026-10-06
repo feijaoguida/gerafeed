@@ -1,4 +1,6 @@
-import { auth, DEFAULT_WORKSPACE_ID } from "@/auth";
+import { redirect } from "next/navigation";
+import { getReviewProduct } from "@/lib/affiliate/product-content-service";
+import { auth } from "@/auth";
 import { BillingService, AFFILIATE_FEATURES } from "@/lib/billing";
 import { AffiliatePublishingWizard } from "@/components/publishing/affiliate-publishing-wizard";
 import Link from "next/link";
@@ -6,10 +8,11 @@ import { Lock, ArrowRight } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 
-export default async function AffiliatePublishingPage() {
+export default async function AffiliatePublishingPage({ searchParams }: { searchParams: Promise<{ productId?: string }> }) {
   const session = await auth();
   const workspaceId =
-    session?.user?.workspaceId || session?.workspaceId || DEFAULT_WORKSPACE_ID;
+    session?.user?.workspaceId || session?.workspaceId;
+  if (!session?.user || !workspaceId) redirect("/login");
 
   let hasAffiliateModule = false;
   try {
@@ -49,9 +52,16 @@ export default async function AffiliatePublishingPage() {
     );
   }
 
+  const { productId } = await searchParams;
+  let initialProduct;
+  let initialError = "";
+  if (productId) {
+    try { initialProduct = await getReviewProduct(workspaceId, productId); }
+    catch (e) { initialError = e instanceof Error ? e.message : "Produto indisponível. Selecione outro produto."; }
+  }
   return (
     <div className="p-6 md:p-8 max-w-7xl mx-auto">
-      <AffiliatePublishingWizard />
+      <AffiliatePublishingWizard initialProduct={initialProduct} initialError={initialError} />
     </div>
   );
 }

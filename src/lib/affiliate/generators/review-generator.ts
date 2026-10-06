@@ -1,3 +1,4 @@
+import { enrichGeneratedBlocks } from "./enrich-document";
 import { prisma } from "@/lib/prisma";
 import { BillingService, AFFILIATE_FEATURES } from "@/lib/billing";
 import { getActiveAIProvider } from "@/lib/ai";
@@ -116,12 +117,14 @@ export class ProductReviewGenerator {
         name: product.name,
         brand: product.brand || "Marca não especificada",
         description: product.description || "",
+        sourceDescription: product.sourceDescription || "Não informada",
+        sourceSpecs: product.sourceSpecs ? JSON.stringify(product.sourceSpecs) : "Não informadas",
         price: formattedPrice,
         specs: formattedSpecs,
         pros: formattedPros,
         cons: formattedCons,
-        rating: product.rating !== null ? `${product.rating}` : "4.5",
-        seller: selectedOffer?.seller || "Loja Oficial",
+        rating: product.rating !== null ? `${product.rating}` : "Não informada",
+        seller: selectedOffer?.seller || "Vendedor não informado",
         reviews: formattedReviews,
         referenceSources: formattedReferences,
       },
@@ -152,6 +155,7 @@ export class ProductReviewGenerator {
     const aiResponse = await provider.generateArticle({
       originalTitle: `Review: ${product.name}`,
       originalDescription: renderedUserPrompt,
+      systemPrompt: template.systemPrompt,
       categories: [],
     });
 
@@ -180,10 +184,10 @@ export class ProductReviewGenerator {
         data: {
           productId: product.id,
           offerId: selectedOffer?.id || null,
-          highlightBadge: "Análise do Especialista",
+          highlightBadge: null,
           showSpecs: true,
           showProsCons: true,
-          ctaText: "Ver Menor Preço e Disponibilidade",
+          ctaText: "Ver preço atual e disponibilidade",
         },
       },
     ];
@@ -210,8 +214,8 @@ export class ProductReviewGenerator {
         type: "PROS_CONS",
         data: {
           productId: product.id,
-          pros: product.pros.length > 0 ? product.pros : ["Excelente acabamento", "Ótimo custo-benefício"],
-          cons: product.cons.length > 0 ? product.cons : ["Disponibilidade pode variar"],
+          pros: product.pros,
+          cons: product.cons,
         },
       }
     );
@@ -232,13 +236,14 @@ export class ProductReviewGenerator {
       data: {
         productId: product.id,
         offerId: selectedOffer?.id || null,
-        text: "Conferir Oferta com Desconto",
+        text: "Conferir oferta",
         subtext: "Estoque e preço sujeitos a alteração sem aviso prévio",
         buttonStyle: "deal",
       },
     });
 
-    const canonicalDoc = CanonicalDocumentService.createDocument(canonicalBlocks, {
+    const canonicalDoc = CanonicalDocumentService.createDocument(enrichGeneratedBlocks(canonicalBlocks, [product]), {
+      baseProductIds: [product].map(p => p.id),
       wordCount: (aiResponse.content || "").split(/\s+/).length,
       readingTimeMinutes: Math.max(1, Math.ceil(((aiResponse.content || "").split(/\s+/).length) / 200)),
     });
@@ -275,9 +280,9 @@ export class ProductReviewGenerator {
         productId: product.id,
         offerId: selectedOffer?.id || null,
         position: 0,
-        badge: "Escolha do Editor",
-        score: product.rating || 4.5,
-        recommendation: "Recomendado",
+        badge: null,
+        score: product.rating,
+        recommendation: null,
       },
     ]);
 

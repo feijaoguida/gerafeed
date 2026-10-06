@@ -23,7 +23,18 @@ export async function POST(
     });
   } catch (error) {
     console.error("POST /api/articles/[id]/republish error:", error);
+    if (error && typeof error === "object" && "status" in error && typeof (error as { status: unknown }).status === "number") {
+      const errObj = error as { status: number; message?: string };
+      return NextResponse.json({ error: errObj.message || "Erro na republicação" }, { status: errObj.status });
+    }
     const message = error instanceof Error ? error.message : "Erro ao republicar artigo";
-    return NextResponse.json({ error: message }, { status: 400 });
+    const status = message.includes("não está habilitado")
+      ? 403
+      : message.includes("não encontrado")
+      ? 404
+      : message.includes("sem a oferta ativa") || message.includes("oferta") || message.includes("Oferta")
+      ? 409
+      : 400;
+    return NextResponse.json({ error: message }, { status });
   }
 }

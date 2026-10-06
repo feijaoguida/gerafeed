@@ -1,10 +1,11 @@
 import { NextResponse } from "next/server";
-import { getSessionWorkspaceId } from "@/lib/workspace";
+import { requireAffiliateWorkspace } from "@/lib/affiliate/request-auth";
+import { AffiliateContentError } from "@/lib/affiliate/block-contract";
 import { AffiliateService } from "@/lib/affiliate";
 
 export async function POST(request: Request) {
   try {
-    const workspaceId = await getSessionWorkspaceId();
+    const workspaceId = await requireAffiliateWorkspace();
     const body = await request.json();
     const { affiliateUrl, providerCode } = body;
 
@@ -23,7 +24,7 @@ export async function POST(request: Request) {
     return NextResponse.json(preview);
   } catch (error) {
     const message = error instanceof Error ? error.message : "Erro ao gerar preview de importação.";
-    const status = message.includes("não está habilitado") ? 403 : 500;
+    const status = error instanceof AffiliateContentError ? error.status : message.includes("não está habilitado") ? 403 : 500;
     return NextResponse.json({ error: message }, { status });
   }
 }

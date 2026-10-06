@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
+import { ProductContentResearch } from "./product-content-research";
 import { useRouter } from "next/navigation";
 import {
   ArrowLeft,
@@ -1230,7 +1231,7 @@ export function ProductDetail({ productId }: { productId: string }) {
                   Fontes de Pesquisa & Artigos de Referência ({referenceSources.length})
                 </h2>
                 <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                  Adicione URLs de reviews especializados, fóruns ou comparativos. O sistema extrai o conteúdo e gera um resumo por IA para enriquecer o grounding.
+                  Adicione URLs de reviews especializados, fóruns ou comparativos. O sistema extrai o conteúdo e gera um resumo por IA para ajudar a IA a escrever um review mais completo.
                 </p>
               </div>
             </div>
@@ -1353,23 +1354,7 @@ export function ProductDetail({ productId }: { productId: string }) {
             )}
           </div>
 
-          {/* Related Articles Section */}
-          <div className="bg-white dark:bg-slate-800 p-6 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm space-y-4">
-            <div>
-              <h2 className="text-base font-semibold text-slate-900 dark:text-white">
-                Conteúdos & Artigos Publicados Vinculados
-              </h2>
-              <p className="text-xs text-slate-500 dark:text-slate-400">
-                Artigos gerados no portal que incluem este produto no card de recomendação ou comparativo.
-              </p>
-            </div>
-            <div className="p-8 text-center border border-dashed border-slate-200 dark:border-slate-700 rounded-lg">
-              <FileText className="w-8 h-8 text-slate-400 mx-auto mb-2" />
-              <p className="text-xs text-slate-500">
-                Nenhum artigo vinculado ainda. Utilize a Fase 12 (Affiliate Content Engine) para gerar reviews.
-              </p>
-            </div>
-          </div>
+          <ProductContentResearch key={product.id} productId={product.id} />
         </div>
       )}
     </div>

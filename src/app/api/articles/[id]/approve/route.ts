@@ -34,8 +34,19 @@ export async function POST(
     return NextResponse.json(result);
   } catch (error) {
     console.error("POST /api/articles/[id]/approve error:", error);
+    if (error && typeof error === "object" && "status" in error && typeof (error as { status: unknown }).status === "number") {
+      const errObj = error as { status: number; message?: string };
+      return NextResponse.json({ error: errObj.message || "Erro de validação" }, { status: errObj.status });
+    }
     const message = error instanceof Error ? error.message : "Erro ao aprovar e publicar notícia no WordPress";
-    return NextResponse.json({ error: message }, { status: 400 });
+    const status = message.includes("não está habilitado")
+      ? 403
+      : message.includes("não encontrada") || message.includes("não encontrado")
+      ? 404
+      : message.includes("sem a oferta ativa") || message.includes("oferta") || message.includes("Oferta")
+      ? 409
+      : 400;
+    return NextResponse.json({ error: message }, { status });
   }
 }
 

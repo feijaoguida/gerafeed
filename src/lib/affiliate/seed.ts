@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 
 export const DEFAULT_AFFILIATE_PROGRAMS = [
+  { code: "SHOPEE", name: "Shopee", providerType: "SHOPEE", active: true },
   {
     code: "MERCADO_LIVRE",
     name: "Mercado Livre",

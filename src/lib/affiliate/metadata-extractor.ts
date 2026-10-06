@@ -103,7 +103,7 @@ function sanitizeAuthorName(raw?: string | null): string | undefined {
 /**
  * Extracts JSON-LD structured data from HTML.
  */
-function extractJsonLd(html: string): RawExtractedMetadata | null {
+export function extractJsonLd(html: string): RawExtractedMetadata | null {
   const jsonLdRegex = /<script\s+[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi;
   let match: RegExpExecArray | null;
 
@@ -320,7 +320,7 @@ function extractJsonLd(html: string): RawExtractedMetadata | null {
 /**
  * Extracts OpenGraph and HTML Meta tags from HTML.
  */
-function extractMetaTags(html: string): RawExtractedMetadata {
+export function extractMetaTags(html: string): RawExtractedMetadata {
   const getMeta = (prop: string): string | undefined => {
     const reg = new RegExp(`<meta\\s+[^>]*(?:property|name)=["']${prop}["'][^>]*content=["']([^"']*)["']`, "i");
     const match = reg.exec(html);

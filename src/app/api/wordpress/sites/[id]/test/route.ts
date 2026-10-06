@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
 import { getSessionWorkspaceId } from "@/lib/workspace";
 import { getWordPressSiteConfig } from "@/lib/wordpress-sites";
+import { handleApiError } from "@/lib/errors/service";
 
 export async function POST(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
@@ -70,8 +71,12 @@ export async function POST(
       },
     });
   } catch (error: unknown) {
-    console.error("POST /api/wordpress/sites/[id]/test error:", error);
-    const message = error instanceof Error ? error.message : "Erro ao testar conexão com o WordPress.";
-    return NextResponse.json({ error: message }, { status: 500 });
+    const { id } = await params;
+    return handleApiError(error, request, {
+      module: "WORDPRESS",
+      screen: "Sites WordPress / Teste de Conexão",
+      query: { wordpressSiteId: id },
+      userFacingMessage: "Erro ao testar conexão com o WordPress.",
+    });
   }
 }

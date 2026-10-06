@@ -475,3 +475,109 @@ Para planos por assinatura pagos:
 - O usuário é redirecionado para concluir o pagamento com segurança;
 - A liberação final de limites e ativação da assinatura é conduzida pelo Webhook do Asaas de forma assíncrona e auditável.
 
+
+## ADR-090. Blocos comerciais editáveis e integração Shopee (proposta Phase 30)
+Status: Proposed — implementação não autorizada; detalhes a decidir na task 247.
+
+Contexto: o pedido inclui importação Shopee, imagens originais, ocorrências repetidas de
+produtos e inserção na posição do cursor em RSS e artigos comerciais. Há renderers e
+representações distintas de conteúdo; ArticleProduct permite um vínculo único por produto/artigo.
+
+Direção proposta:
+- Reutilizar AffiliateProvider para Shopee e ProductOffer como fonte do link comercial.
+- Representar ocorrências de blocos separadamente do vínculo ArticleProduct.
+- Compartilhar contratos visuais e resolução de ofertas entre preview e publicação.
+- Sincronizar edição, documento canônico e vínculos atomicamente, mantendo compatibilidade.
+- Distinguir produtos-base do gerador e recomendações adicionais da revisão.
+
+Ainda não decidido: schema de ocorrência, necessidade de migration, serialização em HTML,
+estratégia de sincronização dos modelos existentes e eventual componente de edição.
+Não tratar comentários HTML nem nova tabela como arquitetura aprovada por este planejamento.
+A task 247 deve documentar escolha, alternativas, compatibilidade e testes antes da adoção.
+
+### ADR-090 — decisão da task 247 (2026-10-02)
+Status: Accepted. Autorização do usuário: executar 247–254, sem publicar em produção.
+
+- Sem migration: `canonicalContent` comporta novo `PRODUCT_GROUP` com data.id estável,
+  layout, products ordenados e ctaText. Cada referência possui productId/offerId opcional.
+- `meta.baseProductIds` guarda produtos-base/editoriais, inicializados pelo servidor a partir
+  dos vínculos existentes ao primeiro save. Recomendações extras vêm das ocorrências.
+- ArticleProduct projeta a união dos produtos-base e ocorrências. Remover último uso elimina
+  somente vínculo que não é base. Cardinalidade do gerador continua aplicada aos produtos-base.
+- Editor HTML representa blocos em comentários URI-encoded; helpers fazem round-trip e validam
+  payload/IDs/duplicatas. UI visual gerencia comentários; usuário não precisa editar JSON.
+- No save, servidor valida referências do tenant e atualiza texto/canônico/vínculos na mesma
+  transação. Ao editar, canônico é reconstruído do texto com marcadores, mantendo meta de base.
+- Compatibilidade: HTML antigo vira RICH_TEXT; blocos antigos continuam válidos e são
+  preservados como marcadores no editor. Placements antigos continuam no caminho legado,
+  até conversão explícita; não duplicá-los em duas representações na publicação.
+- Oferta implícita: ativa, menor preço não nulo, desempate por ID; explícita nunca faz fallback.
+- Contratos: GET artigo retorna capacidades + conteúdo editável; PATCH recebe content e valida
+  canônico/referências; preview recebe documento e retorna HTML/pendências. Erros 400 formato,
+  401 sessão, 403 plano, 404 recurso fora do tenant/ausente, 409 oferta indisponível/conflito.
+- Consumidores: revisão RSS e AffiliateArticleEditor → PATCH artigo; approve → publishToWordPress
+  em wordpress.ts; republish → PublicationSyncService → WordPressAffiliateRenderer → adapter.
+  CanonicalDocumentService.renderToHtml e preview atual precisam compartilhar modelos com o renderer.
+  Adapter recebe HTML já autorizado/renderizado, não resolve catálogo por conta própria.
+- Testes iniciais: scripts/phase30/contracts.test.ts (contratos, round-trip, seleção de oferta).
+
+## ADR-091 — Sistema de Log de Erros, Diagnóstico e Auditoria no Backoffice (Phase 31)
+Status: Accepted. Autorização do usuário em 2026-10-04.
+
+Contexto:
+Erros no sistema eram tratados e mascarados para o cliente com mensagens genéricas, impossibilitando que a equipe de desenvolvimento e suporte identificasse a causa raiz exata e simulasse os problemas.
+O usuário solicitou um sistema completo de log no banco com captura de Usuário, Tela, Consulta, Caminho, Mensagem original e Stack trace antes do mascaramento, mantendo o feedback visual amigável com pequenos popups nos cantos da tela, permitindo visualização e filtros exclusivos no Backoffice para SuperAdmin (por tenant, módulo, usuário e data), além de configuração de tempo de retenção (padrão 180 dias) e rotina de expurgo de logs antigos.
+
+Decisões:
+1. **Modelos no Prisma**:
+   - `SystemErrorLog`: armazena `id`, `workspaceId` (opcional), `userId`, `userEmail`, `userName`, `screen`, `path`, `method`, `query` (JSON sanitizado), `module`, `errorMessage` (bruta/sem tratamento), `errorStack`, `statusCode`, `ipAddress`, `userAgent` e `createdAt`.
+   - `SystemSetting`: chave/valor global para configurações do sistema (ex: `error_log_retention_days = 180`).
+2. **Logging Não-Bloqueante & Higienização**:
+   - O serviço de log no servidor (`src/lib/errors/service.ts`) opera com try/catch isolado e não-bloqueante: uma indisponibilidade temporária de gravação de log nunca derruba a requisição principal do usuário.
+   - Higienização automática de campos sensíveis (senhas, hashes, secrets, chaves de API, tokens de cartão/auth) antes de gravar em `query`.
+3. **Tratamento de Erros e Feedback Amigável**:
+   - Para o usuário comum: respostas de erro na API continuam mascaradas de forma amigável (`{ error: string, errorId?: string }`), e no client pequenos popups tipo toast nos cantos da tela notificam o usuário sem travar a interface.
+   - Para o desenvolvedor/suporte: os logs reais e completos ficam salvos no banco com `errorId` rastreável.
+4. **Governança no Backoffice**:
+   - Apenas usuários com `isSuperAdmin === true` têm acesso a `/backoffice/audit/errors` e `/backoffice/settings`.
+   - Listagem com filtros por Tenant (Workspace), Módulo (AI, RSS, BILLING, WORDPRESS, AFFILIATES, AUTH, BACKOFFICE, GENERAL), Usuário (busca por e-mail ou nome) e Período de Data.
+   - Modal com dados completos de reprodução e stack trace formatado.
+5. **Retenção e Expurgo**:
+   - Tela `/backoffice/settings` permite configurar os dias de retenção (padrão 180).
+   - Rotina manual de expurgo acionável via endpoint protegido `POST /api/backoffice/settings/cleanup-logs` deletando registros com `createdAt` anterior à data de corte.
+
+## ADR-092 — Recuperação de Senha com Código OTP de 6 Dígitos via E-mail (Phase 32)
+Status: Accepted. Autorização do usuário em 2026-10-05.
+
+Contexto:
+Usuários que esquecerem sua senha de acesso ao GeraFeed precisam de um fluxo seguro e autônomo para recuperação da conta. A infraestrutura de envio de e-mails (`resend`, `smtp`, `mock`), o modelo `VerificationToken` e os utilitários de geração de OTP (`generateOtpCode`) e hash de senha (`hashPassword`) já existem e devem ser reaproveitados de maneira segura.
+
+Decisões:
+1. **Isolamento de Escopo do Token (Purpose Binding)**:
+   - Para impedir que um token de cadastro seja utilizado para redefinir senha (ou vice-versa), os registros de recuperação de senha em `VerificationToken` utilizarão o identificador prefixado:  
+     `identifier: "password-reset:" + cleanEmail`.
+2. **Proteção contra Enumeração de Usuários (Anti-User-Enumeration)**:
+   - O endpoint de solicitação do código responderá com uma mensagem de sucesso uniforme independentemente do e-mail existir ou não na base de dados (`"Se este e-mail estiver cadastrado em nossa plataforma, você receberá um código de verificação em instantes."`).
+   - Se o usuário não existir, nenhum e-mail é disparado, mas o atacante não consegue enumerar quais e-mails têm conta ativa.
+3. **Proteção Anti-Flood / Rate Limiting**:
+   - Cooldown de 60 segundos entre solicitações para o mesmo e-mail, retornando HTTP 429 se houver tentativa antes do intervalo.
+4. **Ciclo de Vida Curto & Uso Único (Single-Use)**:
+   - Expiração estrita de 15 minutos (`TOKEN_LIFETIME_MS = 15 * 60 * 1000`).
+   - Após a validação e redefinição com sucesso, todos os tokens com `identifier: "password-reset:" + cleanEmail` são deletados imediatamente, impedindo repetição do código.
+5. **Criptografia Forte & Validação**:
+   - A nova senha deve ter no mínimo 6 caracteres e ser armazenada via `hashPassword` (`bcryptjs` com SALT rounds 10) no campo `passwordHash` do usuário.
+6. **Desacoplamento e Rota Pública**:
+   - A página `/forgot-password` é liberada no matcher do `src/proxy.ts` como rota pública.
+   - O link "Esqueceu a senha?" é posicionado no formulário de login (`/login`).
+7. **Padrão Visual e UX**:
+   - Visual alinhado ao design system GeraFeed (Dark Mode institucional, layout split, inputs com feedback visual, timer regressivo para reenvio e mensagens amigáveis).
+
+
+
+## 2026-10-05 — Instruções de afiliados no contrato de geração (Task 266)
+- `GenerateArticleInput.systemPrompt` é opcional e preenchido exclusivamente por
+  código servidor com o template global efetivo. Não é um campo aceito do client.
+- Os quatro provedores usam `buildArticlePrompts`: com template comercial,
+  enviam suas instruções e o contexto renderizado; sem ele, mantêm o prompt RSS.
+- Review e comparativo adotam o contrato agora. Governança global, versionamento,
+  revisão humana, resolução de ofertas e renderização canônica são preservados.

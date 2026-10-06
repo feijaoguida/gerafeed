@@ -101,6 +101,7 @@ model Workspace {
   articleAffiliatePlacements ArticleAffiliatePlacement[]
   checkoutSessions           BillingCheckoutSession[]
   invoices                   Invoice[]
+  systemErrorLogs            SystemErrorLog[]
 }
 
 // ---------------------------------------------------------------------------
@@ -755,6 +756,40 @@ model Invoice {
   @@index([status])
 }
 
+// ---------------------------------------------------------------------------
+// Governança, Diagnóstico e Logs do Sistema (Phase 31)
+// ---------------------------------------------------------------------------
 
+model SystemErrorLog {
+  id           String     @id @default(cuid())
+  workspaceId  String?
+  workspace    Workspace? @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  userId       String?
+  userEmail    String?
+  userName     String?
+  screen       String?
+  path         String
+  method       String?    @default("GET")
+  query        Json?
+  module       String     @default("GENERAL") // AI, RSS, BILLING, WORDPRESS, AFFILIATES, AUTH, BACKOFFICE, GENERAL
+  errorMessage String     @db.Text
+  errorStack   String?    @db.Text
+  statusCode   Int?       @default(500)
+  ipAddress    String?
+  userAgent    String?
+  createdAt    DateTime   @default(now())
 
+  @@index([workspaceId])
+  @@index([module])
+  @@index([createdAt])
+  @@index([userId])
+}
 
+model SystemSetting {
+  id          String   @id @default(cuid())
+  key         String   @unique
+  value       Json
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}

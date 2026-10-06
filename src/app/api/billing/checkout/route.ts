@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { getPaymentGateway } from "@/lib/payments";
 import { BillingProfileService } from "@/lib/billing-profile";
 import { calculateAnnualPlanPrice } from "@/lib/pricing";
+import { handleApiError } from "@/lib/errors/service";
 
 const FORBIDDEN_CARD_KEYS = [
   "cardNumber",
@@ -240,8 +241,11 @@ export async function POST(request: Request) {
       cycle,
     });
   } catch (error) {
-    console.error("POST /api/billing/checkout error:", error);
-    const message = error instanceof Error ? error.message : "Erro ao iniciar checkout.";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return handleApiError(error, request, {
+      module: "BILLING",
+      screen: "Checkout de Assinatura",
+      userFacingMessage: "Erro ao iniciar checkout.",
+    });
   }
 }
+

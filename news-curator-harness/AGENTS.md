@@ -12,6 +12,12 @@ O repositório é a fonte de verdade. Antes de alterar código:
 6. Leia `docs/decisions.md` quando houver mudança arquitetural.
 7. Inspecione a implementação atual antes de criar ou alterar abstrações.
 
+## Autorização — Phase 30
+
+Em 2026-10-02, o usuário autorizou implementar as tasks 247–254 em sequência,
+uma por vez, executando testes e atualizando o harness. Não publicar em produção.
+Essa autorização substitui o gate anterior de documentação apenas.
+
 ## Harness
 
 Uma task por vez.

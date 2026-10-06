@@ -1,12 +1,16 @@
 import { AffiliateProvider } from "./types";
 import { MercadoLivreAffiliateProvider } from "./mercado-livre";
 
+import { ShopeeAffiliateProvider } from "./shopee";
+
 const providersRegistry: Map<string, AffiliateProvider> = new Map();
 
 function initializeProviders() {
   if (providersRegistry.size === 0) {
     const meli = new MercadoLivreAffiliateProvider();
     providersRegistry.set(meli.code.toUpperCase(), meli);
+    const shopee = new ShopeeAffiliateProvider();
+    providersRegistry.set(shopee.code, shopee);
   }
 }
 

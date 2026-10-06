@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   Search,
   CheckCircle2,
@@ -14,6 +14,8 @@ import {
   Sparkles,
 } from "lucide-react";
 import { CanonicalDocument } from "@/lib/affiliate/canonical-document";
+import { AffiliateBlockManager } from "@/components/affiliate/affiliate-block-manager";
+import { documentToEditorHtml, editorHtmlToDocument } from "@/lib/affiliate/editor-document";
 
 export interface ArticleProductItem {
   id?: string;
@@ -92,7 +94,14 @@ export function AffiliateArticleEditor({
 }: AffiliateArticleEditorProps) {
   const [title, setTitle] = useState(initialTitle);
   const [summary, setSummary] = useState(initialSummary);
-  const [content, setContent] = useState(initialContent);
+  const [content, setContent] = useState(() => {
+    if (initialContent && initialContent.includes("gerafeed-block:")) return initialContent;
+    if (initialCanonicalDocument && Array.isArray(initialCanonicalDocument.blocks)) {
+      return documentToEditorHtml(initialCanonicalDocument);
+    }
+    return initialContent || "";
+  });
+  const contentRef = useRef<HTMLTextAreaElement>(null);
   const [status, setStatus] = useState(initialStatus);
   const [originalImageUrl, setOriginalImageUrl] = useState<string>(initialOriginalImageUrl || "");
   const [wordpressSiteId, setWordpressSiteId] = useState<string>(initialWordpressSiteId || "");
@@ -219,11 +228,22 @@ export function AffiliateArticleEditor({
     }
 
     try {
+      const hasBlocks = content.includes("gerafeed-block:");
+      let canonicalPayload: unknown = initialCanonicalDocument || null;
+      if (hasBlocks) {
+        try {
+          canonicalPayload = editorHtmlToDocument(content, initialCanonicalDocument?.meta);
+        } catch (err) {
+          console.warn("Falha ao gerar canonicalContent do HTML editado:", err);
+        }
+      }
+
       // 1. Update Article Core, Category, WordPress Site, Image & SEO
       const articlePayload = {
         title,
         summary,
         content,
+        canonicalContent: canonicalPayload,
         originalImageUrl: originalImageUrl || null,
         modifiedImageUrl: originalImageUrl || null,
         wordpressSiteId: wordpressSiteId || null,
@@ -568,10 +588,19 @@ export function AffiliateArticleEditor({
           </div>
 
           <div>
-            <label className="block text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1.5">
-              Conteúdo Editorial (HTML / Texto Rico)
-            </label>
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="block text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Conteúdo Editorial (HTML / Texto Rico)
+              </label>
+            </div>
+            <AffiliateBlockManager
+              content={content}
+              onChangeContent={setContent}
+              textareaRef={contentRef}
+              articleProducts={products}
+            />
             <textarea
+              ref={contentRef}
               rows={14}
               value={content}
               onChange={(e) => setContent(e.target.value)}

@@ -2914,3 +2914,315 @@ A Phase 29 fecha o ciclo de aquisição com integridade de dados e alta convers�
 - [ ] Evidências registradas em `PROGRESS.md`.
 
 
+
+---
+
+# Phase 30. Shopee, Imagens Originais e Blocos de Afiliados na Revisão
+
+## 1. Estado e autorização
+
+**Implementação parcial — tasks 247–251 DONE; 252–254 TODO.** Execução encerrada após a
+task 251 por solicitação do usuário em 2026-10-03. O usuário autorizou executar
+as tasks 247–254 em sequência, com testes e harness atualizado. Não publicar em produção.
+A Phase 29 e suas evidências permanecem preservadas.
+
+## 2. Objetivo e escopo
+
+1. Importar produtos através de links de afiliados Shopee, mantendo Mercado Livre.
+2. Usar imagens originais cadastradas no produto no corpo do artigo e nos cards; repetição permitida.
+3. Repetir cards de recomendação no meio e no final dos novos artigos comerciais.
+4. Atualizar Conteúdo & Pesquisa com linguagem amigável, atalho para review e artigos reais vinculados.
+5. Na revisão, inserir um bloco para um ou vários produtos na posição do cursor.
+6. Oferecer card com foto, card sem foto, grade, carrossel e botão com subtítulo.
+7. Liberar ações de afiliados somente através do entitlement `AFFILIATE_MODULE`.
+
+Aplica-se à revisão de notícias/RSS e artigos comerciais. Não alterar automaticamente posts
+já publicados nem gerar/publicar conteúdo ao abrir o wizard.
+
+## 3. Evidências da inspeção inicial (sem implementação)
+
+- `src/lib/affiliate/factory.ts` registra apenas Mercado Livre.
+- `src/lib/affiliate/seed.ts` contém apenas o programa Mercado Livre.
+- `src/components/affiliate/affiliate-importer.tsx` não envia seleção de provider.
+- Cards em `canonical-document.ts` e `publisher/wordpress-renderer.ts` não exibem a foto.
+- `review-generator.ts` usa a primeira imagem como destaque e exige segunda/terceira imagem
+  para certos blocos do corpo, deixando produtos com uma única imagem sem esses blocos.
+- Conteúdo & Pesquisa em `product-detail.tsx` exibe placeholder fixo de artigos relacionados.
+- O wizard não recebe produto inicial pela navegação do detalhe.
+- O editor comercial salva `content`, enquanto a publicação pode preferir `canonicalContent`;
+  as duas representações precisam ser sincronizadas para a edição chegar ao WordPress.
+- Existem caminhos distintos de renderização: `wordpress.ts`, o adapter/renderer do publisher
+  e o preview do editor. Todos precisam respeitar os mesmos contratos visuais e de referências.
+- `ArticleProduct` tem unicidade por artigo/produto; ocorrências repetidas de um card não são
+  novos vínculos nesta tabela.
+
+Revalidar estes pontos ao iniciar, pois o repositório pode mudar entre planejamento e execução.
+
+## 4. Importação Shopee
+
+### Experiência
+
+O importador apresenta Mercado Livre e Shopee, com seleção explícita de marketplace.
+Texto sugerido: “Cole seu link de afiliado. Vamos buscar os dados disponíveis para você revisar.”
+Fluxo: selecionar marketplace → colar link → buscar → revisar/completar → confirmar.
+Ao trocar marketplace ou URL depois do preview, invalidar o preview anterior.
+
+Preservar o link afiliado informado, incluindo parâmetros de atribuição. URL resolvida e URL
+canônica são informações separadas e não substituem o link comercial.
+Não gerar links afiliados, acessar contas ou solicitar login/senha Shopee.
+
+### Provider e resolução
+
+Implementar `ShopeeAffiliateProvider` pelo contrato existente; registrar factory e seed
+idempotente. Resolver e atualizar metadados pelo provider associado à oferta, inclusive no refresh.
+Domínios candidatos de links: `shopee.com.br` (incluindo `s.shopee.com.br`), `shope.ee` e `shp.ee`.
+A lista definitiva deve ser validada com links reais e documentação oficial na task 248;
+redirecionamentos legítimos fora dela exigem revisão explícita, nunca wildcard irrestrito.
+
+Usar Safe Fetch/Resolver existente com validação de todos os redirects, DNS/IP, redes privadas,
+protocolo, credenciais embutidas, timeout também durante leitura do corpo e limite de tamanho.
+Não contornar login, CAPTCHA ou bloqueio de acesso. Sem endpoints privados não documentados.
+Extrair somente dados públicos estruturados disponíveis, sem regras de Mercado Livre aplicadas
+indevidamente à Shopee. Usar identidade de loja + item quando disponível para evitar colisões.
+
+### Resultado e persistência
+
+- `COMPLETE`: dados mínimos definidos na task disponíveis, com origem e data registradas.
+- `PARTIAL`: link permitido, mas faltam dados ou o marketplace impediu a extração; permitir cadastro manual.
+- `FAILED`: URL inválida/proibida ou redirecionamento inseguro; não confirmar o preview como importação válida.
+
+Nunca importar título de página de login/challenge como nome do produto.
+Campos ausentes permanecem ausentes. Preview não grava produto/oferta.
+Confirmar no servidor provider, URL, workspace, categoria, limites e duplicidade; não confiar no preview do cliente.
+Deduplicar por workspace + programa + identidade externa e por URLs normalizadas,
+preservando parâmetros de atribuição do link salvo. Repetição ou corrida de confirmação
+não pode criar duplicatas silenciosas. Atualização preserva campos editoriais conforme merge policy.
+
+## 5. Imagens originais e distribuição dos cards
+
+Usar `imageUrl` e `images` do catálogo como fonte; não pedir à IA para inventar URLs.
+Uma única imagem pode aparecer na capa, no corpo e em cards repetidos.
+Validar URLs e escapar atributos. Sem imagem, manter layout legível sem ícone quebrado.
+Não aplicar transformação obrigatória. Não migrar imagens para um serviço novo nesta fase.
+
+Nos novos reviews: manter a abertura existente e incluir uma ocorrência do produto no meio
+editorial e outra ao final. Em comparativos/listas/guias, usar os produtos selecionados e
+blocos em grupo para evitar repetição excessiva de todos os cards individuais.
+O meio deve ser calculado por limites de parágrafos/seções, nunca cortando uma tag HTML.
+As ocorrências ficam visíveis e editáveis na revisão, podendo ser removidas ou repetidas.
+Respeitar imagens já presentes para não multiplicá-las acidentalmente ao salvar novamente.
+
+Não inventar notas, vantagens, preço anterior, descontos ou experiência de teste físico.
+CTAs padrão neutros: “Conferir oferta” ou “Ver preço atual”.
+Artigos existentes não são reescritos em lote; os novos formatos podem ser inseridos manualmente.
+
+## 6. Conteúdo & Pesquisa e wizard
+
+Substituir referências técnicas como “Fase 12” e “grounding” por linguagem de produto.
+Texto sugerido: “Transforme as informações deste produto em um review. Você poderá revisar tudo antes de publicar.”
+Botão exato: **Gerar Review deste Produto**.
+
+Abrir `/publishing/affiliate` com referência ao produto. O wizard deve:
+
+- iniciar com `PRODUCT_REVIEW` e o produto previamente selecionado;
+- carregar esse produto mesmo fora da primeira página do catálogo;
+- validar workspace, entitlement e elegibilidade no servidor;
+- tratar produto removido/arquivado ou ID inválido com mensagem e possibilidade de nova seleção;
+- manter o fluxo normal sem parâmetro e exigir ação do usuário para gerar.
+
+Listar artigos reais através de `ArticleProduct`, filtrando produto e artigo pelo workspace.
+Mostrar título (fallback para título original), status, data pertinente e link para revisão.
+Incluir pendentes, publicados e rejeitados com status explícito; não chamar todos de publicados.
+Se existir URL publicada válida, oferecer também acesso ao post.
+Paginar ou limitar com mecanismo de carregar mais; ordenação determinística, recentes primeiro.
+Exibir estados de carregamento, erro e lista vazia; não usar exemplos estáticos.
+Uma relação única deve representar um produto usado várias vezes no mesmo artigo.
+
+## 7. Modelos visuais
+
+| Modelo | Conteúdo | Quantidade |
+|---|---|---|
+| Card com foto | Imagem original, título, texto disponível e CTA | Um ou vários cards |
+| Card de texto | Título, texto disponível e CTA | Um ou vários cards |
+| Grade | Foto, título e CTA por produto | Um ou vários produtos |
+| Carrossel | Foto, título e CTA por produto, rolagem horizontal | Um ou vários produtos |
+| Botão | “Conferir oferta” e nome do produto menor abaixo, dentro do botão | Um ou vários botões |
+
+Grade responsiva; carrossel utilizável por toque e teclado, sem autoplay e sem depender de
+JavaScript externo para funcionar no WordPress. Cada produto aponta para sua própria oferta.
+Nome abaixo do CTA também funciona como identificação acessível do destino.
+Permitir ajustar o texto principal do CTA; não gerar promessas de desconto sem dados.
+Layouts devem funcionar com textos longos, sem imagem e em telas pequenas.
+UI administrativa reutiliza design system e temas claro/escuro; HTML publicado permanece
+legível nos temas WordPress sem depender dos estilos administrativos.
+
+## 8. Inserção no corpo e experiência de revisão
+
+Na área “Corpo do Artigo (HTML)” e no editor comercial, disponibilizar **Inserir produto afiliado**
+somente quando o plano liberar afiliados. O seletor permite buscar produtos, selecionar um ou
+vários, escolher modelo e CTA, visualizar e confirmar.
+
+Capturar a seleção/cursor antes de abrir o seletor e restaurar foco após inserir.
+Inserir na posição escolhida, inclusive início, meio e final; não redirecionar silenciosamente
+para o rodapé. Se estiver no meio de um parágrafo, preservar os dois trechos com HTML válido.
+Seleção de texto não deve ser apagada acidentalmente; adotar inserção no início da seleção.
+Posição dentro de tag, atributo ou marcador inválido exige orientação para reposicionar.
+Cancelar não altera o corpo. Se o corpo mudar com o seletor aberto, invalidar a posição antiga
+ou recalculá-la de forma segura; nunca inserir em índice obsoleto silenciosamente.
+
+O usuário vê um preview do bloco com dados reais; IDs/JSON não substituem a apresentação visual.
+No modo HTML podem existir marcadores internos, mas sua sintaxe não deve ser requisito para uso.
+Permitir selecionar um bloco inserido para alterar modelo/produtos/CTA, duplicar e remover.
+Ocorrências independentes podem referenciar o mesmo produto.
+Salvar/recarregar e publicar devem manter ordem, imagens, escolha visual e texto revisado.
+Usar componentes existentes; eventual dependência de editor requer justificativa na task 247.
+
+## 9. Contrato de dados e integridade
+
+`Product` e `ProductOffer` continuam sendo fontes dos dados comerciais.
+Conteúdo persistido referencia IDs, nunca copia permanentemente o `affiliateUrl` nos blocos.
+O contrato de ocorrência deve representar identidade estável, modelo, produtos ordenados,
+CTA e posição/âncora ou posição no documento. Referência explícita de oferta é opcional.
+
+Reutilizar `canonicalContent`, `ArticleAffiliatePlacement` e `ArticleProduct` conforme seu papel,
+sem criar catálogo paralelo. A task 247 decide a representação compatível para RSS e comercial,
+validação, migração/backward compatibility e sincronização atômica antes de implementar.
+Não pré-aprovar nesta spec uma serialização baseada em comentários HTML.
+
+`ArticleProduct` é a projeção de produtos vinculados, não o armazenamento de todas as ocorrências.
+Manter vínculos explícitos editoriais e ocorrências em sincronia, com política documentada para
+remoção do último uso sem apagar uma associação editorial ainda necessária.
+Restrições de geração (review = um produto, comparação >= dois) não devem impedir a inserção
+manual de recomendações adicionais na revisão. Distinguir produtos-base de geração dos
+produtos recomendados no corpo; definir representação na task 247 sem enfraquecer o wizard.
+
+Edição de texto deve atualizar o documento que será efetivamente publicado. Não sobrescrever
+blocos comerciais ao atualizar `content`; não ignorar edições por preferir um canônico antigo.
+Dados de outro workspace e ofertas incompatíveis são rejeitados antes de qualquer gravação.
+Salvamento de corpo, blocos e vínculos deve ser atômico. Repetir salvamento não duplica ocorrências.
+
+## 10. Preview, publicação e plano
+
+Resolver ofertas ativas no momento de preview/publicação, no workspace autorizado.
+Se uma oferta explícita ficar inválida, não trocar de marketplace silenciosamente.
+Sem oferta explícita, adotar uma seleção determinística documentada e mostrar qual foi usada.
+Sem oferta ativa, destacar a pendência na revisão e impedir nova publicação até corrigir ou
+remover o bloco. Nunca publicar botão `href="#"`, link vazio ou oferta pausada/arquivada.
+
+Preview e WordPress compartilham as regras de renderização. Validar todos os caminhos de
+aprovar, republicar, publisher adapter e legado. Marcar publicação alterada para republicação
+conforme mecanismo existente; não publicar automaticamente.
+Links: HTTP(S) validado, conteúdo escapado e `rel="sponsored nofollow noopener"` com nova aba.
+Disclosure comercial reutiliza configuração existente, sem duplicação por card.
+Tracking existente deve reconhecer os novos modelos quando `AFFILIATE_ANALYTICS` permitir;
+navegação não pode depender do sucesso da telemetria. Não medir clique como venda.
+
+`AFFILIATE_MODULE` controla UI e APIs de importar, gerar, consultar produtos relacionados,
+inserir/editar blocos, renderizar preview e publicar conteúdo com afiliados.
+Sem entitlement: ocultar ação de inserção, rejeitar tentativas diretas no servidor com 403,
+preservar dados existentes e permitir leitura do artigo e remoção de blocos para publicação sem afiliados.
+Downgrade não altera remotamente posts já publicados, mas bloqueia nova publicação/republicação
+com afiliados até adequação. Limites continuam pelo BillingService, sem nomes de planos hardcoded.
+
+## 11. Fora do escopo e ideias futuras
+
+Não implementar: API de vendas/comissões Shopee, geração automática de links, login marketplace,
+cron, filas, microserviços, publicação em massa ou migração automática de artigos publicados.
+
+Ideias para avaliação posterior, sem autorização de execução nesta fase:
+- presets visuais de marca por workspace;
+- comparação A/B de CTA baseada em cliques;
+- relatório de produtos sem oferta ativa usados em posts;
+- posicionamento automático sugerido pela IA e aprovado pelo editor.
+
+## 12. Plano de tasks e Definition of Done
+
+Sequência detalhada em `PLAN-phase30-affiliates.md` e `tasks/247-*.md` a `tasks/254-*.md`.
+Uma task de implementação por vez, somente após autorização.
+
+- [ ] Shopee e Mercado Livre importam com provider correto, dedupe e fallback manual seguro.
+- [ ] Imagens originais aparecem, inclusive quando só há uma disponível.
+- [ ] Novos artigos comerciais têm blocos no meio e fim sem duplicação no save.
+- [ ] Botão de review abre wizard pré-selecionado; artigos relacionados vêm de ArticleProduct.
+- [ ] Cinco modelos inseridos/editados/duplicados/removidos na posição escolhida.
+- [ ] Texto editado e blocos persistem e são os mesmos enviados ao WordPress.
+- [ ] Tenant, plano, ofertas, disclosure e tracking validados em todos os caminhos.
+- [ ] Testes automatizados aplicáveis aprovados, com cenários negativos e regressão Mercado Livre.
+- [ ] Integração em ambiente de teste validada; sem publicação de produção automática.
+- [ ] `npx tsc --noEmit`, `npm run lint` e `npm run build`: PASS.
+- [ ] Evidências objetivas registradas. Dependências externas indisponíveis registradas como pendência,
+  sem declarar validação real a partir de mocks nem concluir task com critério não executado.
+
+---
+
+# Phase 31. Sistema de Log de Erros, Diagnóstico e Auditoria no Backoffice
+
+## 1. Estado e autorização
+Autorizada pelo usuário em 2026-10-04.
+Em andamento: Task 255.
+
+## 2. Objetivo e escopo
+1. Criar sistema centralizado de logging de erros no banco de dados (`SystemErrorLog`) com captura de dados de diagnóstico ricos:
+   - Usuário (`userId`, `userEmail`, `userName`)
+   - Tela (`screen`)
+   - Consulta / Payload de entrada (`query`, devidamente sanitizado)
+   - Caminho / URL (`path`, `method`)
+   - Módulo (`AI`, `RSS`, `BILLING`, `WORDPRESS`, `AFFILIATES`, `AUTH`, `BACKOFFICE`, `GENERAL`)
+   - Mensagem original antes de mascarar (`errorMessage`)
+   - Stack trace completo (`errorStack`)
+   - Identificação do Tenant / Empresa (`workspaceId`)
+   - Código HTTP e timestamp (`statusCode`, `createdAt`)
+2. Manter a exibição de erros para os usuários finais mascarada e amigável, com pequenos popups nos cantos da tela (estilo Toast/notificação discreta).
+3. Criar visualizador de logs no Backoffice exclusivo para SuperAdmin em `/backoffice/audit/errors`, com:
+   - Filtro por Tenant/Empresa
+   - Filtro por Módulo
+   - Filtro por Usuário
+   - Filtro por Data
+   - Modal de inspeção e reprodução com mensagem original e stack trace formatado.
+4. Criar tela de Configurações Gerais no Backoffice em `/backoffice/settings`:
+   - Configuração de tempo de retenção em dias (padrão: 180 dias) persistida em `SystemSetting`.
+   - Rotina de limpeza/expurgo de registros com mais de N dias com botão manual "Limpar logs antigos agora".
+
+## 3. Plano de tasks e Definition of Done
+Sequência detalhada em `news-curator-harness/PLAN-phase31-error-logs.md` e tasks 255 a 260.
+- [x] Task 255: Modelos `SystemErrorLog` e `SystemSetting`, migration e seed default.
+- [x] Task 256: Serviço central de logging e handler de API não-bloqueante com mascaramento.
+- [x] Task 257: Módulo client de captura, endpoint de reporte e toast popup nos cantos.
+- [x] Task 258: Tela Backoffice de logs com filtros (tenant, módulo, usuário, data) e modal de stack trace.
+- [x] Task 259: Tela de Configurações Gerais no Backoffice, retenção (180 dias) e rotina de expurgo.
+- [x] Task 260: Integração end-to-end, testes de regressão, lint, tipos e evidências.
+
+# Phase 32. Recuperação de Senha ("Esqueceu a Senha") com Código de Segurança via E-mail
+
+## 1. Estado e autorização
+Autorizada pelo usuário em 2026-10-05.
+Em andamento: Task 261 TODO.
+
+## 2. Objetivo e escopo
+1. Fornecer fluxo autônomo, seguro e amigável para que usuários que esqueceram sua senha possam redefini-la sem intervenção manual.
+2. Reutilizar a infraestrutura de e-mail existente (`src/lib/mail/`) e o modelo `VerificationToken` do Prisma, aplicando isolamento estrito de tokens:
+   - Identificador com propósito exclusivo: `password-reset:${cleanEmail}` para evitar colisões ou reuso de tokens de cadastro.
+   - Código numérico criptográfico de 6 dígitos (`generateOtpCode()`).
+   - Validade curta de 15 minutos (`expires`).
+   - Cooldown anti-flood de 60 segundos entre solicitações.
+   - Consumo único (remoção do token imediatamente após a troca de senha).
+3. Prevenção de Enumeração de Usuários (Anti-User-Enumeration):
+   - A resposta da API `POST /api/auth/forgot-password/send-code` é idêntica para e-mails cadastrados e não cadastrados, protegendo a privacidade dos usuários.
+4. Criptografia Forte:
+   - A nova senha é validada (mínimo de 6 caracteres) e salva como hash `bcryptjs` com custo 10 (`hashPassword`).
+5. Interface Visual do Usuário:
+   - Link "Esqueceu a senha?" adicionado na tela de login `/login`.
+   - Nova página pública `/forgot-password` liberada no proxy (`src/proxy.ts`).
+   - Fluxo intuitivo em 2 passos (Passo 1: Solicitar código via e-mail; Passo 2: Digitar código recebido, nova senha e confirmação, com timer regressivo de reenvio).
+   - Feedback de sucesso e redirecionamento para `/login`.
+
+## 3. Plano de tasks e Definition of Done
+Sequência detalhada em `news-curator-harness/PLAN-phase32-password-recovery.md` e tasks 261 a 265.
+- [x] Task 261: Template de e-mail de recuperação de senha e renderizador.
+- [x] Task 262: Endpoints de API para solicitação e redefinição de senha (`/api/auth/forgot-password/send-code` e `/api/auth/forgot-password/reset`).
+- [x] Task 263: Link "Esqueceu a senha?" no login e liberação de rota pública em `src/proxy.ts`.
+- [x] Task 264: Página `/forgot-password` e componente de visualização em 2 passos com timer regressivo e UX GeraFeed.
+- [x] Task 265: Integração end-to-end, testes de segurança (anti-flood, anti-enumeração, expiração), lint, tipos e evidências.
+
+
+

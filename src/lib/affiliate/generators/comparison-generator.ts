@@ -1,3 +1,4 @@
+import { enrichGeneratedBlocks } from "./enrich-document";
 import { prisma } from "@/lib/prisma";
 import { BillingService, AFFILIATE_FEATURES } from "@/lib/billing";
 import { getActiveAIProvider } from "@/lib/ai";
@@ -67,6 +68,8 @@ export class ProductComparisonGenerator {
       },
       include: {
         category: true,
+        reviewSamples: { take: 5 },
+        referenceSources: { where: { status: "READY" }, take: 5 },
         offers: {
           where: { status: "ACTIVE" },
           orderBy: { price: "asc" },
@@ -97,11 +100,16 @@ export class ProductComparisonGenerator {
       }
 
       return `Produto ${index + 1}: ${product.name} (Marca: ${product.brand || "N/A"})
-- Preço: ${formattedPrice} (${selectedOffer?.seller || "Loja Oficial"})
+- Descrição editorial: ${product.description || "Não informada"}
+- Descrição do marketplace: ${product.sourceDescription || "Não informada"}
+- Preço cadastrado (sujeito a alteração): ${formattedPrice} (${selectedOffer?.seller || "Vendedor não informado"})
 - Especificações: ${formattedSpecs}
+- Especificações do marketplace (não substituem dados editoriais): ${product.sourceSpecs ? JSON.stringify(product.sourceSpecs) : "Não informadas"}
 - Pontos Fortes: ${product.pros.join(", ") || "Nenhum informado"}
 - Pontos Fracos: ${product.cons.join(", ") || "Nenhum informado"}
-- Avaliação: ${product.rating !== null ? product.rating : "4.5"}`;
+- Avaliação editorial (escala de 0 a 5): ${product.rating !== null ? product.rating : "Não informada"}
+- Amostras qualitativas de consumidores: ${product.reviewSamples.map(r => r.text).join("; ") || "Não informadas"}
+- Referências externas: ${product.referenceSources.map(s => `${s.title || "Referência externa"}: ${s.summary || "Sem resumo"}`).join("; ") || "Não informadas"}`;
     }).join("\n\n");
 
     const promptContext: Record<string, unknown> = {
@@ -131,6 +139,7 @@ export class ProductComparisonGenerator {
     const aiResponse = await provider.generateArticle({
       originalTitle: `Comparativo: ${products.map((p) => p.name).join(" vs ")}`,
       originalDescription: renderedUserPrompt,
+      systemPrompt: template.systemPrompt,
       categories: [],
     });
 
@@ -161,7 +170,6 @@ export class ProductComparisonGenerator {
         type: "PRODUCT_COMPARISON",
         data: {
           productIds: products.map((p) => p.id),
-          highlightBestId: products[0].id,
           criteria: ["Preço", "Desempenho", "Custo-Benefício", "Construção"],
           showPriceRow: true,
         },
@@ -181,10 +189,10 @@ export class ProductComparisonGenerator {
         data: {
           productId: prod.id,
           offerId: selectedOffer?.id || null,
-          highlightBadge: i === 0 ? "Melhor Escolha" : i === 1 ? "Melhor Custo-Benefício" : null,
+          highlightBadge: null,
           showSpecs: true,
           showProsCons: true,
-          ctaText: `Ver Menor Preço de ${prod.name}`,
+          ctaText: `Ver preço atual de ${prod.name}`,
         },
       });
 
@@ -193,8 +201,8 @@ export class ProductComparisonGenerator {
           type: "PROS_CONS",
           data: {
             productId: prod.id,
-            pros: prod.pros.length > 0 ? prod.pros : ["Bom desempenho"],
-            cons: prod.cons.length > 0 ? prod.cons : ["Preço variável"],
+            pros: prod.pros,
+            cons: prod.cons,
           },
         });
       }
@@ -206,13 +214,14 @@ export class ProductComparisonGenerator {
       data: {
         productId: products[0].id,
         offerId: offerIds?.[products[0].id] || products[0].offers[0]?.id || null,
-        text: `Comprar ${products[0].name} com o Melhor Preço`,
+        text: `Conferir oferta de ${products[0].name}`,
         subtext: "Estoque e ofertas sujeitos a alterações",
         buttonStyle: "deal",
       },
     });
 
-    const canonicalDoc = CanonicalDocumentService.createDocument(canonicalBlocks, {
+    const canonicalDoc = CanonicalDocumentService.createDocument(enrichGeneratedBlocks(canonicalBlocks, products), {
+      baseProductIds: products.map(p => p.id),
       wordCount: (aiResponse.content || "").split(/\s+/).length,
       readingTimeMinutes: Math.max(1, Math.ceil(((aiResponse.content || "").split(/\s+/).length) / 200)),
     });
@@ -226,6 +235,7 @@ export class ProductComparisonGenerator {
         content: aiResponse.content || `<p>Comparativo entre ${products.map((p) => p.name).join(" e ")}.</p>`,
         commercialType: "COMPARISON",
         canonicalContent: canonicalDoc as object,
+        originalImageUrl: products[0]?.imageUrl || products[0]?.images?.[0] || null,
         seoFocusKeyword: aiResponse.seoFocusKeyword || focusKeyword?.trim() || `${products[0].name} vs ${products[1]?.name || ""}`,
         seoTitle: aiResponse.seoTitle || aiResponse.title || `Comparativo: ${products.map((p) => p.name).join(" vs ")}`,
         seoDescription: aiResponse.seoDescription || aiResponse.summary,
@@ -246,9 +256,9 @@ export class ProductComparisonGenerator {
       productId: prod.id,
       offerId: offerIds?.[prod.id] || prod.offers[0]?.id || null,
       position: index,
-      badge: index === 0 ? "Melhor Escolha" : index === 1 ? "Melhor Custo-Benefício" : null,
-      score: prod.rating || 4.5,
-      recommendation: index === 0 ? "Vencedor do comparativo" : "Excelente alternativa",
+      badge: null,
+      score: prod.rating,
+      recommendation: null,
     }));
 
     await ArticleProductService.attachProducts(workspaceId, createdArticle.id, attachItems);

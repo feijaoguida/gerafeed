@@ -1,3 +1,4 @@
+import { REVIEW_SYSTEM_PROMPT, COMPARISON_SYSTEM_PROMPT } from "./editorial-prompts";
 import { prisma } from "@/lib/prisma";
 import { CommercialArticleType } from "@/lib/affiliate/types";
 
@@ -14,29 +15,21 @@ export const DEFAULT_AFFILIATE_PROMPT_TEMPLATES: Record<CommercialArticleType, D
     type: "PRODUCT_REVIEW",
     name: "Review Completo de Produto",
     description: "Análise aprofundada com veredito editorial, prós e contras, especificações e recomendação de compra.",
-    systemPrompt: `Você é um redator e jornalista de tecnologia/produtos altamente experiente.
-Sua missão é produzir um review detalhado, honesto, informativo e persuasivo em formato HTML semântico com tags <p>, <h2>, <h3>, <ul>, <li>, <strong>, <blockquote>.
-Foque na experiência real de uso, pontos fortes e fracos, relação custo-benefício e recomendação sincera.
-Responda SEMPRE em formato JSON com as chaves:
-{
-  "title": "Título atraente e otimizado para SEO",
-  "summary": "Resumo executivo de 2-3 frases sobre o veredito",
-  "content": "<p>HTML completo do artigo...</p>",
-  "seoFocusKeyword": "palavra-chave principal",
-  "seoTitle": "Título SEO (máx 60 caracteres)",
-  "seoDescription": "Meta description (máx 155 caracteres)",
-  "tags": ["tag1", "tag2", "tag3"]
-}`,
+    systemPrompt: REVIEW_SYSTEM_PROMPT,
     userPromptTemplate: `Escreva um review completo e aprofundado sobre o seguinte produto:
 
 Nome: {{product.name}}
 Marca: {{product.brand}}
 Categoria: {{category.name}}
-Preço Atual: {{product.price}}
-Descrição Base: {{product.description}}
+Preço cadastrado (sujeito a alteração): {{product.price}}
+Descrição editorial: {{product.description}}
+Descrição do marketplace (alegações da fonte): {{product.sourceDescription}}
 
 Especificações Técnicas:
 {{product.specs}}
+
+Especificações do marketplace (não substituem dados editoriais):
+{{product.sourceSpecs}}
 
 Pontos Fortes (Prós):
 {{product.pros}}
@@ -44,7 +37,7 @@ Pontos Fortes (Prós):
 Pontos Fracos (Contras):
 {{product.cons}}
 
-Avaliação Editorial: {{product.rating}} / 5
+Avaliação editorial cadastrada (escala de 0 a 5): {{product.rating}}
 
 Amostras de Avaliações Reais de Consumidores:
 {{product.reviews}}
@@ -60,19 +53,7 @@ Instruções Adicionais:
     type: "COMPARISON",
     name: "Comparativo Lado a Lado",
     description: "Comparação direta entre dois ou mais produtos, destacando prós/contras, tabela e veredito final por perfil.",
-    systemPrompt: `Você é um especialista em análise comparativa de produtos.
-Sua missão é produzir um comparativo técnico e prático entre os produtos fornecidos, destacando diferenças de desempenho, acabamento, recursos e preço.
-Gere um veredito claro de qual produto vale mais a pena para cada perfil de usuário.
-Responda SEMPRE em formato JSON com as chaves:
-{
-  "title": "Título atraente do comparativo (Ex: Produto A vs Produto B: Qual é o Melhor?)",
-  "summary": "Resumo conciso das principais conclusões",
-  "content": "<p>HTML completo com introdução, comparativo por quesitos, tabela resumo e veredito...</p>",
-  "seoFocusKeyword": "palavra-chave principal",
-  "seoTitle": "Título SEO (máx 60 caracteres)",
-  "seoDescription": "Meta description (máx 155 caracteres)",
-  "tags": ["tag1", "tag2", "tag3"]
-}`,
+    systemPrompt: COMPARISON_SYSTEM_PROMPT,
     userPromptTemplate: `Escreva um artigo comparativo detalhado entre os seguintes produtos:
 
 {{productsList}}
@@ -257,6 +238,8 @@ export const TEMPLATE_CONSTRAINTS: Record<CommercialArticleType, TemplateConstra
       "product.name",
       "product.brand",
       "product.description",
+      "product.sourceDescription",
+      "product.sourceSpecs",
       "product.price",
       "product.specs",
       "product.pros",

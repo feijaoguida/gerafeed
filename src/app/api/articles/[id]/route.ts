@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { ArticleStatus } from "@prisma/client";
 import { getSessionWorkspaceId } from "@/lib/workspace";
+import { ArticlePersistenceService } from "@/lib/affiliate/article-persistence-service";
+import { AffiliateContentError } from "@/lib/affiliate/block-contract";
 
 export async function GET(
   _request: Request,
@@ -55,69 +56,29 @@ export async function PATCH(
     const { id } = await params;
     const body = await request.json();
 
-    const existing = await prisma.article.findFirst({
-      where: { id, workspaceId },
-    });
-    if (!existing) {
-      return NextResponse.json({ error: "Notícia não encontrada" }, { status: 404 });
-    }
-
-    const dataToUpdate: Record<string, unknown> = {};
-
-    if (typeof body.title === "string") dataToUpdate.title = body.title.trim();
-    if (typeof body.summary === "string") dataToUpdate.summary = body.summary.trim();
-    if (typeof body.content === "string") dataToUpdate.content = body.content.trim();
-    if (body.canonicalContent && typeof body.canonicalContent === "object") {
-      dataToUpdate.canonicalContent = body.canonicalContent;
-    }
-    if (typeof body.commercialType === "string") {
-      dataToUpdate.commercialType = body.commercialType;
-    }
-    if (body.wordpressSiteId === null || typeof body.wordpressSiteId === "string") {
-      dataToUpdate.wordpressSiteId = body.wordpressSiteId;
-    }
-    if (body.categoryId === null || typeof body.categoryId === "string") {
-      dataToUpdate.categoryId = body.categoryId;
-    }
-    if (body.suggestedCategoryId === null || typeof body.suggestedCategoryId === "string") {
-      dataToUpdate.suggestedCategoryId = body.suggestedCategoryId;
-    }
-    if (Array.isArray(body.tags)) {
-      dataToUpdate.tags = body.tags.map((t: unknown) => String(t).trim()).filter(Boolean);
-    }
-    if (typeof body.seoFocusKeyword === "string") dataToUpdate.seoFocusKeyword = body.seoFocusKeyword.trim();
-    if (typeof body.seoTitle === "string") dataToUpdate.seoTitle = body.seoTitle.trim();
-    if (typeof body.seoDescription === "string") dataToUpdate.seoDescription = body.seoDescription.trim();
-    if (typeof body.status === "string" && ["PENDING", "PUBLISHED", "REJECTED"].includes(body.status.toUpperCase())) {
-      dataToUpdate.status = body.status.toUpperCase() as ArticleStatus;
-    }
-    if (typeof body.selectedImage === "string" && ["ORIGINAL", "MODIFIED"].includes(body.selectedImage.toUpperCase())) {
-      dataToUpdate.selectedImage = body.selectedImage.toUpperCase();
-    }
-    if (typeof body.aiScore === "number") dataToUpdate.aiScore = body.aiScore;
-
-    const updated = await prisma.article.update({
-      where: { id: existing.id },
-      data: dataToUpdate,
-      include: {
-        source: true,
-        wordpressSite: true,
-        suggestedCategory: true,
-        category: true,
-        articleProducts: {
-          orderBy: { position: "asc" },
-          include: {
-            product: true,
-            offer: true,
-          },
-        },
-      },
-    });
+    const updated = await ArticlePersistenceService.validateAndSaveArticle(
+      workspaceId,
+      id,
+      body
+    );
 
     return NextResponse.json(updated);
   } catch (error) {
     console.error("PATCH /api/articles/[id] error:", error);
-    return NextResponse.json({ error: "Erro ao atualizar notícia" }, { status: 500 });
+    if (error instanceof AffiliateContentError) {
+      return NextResponse.json({ error: error.message }, { status: error.status });
+    }
+    const message = error instanceof Error ? error.message : "Erro ao atualizar notícia";
+    const status = message.includes("não está habilitado")
+      ? 403
+      : message.includes("não encontrada") || message.includes("não encontrado")
+      ? 404
+      : message.includes("oferta") || message.includes("Oferta")
+      ? 409
+      : message.includes("inválido") || message.includes("obrigatório")
+      ? 400
+      : 500;
+    return NextResponse.json({ error: message }, { status });
   }
 }
 

@@ -40,6 +40,7 @@ export const metadata: Metadata = {
 
 import { GoogleTagManager } from "@/components/analytics/google-tag-manager";
 import { ConsentBanner } from "@/components/analytics/consent-banner";
+import { ToastProvider } from "@/components/ui/toast";
 
 /**
  * Root layout — shell global: fontes oficiais Sora & Inter, tema claro/escuro e ThemeProvider.
@@ -66,7 +67,9 @@ export default function RootLayout({
           disableTransitionOnChange
         >
           <GoogleTagManager />
-          {children}
+          <ToastProvider>
+            {children}
+          </ToastProvider>
           <ConsentBanner />
         </ThemeProvider>
       </body>

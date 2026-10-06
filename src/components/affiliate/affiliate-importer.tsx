@@ -15,13 +15,14 @@ import {
   Layers,
   FileText,
 } from "lucide-react";
-import { PreviewImportResult } from "@/lib/affiliate/service";
+import type { PreviewImportResult } from "@/lib/affiliate/service";
 
 interface AffiliateImporterProps {
   onSuccess?: (product: unknown) => void;
 }
 
 export function AffiliateImporter({ onSuccess }: AffiliateImporterProps) {
+  const [providerCode, setProviderCode] = useState("MERCADO_LIVRE");
   const [affiliateUrl, setAffiliateUrl] = useState("");
   const [isLoadingPreview, setIsLoadingPreview] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -57,7 +58,7 @@ export function AffiliateImporter({ onSuccess }: AffiliateImporterProps) {
       const res = await fetch("/api/affiliate/import/preview", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ affiliateUrl: affiliateUrl.trim() }),
+        body: JSON.stringify({ affiliateUrl: affiliateUrl.trim(), providerCode }),
       });
 
       const data = await res.json();
@@ -65,6 +66,7 @@ export function AffiliateImporter({ onSuccess }: AffiliateImporterProps) {
         throw new Error(data.error || "Erro ao consultar informações do produto.");
       }
 
+      if (data.metadata?.status === "FAILED") throw new Error(data.metadata.warnings.join(" "));
       setPreviewData(data);
       const meta = data.metadata;
       setName(meta.name || "");
@@ -99,6 +101,7 @@ export function AffiliateImporter({ onSuccess }: AffiliateImporterProps) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          providerCode,
           affiliateUrl: previewData.metadata.affiliateUrl,
           resolvedUrl: previewData.metadata.resolvedUrl,
           canonicalUrl: previewData.metadata.canonicalUrl,
@@ -153,19 +156,24 @@ export function AffiliateImporter({ onSuccess }: AffiliateImporterProps) {
           <div>
             <h2 className="text-lg font-semibold text-foreground">Importar Produto de Afiliado</h2>
             <p className="text-sm text-muted-foreground">
-              Cole o link de afiliado gerado no Mercado Livre (ex: meli.la, mercadolivre.com/sec/...)
+              Cole seu link de afiliado. Vamos buscar os dados disponíveis para você revisar.
             </p>
           </div>
         </div>
 
+        <label className="block text-sm font-medium">Marketplace
+          <select aria-label="Marketplace" value={providerCode} disabled={isLoadingPreview || isSaving} onChange={e => { setProviderCode(e.target.value); setPreviewData(null); setErrorMessage(null); }} className="ml-3 rounded-lg border bg-background p-2">
+            <option value="MERCADO_LIVRE">Mercado Livre</option><option value="SHOPEE">Shopee</option>
+          </select>
+        </label>
         <form onSubmit={handleFetchPreview} className="space-y-4">
           <div className="flex flex-col sm:flex-row gap-3 items-stretch">
             <div className="relative flex-1">
               <input
                 type="url"
                 value={affiliateUrl}
-                onChange={(e) => setAffiliateUrl(e.target.value)}
-                placeholder="https://mercadolivre.com/sec/..."
+                onChange={(e) => { setAffiliateUrl(e.target.value); setPreviewData(null); }}
+                placeholder={providerCode === "SHOPEE" ? "https://s.shopee.com.br/..." : "https://mercadolivre.com/sec/..."}
                 className="w-full h-full px-4 py-2.5 bg-background border rounded-lg text-sm text-foreground focus:ring-2 focus:ring-primary focus:outline-none"
                 disabled={isLoadingPreview || isSaving}
                 required

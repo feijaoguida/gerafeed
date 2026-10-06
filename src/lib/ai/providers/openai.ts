@@ -5,7 +5,7 @@ import {
   GenerateArticleInput,
   GeneratedArticle,
   AIConnectionResult,
-  buildSystemPrompt,
+  buildArticlePrompts,
   parseAIJsonResponse,
 } from "../types";
 
@@ -23,17 +23,7 @@ export class OpenAIProvider implements AIProvider {
   }
 
   async generateArticle(input: GenerateArticleInput): Promise<GeneratedArticle> {
-    const systemPrompt = buildSystemPrompt(input.promptSettings);
-    const userPrompt = `Analise e reescreva a seguinte notícia:
-
-Título Original: ${input.originalTitle}
-Descrição Original: ${input.originalDescription || "Nenhuma descrição fornecida."}${
-      input.originalContent ? `\n\nConteúdo Completo da Matéria Original:\n${input.originalContent}` : ""
-    }
-
-Categorias disponíveis no WordPress:
-${JSON.stringify(input.categories, null, 2)}
-`;
+    const { systemPrompt, userPrompt } = buildArticlePrompts(input);
 
     const response = await this.client.chat.completions.create({
       model: this.model,

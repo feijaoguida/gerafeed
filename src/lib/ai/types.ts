@@ -4,6 +4,33 @@ export interface GenerateArticleInput {
   originalContent?: string | null;
   categories: Array<{ id: string; name: string; slug: string }>;
   promptSettings?: PromptSettings;
+  /** Trusted server-side template; never accept this field directly from client input. */
+  systemPrompt?: string;
+}
+
+/** Keep the existing RSS prompt unless a server-resolved commercial template is supplied. */
+export function buildArticlePrompts(input: GenerateArticleInput): { systemPrompt: string; userPrompt: string } {
+  const commercialPrompt = input.systemPrompt?.trim();
+  if (commercialPrompt) {
+    return {
+      systemPrompt: commercialPrompt,
+      userPrompt: input.originalDescription || input.originalTitle,
+    };
+  }
+
+  return {
+    systemPrompt: buildSystemPrompt(input.promptSettings),
+    userPrompt: `Analise e reescreva a seguinte notícia:
+
+Título Original: ${input.originalTitle}
+Descrição Original: ${input.originalDescription || "Nenhuma descrição fornecida."}${
+      input.originalContent ? `\n\nConteúdo Completo da Matéria Original:\n${input.originalContent}` : ""
+    }
+
+Categorias disponíveis no WordPress:
+${JSON.stringify(input.categories, null, 2)}
+`,
+  };
 }
 
 export interface GeneratedArticle {

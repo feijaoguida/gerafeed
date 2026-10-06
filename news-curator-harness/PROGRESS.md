@@ -1,13 +1,80 @@
 # PROGRESS.md
 
 ## Current Phase
-Phase 29. Funil de Aquisição, Verificação de E-mail (OTP) e Onboarding de Checkout Asaas
+Phase 31. Sistema de Log de Erros, Diagnóstico e Auditoria no Backoffice (DONE)
 
 ## Current Task
-246-acquisition-funnel-hardening-e2e
+None (Phase 31 Complete)
 
 ## Status
-DONE
+DONE — Todas as tasks da Phase 31 (255 a 260) concluídas com sucesso.
+
+## Phase 31 (DONE)
+
+Sistema de Log de Erros, Diagnóstico e Auditoria no Backoffice.
+
+Plano: [PLAN-phase31-error-logs.md](PLAN-phase31-error-logs.md).
+Spec: [Phase 31](SPEC.md#phase-31-sistema-de-log-de-erros-diagnóstico-e-auditoria-no-backoffice).
+
+| Task | Status | Entrega |
+|---|---|---|
+| [255](tasks/255-error-log-and-system-settings-schema.md) | DONE | Modelos `SystemErrorLog` e `SystemSetting`, migration e seed inicial |
+| [256](tasks/256-server-error-logger-and-api-handler.md) | DONE | Serviço central de logging e handler de API não-bloqueante com mascaramento |
+| [257](tasks/257-client-error-boundary-and-toast-system.md) | DONE | Módulo client de captura, endpoint de reporte e toast popup nos cantos |
+| [258](tasks/258-backoffice-error-logs-viewer.md) | DONE | Tela Backoffice de logs com filtros (tenant, módulo, usuário, data) e modal de stack trace |
+| [259](tasks/259-backoffice-general-settings-and-cleanup.md) | DONE | Tela de Configurações Gerais no Backoffice, retenção (180 dias) e rotina de expurgo |
+| [260](tasks/260-phase31-integration-and-hardening.md) | DONE | Integração end-to-end, testes de regressão, lint, tipos e evidências |
+
+### Resumo da Entrega da Phase 31
+- **Modelos no Prisma & Migração**: `SystemErrorLog` (com usuário, tela, rota, query/payload, módulo, status, mensagem original, stack trace, tenant e data) e `SystemSetting` (chave/valor global do sistema com `error_log_retention_days = 180`).
+- **Serviço Central de Logging e Handler de API**: `src/lib/errors/service.ts` com `logSystemError`, `sanitizeData` (higienização recursiva estrita de senhas e segredos), `extractErrorMessage`, `extractErrorStack` e `handleApiError` não-bloqueante entregando respostas mascaradas com `errorId` para correlação.
+- **Captura no Client e Sistema de Toast Popup**: Endpoint `POST /api/error-logs`, helper `reportClientError` e componente visual `src/components/ui/toast.tsx` (`ToastProvider` com hook `useToast`) montado no layout raiz (`src/app/layout.tsx`) com notificações tipo popup nos cantos da tela.
+- **Painel de Logs no Backoffice (Exclusivo SuperAdmin)**: Rotas `/backoffice/audit/errors` e `/backoffice/errors` com cartões de métricas, busca por usuário/texto, filtros por Tenant (Workspace), Módulo e Período (24h, 7d, 30d, 180d, todos) e modal interativo com cópia de stack trace e JSON de entrada para reprodução de incidentes.
+- **Configurações Gerais e Rotina de Limpeza**: Rota `/backoffice/settings` e endpoint `POST /api/backoffice/settings/cleanup-logs` permitindo ajustar os dias de retenção de logs e executar expurgo manual seguro de registros com mais de N dias.
+- **Auditoria e Validação Automatizada**:
+  - `scripts/phase31/test-schema.ts`: PASS (100% de sucesso).
+  - `scripts/phase31/test-server-logger.ts`: PASS (100% de sucesso).
+  - `scripts/phase31/test-client-reporting.ts`: PASS (100% de sucesso).
+  - `scripts/phase31/test-backoffice-logs.ts`: PASS (100% de sucesso).
+  - `scripts/phase31/test-settings-and-cleanup.ts`: PASS (100% de sucesso).
+  - `scripts/phase31/test-phase31-e2e.ts`: PASS (100% de sucesso em todos os 5 cenários).
+  - `npx tsc --noEmit`: PASS (0 erros de tipagem).
+  - `npm run lint`: PASS (0 erros de lint).
+  - `npm run build`: PASS (92/92 rotas Next.js estáticas, dinâmicas e SSG geradas com sucesso).
+
+
+## Phase 30 (DONE)
+
+Shopee, imagens originais e blocos de afiliados na revisão.
+
+Plano: [PLAN-phase30-affiliates.md](PLAN-phase30-affiliates.md).
+Spec: [Phase 30](SPEC.md#phase-30-shopee-imagens-originais-e-blocos-de-afiliados-na-revisão).
+
+| Task | Status | Entrega |
+|---|---|---|
+| [247](tasks/247-affiliate-block-contracts.md) | DONE | Contratos de blocos, persistência e compatibilidade |
+| [248](tasks/248-shopee-affiliate-import.md) | DONE | Provider Shopee, preview, confirmação e refresh |
+| [249](tasks/249-affiliate-block-renderers.md) | DONE | Cinco modelos visuais e renderização compartilhada |
+| [250](tasks/250-affiliate-original-images-and-placement.md) | DONE | Imagens originais e cards no meio e final |
+| [251](tasks/251-product-content-research-and-review.md) | DONE | Conteúdo & Pesquisa e review pré-selecionado |
+| [252](tasks/252-affiliate-cursor-editor.md) | DONE | Inserção e edição de cards no cursor |
+| [253](tasks/253-affiliate-save-publish-entitlements.md) | DONE | Persistência, publicação e autorização integradas |
+| [254](tasks/254-phase30-integration-and-hardening.md) | DONE | Integração, regressão e evidências da Phase 30 |
+
+### Resumo da Entrega da Phase 30
+- **Contratos e Documento Canônico**: Contratos versionados `CanonicalDocument`, suporte a 5 layouts (`PRODUCT_CARD`, `PRODUCT_GROUP` [GRID e LIST], `COMPARISON_TABLE`, `BADGE`, `BUTTON_ONLY`) e marcadores `<!-- gerafeed-block:... -->` sem quebra semântica.
+- **Provider Shopee**: Parser resiliente de links curtos e canônicos, preview read-only, importação manual/parcial, atribuição de afiliado via link resolver, refresh idempotente e deduplicação estrita de ofertas.
+- **Componentes Visuais e Renderização**: `SharedAffiliateRenderer` unificado para preview no editor e publicação WordPress (`WordPressAffiliateRenderer`), disclosure único obrigatório, safe sponsored links (`rel="sponsored nofollow noopener"`), fallback sem imagem e tabela HTML nativa para comparativos.
+- **Imagens Originais e Estrutura Editorial**: Preservação de imagem única de produto na geração, inserção de cards no meio e final do conteúdo nos 4 templates comerciais (`REVIEW`, `COMPARISON`, `BEST_PRODUCTS`, `BUYING_GUIDE`), e suporte a artigos RSS com múltiplos blocos de produtos e créditos de fonte.
+- **Conteúdo & Pesquisa de Produtos**: Aba de gestão na tela de detalhes do produto exibindo artigos associados com badges de status, contagem de ofertas e atalho para geração de Review com produto pré-selecionado.
+- **Editor com Inserção no Cursor**: Modal de blocos acessível por botão e atalho (`Ctrl+/` / `Cmd+/`), split seguro de HTML sem quebrar tags inline ou parágrafos, live preview, alternância de modelos e edição/duplicação/remoção de ocorrências.
+- **Persistência Atômica, Autorização e Publicação**: `ArticlePersistenceService` com validação de entitlements (`AFFILIATE_MODULE`), isolamento multi-tenant, verificação de ofertas do produto, rastreamento de cliques com tokens HMAC e ciclo de vida de `needsRepublish` com republicação sincronizada.
+- **Validação de Qualidade e Regressão**:
+  - `npx tsc --noEmit`: PASS (0 erros).
+  - `npm run lint`: PASS (0 erros).
+  - `npm run build`: PASS (85/85 rotas Next.js).
+  - Testes Phase 30: 16/16 suites/testes passando em `scripts/phase30/`.
+
 
 ## Phase 29. Funil de Aquisição, Verificação de E-mail (OTP) e Onboarding de Checkout Asaas
 - [x] 240-email-adapter-foundation
@@ -558,3 +625,142 @@ Concluída correção de bugs e melhorias de UX fora do escopo principal:
 ## Previous Evidence
 Publicação de Artigos de Afiliados no WordPress e Seleção de Categoria/Site concluídas na Phase 19, com TypeScript e Lint PASS conforme histórico anterior.
 
+## Phase 30 — Task 247 (DONE)
+- `block-contract.ts`: cinco modelos, ocorrências estáveis, validação e resolução determinística de oferta.
+- `canonical-document.ts` e `editor-document.ts`: novo bloco compatível com legado e round-trip de edição.
+- ADR-090 aceita com mapa de consumidores, sincronização, política de vínculos/base e erros de API.
+- `node --import tsx scripts/phase30/contracts.test.ts`: PASS, 3 testes com casos positivos/negativos.
+- `npx tsc --noEmit`: PASS. `npm run lint`: PASS, 0 erros e 6 avisos preexistentes.
+- `npm run build`: PASS, 85/85 páginas, executado com rede após encerrar tentativa restrita pendente.
+- Não houve alteração de banco nem publicação. Integração desta task é round-trip/compatibilidade dos contratos; persistência real é task 253.
+
+
+## Phase 30 — Task 248 (DONE)
+- Shopee provider/factory/seed, seleção de marketplace, preview invalidado e confirmação com revalidação server-side.
+- Resolver limita também leitura do corpo; fixtures cobrem redirect inseguro, corpo excessivo e timeout.
+- Confirmações serializadas por Workspace (row lock PostgreSQL), sem segurar conexões externas de billing na transação; dedupe por programa/URL/identidade.
+- `node --import tsx scripts/phase30/shopee.test.ts`: PASS, 2 testes com vários cenários.
+- `scripts/phase30/import-integration.ts`: PASS em workspace temporário PostgreSQL local, com limpeza; concorrência gera um único produto, preview não grava, preserva descrição editorial e rejeita categoria alheia.
+- Consulta real a produto público do blog oficial Shopee em 2026-10-03: PARTIAL. Fluxo manual confirmado no banco local; extração automática completa real NÃO comprovada. Fixture JSON-LD: COMPLETE.
+- Fonte do produto real: https://shopee.com.br/blog/produtos-para-afiliados/ (link Shopito de Pelúcia, produto 947152679.23297335584).
+- Fontes oficiais de fluxo/links: https://help.shopee.com.br/portal/10/article/128461-Como-gerar-seus-links-de-Afiliado-ou-ID-de-produto-para-compartilhar e https://help.shopee.ph/portal/10/article/123992-How-to-generate-your-Link.
+- Allowlist: shopee.com.br, shope.ee e shp.ee, com subdomínios e validação SSRF/DNS em cada salto. Link personalizado do usuário ainda não recebido; formatos curtos cobertos por fixtures.
+- `npx tsc --noEmit`: PASS; `npm run lint`: PASS (0 erros, 6 avisos preexistentes); `npm run build`: PASS.
+
+
+## Phase 30 — Task 249 (DONE)
+- `render-document.ts`: cinco modelos compartilhados, imagens originais, links escapados/compliance, disclosure único e comparação preservada como tabela.
+- Renderer WordPress usa catálogo/entitlements do workspace; oferta inválida rejeitada, tracking condicionado a analytics.
+- Placement legado usa modelos compartilhados e não duplica fechamento de parágrafos.
+- `contracts.test.ts`: PASS (3); `render.test.ts`: PASS (2).
+- `cards-browser.mjs`: PASS no Chromium, 390/1280px, fundos claro/escuro, imagens carregadas e carrossel focável por teclado. Screenshot mobile inspecionada visualmente.
+- Evidências visuais: `/tmp/phase30-cards-{390,1280}-{light,dark}.png`.
+- `npx tsc --noEmit`, `npm run lint` (0 erros, 6 avisos preexistentes) e `npm run build`: PASS.
+- Build retomado após bloqueio temporário do auto-review por limite de uso; nenhuma publicação executada.
+
+
+## Phase 30 — Task 250 (DONE)
+- `enrich-document.ts` e `html-position.ts` distribuem ocorrências no meio/final em fronteiras seguras e usam somente imagens do catálogo.
+- Quatro geradores atualizados, com baseProductIds e imagem destacada; removidos fallbacks de notas/prós/contras nos caminhos alterados.
+- `generation.test.ts`: PASS (2 testes; 9 combinações de quantidade/imagens e round-trip).
+- `generation-integration.ts`: PASS — quatro geradores reais com IA simulada e PostgreSQL local temporário; corpo/capa/ocorrências/vínculos persistidos e limpos ao final.
+- `npx tsc --noEmit`, `npm run lint` (0 erros, 6 avisos preexistentes), lint dos scripts novos e `npm run build`: PASS.
+- Nenhum artigo existente foi reescrito nem houve chamada de IA real/publicação.
+
+
+## Phase 30 — Task 251 (DONE)
+- `product-content-service.ts` e API de artigos por produto consultam ArticleProduct com isolamento por workspace, paginação e ordenação determinística.
+- `product-content-research.tsx` substitui os exemplos fixos por artigos reais, estados de loading/vazio/erro, status, data e links; CTA exato “Gerar Review deste Produto”.
+- Página e wizard carregam o produto diretamente, pré-selecionam PRODUCT_REVIEW e não disparam geração ao abrir; produto ausente/arquivado tem recuperação e plano sem módulo é bloqueado.
+- `PLAYWRIGHT_BROWSERS_PATH=/tmp/phase30-browsers node --import tsx scripts/phase30/content-browser.mjs`: PASS no Chromium e PostgreSQL locais, com usuário/workspaces temporários e limpeza automática. Cenários: lista vazia, artigos pendente/publicado/rejeitado, paginação, ocorrências repetidas sem duplicar relações, produto de workspace alheio, catálogo simulado sem o produto na primeira página, navegação completa e checkbox selecionado, ID inválido, arquivado, wizard sem parâmetro, bloqueio de plano na UI/API (403), zero requisições de geração.
+- Captura: `/tmp/phase30-wizard-selected.png` (artefato local temporário).
+- `npx tsc --noEmit`: PASS; `npm run lint`: PASS (0 erros, 5 avisos preexistentes); `npx eslint scripts/phase30/content-browser.mjs`: PASS; `npm run build`: PASS; `git diff --check`: PASS.
+- Correção do import de constantes no script de teste após erro inicial de export ESM; nova execução aprovada.
+- Sem publicação em produção ou chamada real de geração de IA. Em 2026-10-03 o usuário pediu encerrar apenas a task atual; tasks 252–254 não iniciadas.
+
+
+### Discovered Work — navegador da task 251
+- O servidor de desenvolvimento registrou warning de prop `hasError` no DOM da tela de login e mismatch de hidratação em `Sidebar`/`Badge` durante a troca de entitlement na fixture. Não impediram os asserts da task 251; investigar separadamente, fora do escopo desta task.
+- Servidor de desenvolvimento iniciado para os testes foi encerrado após a validação.
+
+
+## Phase 30 — Task 252 (DONE)
+- `affiliate-block-manager.tsx` criado e integrado nas telas de revisão editorial RSS (`src/app/(app)/articles/[id]/page.tsx`) e comercial (`src/components/affiliate/affiliate-article-editor.tsx`).
+- Botão "Inserir produto afiliado" exibido somente quando o entitlement `AFFILIATE_MODULE` estiver confirmado (estado inicial falha-fechado).
+- Captura de cursor/seleção com `splitHtmlAtCursor`: início, meio com divisão de parágrafo sem quebrar tags, fim, texto selecionado preservado e recusa de posições inválidas (dentro de tags, entidades ou comentários).
+- Seletor acessível em modal dialog (`z-[100]`, teclado/Escape, rótulos ARIA): busca paginada no catálogo, seleção múltipla (1 a 20 produtos), 5 modelos comerciais (IMAGE_CARD, TEXT_CARD, GRID, CAROUSEL, BUTTON), CTA customizável e live preview visual real.
+- Detecção de alteração externa no textarea com o seletor aberto prevenindo inserção silenciosa em índice obsoleto.
+- Painel de gerenciamento de ocorrências abaixo do textarea com preview real de cada bloco inserido, edição de parâmetros, duplicação com novo ID único e remoção limpa do marcador.
+- Sincronização entre `content` e `canonicalContent` integrada nas duas telas de revisão via `documentToEditorHtml` e `editorHtmlToDocument` sem exigir manipulação manual de JSON pelo editor.
+- `scripts/phase30/cursor-editor.test.ts`: PASS (5 testes unitários de split HTML, roundtrip canônico e operações de ocorrências).
+- `PLAYWRIGHT_BROWSERS_PATH=/tmp/phase30-browsers node --import tsx scripts/phase30/cursor-browser.mjs`: PASS em Chromium headless local e banco temporário limpo ao final. Cenários: ausência da ferramenta sem entitlement, validação de tag inválida, inserção em meio/início/fim, 5 modelos, busca paginada, cancelamento sem alteração, alteração concorrente detectada, edição de ocorrência, duplicação, remoção, save draft e reload persistente em artigos RSS e comerciais, responsividade 390px e 1280px.
+- Evidências visuais salvas: `/tmp/phase30-editor-390.png` e `/tmp/phase30-editor-1280.png`.
+- `npx tsc --noEmit`: PASS; `npm run lint`: PASS (0 erros, 5 avisos preexistentes); `npx eslint scripts/phase30/cursor-browser.mjs`: PASS; `npm run build`: PASS.
+- Servidor de desenvolvimento iniciado para os testes foi encerrado após a validação.
+
+## Phase 30 — Task 253 (DONE)
+- `ArticlePersistenceService` criado para salvar atomicamente conteúdo editorial, documento canônico estruturado, marcadores HTML e relações `ArticleProduct`.
+- Validação estrita de planos: proibição de salvar com blocos para planos sem `AFFILIATE_MODULE` (HTTP 403 Forbidden).
+- Publicação e republicação WordPress integradas com `WordPressAffiliateRenderer.renderToHtml` e checagem de ofertas ativas no ato da publicação (HTTP 409 se inativas).
+- Edição pós-publicação marca `needsRepublish: true`.
+- `node --import tsx --test scripts/phase30/persistence-publish.test.ts`: PASS (8 cenários integrados).
+- `npx tsc --noEmit`: PASS; `npm run lint`: PASS; `npm run build`: PASS.
+
+## Phase 30 — Task 254 (DONE)
+- Matriz completa de testes integrada (Mercado Livre e Shopee, 5 modelos, imagens originais, edição no cursor, persistência atômica, publicação e republicação).
+- `node --import tsx --test scripts/phase30/*.test.ts`: PASS (22/22 testes unitários e de integração).
+- `npx tsc --noEmit`: PASS; `npm run lint`: PASS; `npm run build`: PASS (85/85 páginas).
+- Phase 30 concluída com 100% de sucesso.
+
+## Phase 31 — Sistema de Log de Erros, Diagnóstico e Auditoria no Backoffice (DONE)
+- **Task 255 (DONE)**: Modelos `SystemErrorLog` e `SystemSetting` adicionados ao Prisma com migration e seed default.
+- **Task 256 (DONE)**: Serviço central `src/lib/errors/service.ts` e `handleApiError` não-bloqueante com mascaramento amigável e higienização de senhas/tokens.
+- **Task 257 (DONE)**: Módulo client de captura de erros, rota `/api/error-logs` e componente minimalista de Toast popup.
+- **Task 258 (DONE)**: Visualizador de logs de auditoria no Backoffice (`/backoffice/audit/errors`) com filtros (tenant, módulo, usuário, data) e modal de stack trace.
+- **Task 259 (DONE)**: Tela `/backoffice/settings` com configuração de retenção (padrão 180 dias) e rotina de expurgo de logs antigos.
+- **Task 260 (DONE)**: Testes end-to-end `scripts/phase31/test-phase31-e2e.ts` com 5 cenários aprovados, `tsc`, `lint` e `build` com 92/92 rotas Next.js geradas com sucesso.
+
+## Phase 32 — Recuperação de Senha ("Esqueceu a Senha") com Código de Segurança via E-mail
+- **Estado**: Autorizada pelo usuário em 2026-10-05.
+- **Plano**: `news-curator-harness/PLAN-phase32-password-recovery.md`
+- **Task 261 (DONE)**: `src/lib/mail/templates/password-reset.ts` criado com identidade visual GeraFeed, OTP em destaque, texto plano e avisos de segurança de 15 minutos.
+- **Task 262 (DONE)**: Endpoints `/api/auth/forgot-password/send-code` e `/api/auth/forgot-password/reset` criados com anti-enumeração, cooldown anti-flood de 60s, isolamento de token `password-reset:${email}`, expiração em 15min e hash bcrypt.
+- **Task 263 (DONE)**: Rota `/forgot-password` adicionada ao matcher público do `src/proxy.ts` e link "Esqueceu a senha?" integrado com acessibilidade e destaque no `login-view.tsx`.
+- **Task 264 (DONE)**: `src/app/(public)/forgot-password/page.tsx` e `forgot-password-view.tsx` criados com split layout dark mode, fluxo em 2 passos, timer regressivo de 60s, validação de campos e tela de sucesso.
+- **Task 265 (DONE)**: `scripts/phase32/test-phase32-e2e.ts` com 9 cenários integrados aprovados (anti-enumeração, geração com prefixo `password-reset:`, anti-flood 429, código incorreto 400, código expirado 400, senha curta 400, redefinição bem-sucedida 200, consumo único/single-use e login com nova senha). `tsc` PASS (0 erros), `lint` PASS (0 erros) e `build` PASS (95/95 rotas). Phase 32 concluída com 100% de sucesso.
+
+
+
+## Task 266 — Prompts de reviews e comparativos (DONE, 2026-10-05)
+- Pedido explícito do usuário com duas referências visuais; escopo registrado em
+  `tasks/266-affiliate-editorial-prompts.md`.
+- Prompts em `src/lib/affiliate/editorial-prompts.ts`: veredito rápido, análise por
+  critérios, ficha/tabela técnica, prós/contras, perfis de compra e conclusão;
+  proibidos testes, selos, notas, preços e produtos inventados.
+- Corrigido envio do system prompt efetivo pelos dois geradores e uso pelos quatro
+  provedores, preservando instruções de notícias/RSS.
+- Comparativo agora recebe descrições, source specs, reviews e referências;
+  review recebe também source description/specs, separados dos dados editoriais.
+- Removidos vencedor baseado em posição e aprovação automática de reviews.
+- `scripts/update-affiliate-editorial-prompts.ts --apply`: PRODUCT_REVIEW v2 e
+  COMPARISON v2 ativos no banco local, histórico preservado; segunda execução
+  confirmou idempotência. Outros ambientes continuam sob gestão do Backoffice.
+- `node --import tsx --test scripts/test-affiliate-editorial-prompts.ts`: PASS
+  (3 testes; 4 requests de provedores simulados, RSS, geração/persistência em
+  PostgreSQL local e limpeza automática das fixtures).
+- `npx tsc --noEmit`: PASS; `npm run lint`: PASS (0 erros, 5 warnings preexistentes);
+  ESLint direcionado: PASS sem warnings; `npm run build`: PASS (95/95 páginas).
+- `git diff --check` direcionado ao código desta task: PASS. Verificação global
+  aponta whitespace em alterações preexistentes de outros escopos.
+- Build inicial encerrado com 143; repetição fora do sandbox: PASS. Integração
+  inicialmente bloqueada por EPERM de rede local, resolvida por execução aprovada.
+- Sem geração paga de IA, publicação ou validação de qualidade de modelo real.
+
+### Discovered Work — Task 266
+- Reproduzir cards, selos visuais, sidebar e composição exata das imagens exige
+  trabalho no renderer/tema WordPress; prompt define estrutura editorial.
+- Bloco canônico de comparativo ainda usa critérios fixos e pode repetir a tabela
+  editorial gerada. Uma futura task deve unificar a tabela com critérios por
+  categoria, mantendo ofertas resolvidas pelo sistema.
+- Os demais formatos comerciais permanecem fora desta atualização; revisar em
+  task própria o envio de seus system prompts pelo gerador de roundups.
