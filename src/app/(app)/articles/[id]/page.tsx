@@ -752,19 +752,22 @@ export default function ReviewArticlePage({ params }: { params: Promise<{ id: st
                     Ativa: <strong className="uppercase ml-1 text-primary">{selectedImage}</strong>
                   </Badge>
                 </div>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={handleGenerateImage}
-                  isLoading={isGeneratingImage}
-                  leadingIcon={<Sparkles className="w-3.5 h-3.5 text-purple-500" />}
-                >
-                  {article.generatedImageUrl ? "Regenerar com IA" : "Gerar com IA"}
-                </Button>
+                {/* Botão de gerar com IA (Oculto temporariamente para produção) */}
+                <div style={{ display: "none" }} className="hidden">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={handleGenerateImage}
+                    isLoading={isGeneratingImage}
+                    leadingIcon={<Sparkles className="w-3.5 h-3.5 text-purple-500" />}
+                  >
+                    {article.generatedImageUrl ? "Regenerar com IA" : "Gerar com IA"}
+                  </Button>
+                </div>
               </CardHeader>
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {/* Option 1: Original Image */}
                 {article.originalImageUrl ? (
                   <div
@@ -851,78 +854,80 @@ export default function ReviewArticlePage({ params }: { params: Promise<{ id: st
                   </div>
                 )}
 
-                {/* Option 3: AI Generated Image */}
-                {article.generatedImageUrl ? (
-                  <div
-                    onClick={() => setSelectedImage("AI_GENERATED")}
-                    className={`p-3 rounded-xl border cursor-pointer transition-all flex flex-col justify-between space-y-2 ${
-                      selectedImage === "AI_GENERATED"
-                        ? "bg-purple-500/10 border-purple-500 shadow-xs ring-1 ring-purple-500/30"
-                        : "bg-surface border-border hover:border-muted-foreground/40"
-                    }`}
-                  >
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="text-xs font-semibold flex items-center gap-1.5 text-foreground truncate">
-                        <input
-                          type="radio"
-                          name="selectedImage"
-                          checked={selectedImage === "AI_GENERATED"}
-                          onChange={() => setSelectedImage("AI_GENERATED")}
-                          className="accent-purple-500"
+                {/* Option 3: AI Generated Image (Oculto temporariamente para produção) */}
+                <div style={{ display: "none" }} className="hidden">
+                  {article.generatedImageUrl ? (
+                    <div
+                      onClick={() => setSelectedImage("AI_GENERATED")}
+                      className={`p-3 rounded-xl border cursor-pointer transition-all flex flex-col justify-between space-y-2 ${
+                        selectedImage === "AI_GENERATED"
+                          ? "bg-purple-500/10 border-purple-500 shadow-xs ring-1 ring-purple-500/30"
+                          : "bg-surface border-border hover:border-muted-foreground/40"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-xs font-semibold flex items-center gap-1.5 text-foreground truncate">
+                          <input
+                            type="radio"
+                            name="selectedImage"
+                            checked={selectedImage === "AI_GENERATED"}
+                            onChange={() => setSelectedImage("AI_GENERATED")}
+                            className="accent-purple-500"
+                          />
+                          Gerada por IA
+                        </span>
+                        {selectedImage === "AI_GENERATED" ? (
+                          <Badge variant="purple" size="sm" className="shrink-0">
+                            ATIVA
+                          </Badge>
+                        ) : (
+                          <Badge variant="outline" size="sm" className="shrink-0">
+                            IA
+                          </Badge>
+                        )}
+                      </div>
+                      <div className="relative aspect-video w-full overflow-hidden rounded-lg bg-surface-muted border border-border">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={article.generatedImageUrl}
+                          alt="Imagem Gerada com IA"
+                          className="object-cover w-full h-full"
                         />
-                        Gerada por IA
-                      </span>
-                      {selectedImage === "AI_GENERATED" ? (
-                        <Badge variant="purple" size="sm" className="shrink-0">
-                          ATIVA
-                        </Badge>
-                      ) : (
-                        <Badge variant="outline" size="sm" className="shrink-0">
-                          IA
-                        </Badge>
+                      </div>
+                      {article.imagePrompt && (
+                        <div className="pt-1 flex justify-end">
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setShowPromptModal(!showPromptModal);
+                            }}
+                            className="text-[10px] text-purple-600 dark:text-purple-400 hover:underline"
+                          >
+                            {showPromptModal ? "Ocultar Prompt" : "Ver Prompt"}
+                          </button>
+                        </div>
                       )}
                     </div>
-                    <div className="relative aspect-video w-full overflow-hidden rounded-lg bg-surface-muted border border-border">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={article.generatedImageUrl}
-                        alt="Imagem Gerada com IA"
-                        className="object-cover w-full h-full"
-                      />
+                  ) : (
+                    <div className="p-3 rounded-xl bg-purple-500/5 border border-dashed border-purple-500/30 flex flex-col items-center justify-center text-center space-y-2">
+                      <Sparkles className="w-5 h-5 text-purple-500" />
+                      <p className="text-[11px] text-muted-foreground">
+                        Nenhuma imagem IA gerada ainda.
+                      </p>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={handleGenerateImage}
+                        isLoading={isGeneratingImage}
+                        className="text-xs"
+                      >
+                        Gerar com IA
+                      </Button>
                     </div>
-                    {article.imagePrompt && (
-                      <div className="pt-1 flex justify-end">
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setShowPromptModal(!showPromptModal);
-                          }}
-                          className="text-[10px] text-purple-600 dark:text-purple-400 hover:underline"
-                        >
-                          {showPromptModal ? "Ocultar Prompt" : "Ver Prompt"}
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                ) : (
-                  <div className="p-3 rounded-xl bg-purple-500/5 border border-dashed border-purple-500/30 flex flex-col items-center justify-center text-center space-y-2">
-                    <Sparkles className="w-5 h-5 text-purple-500" />
-                    <p className="text-[11px] text-muted-foreground">
-                      Nenhuma imagem IA gerada ainda.
-                    </p>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={handleGenerateImage}
-                      isLoading={isGeneratingImage}
-                      className="text-xs"
-                    >
-                      Gerar com IA
-                    </Button>
-                  </div>
-                )}
+                  )}
+                </div>
               </div>
 
               {/* Prompt Expandível */}

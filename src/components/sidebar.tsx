@@ -24,6 +24,8 @@ import {
   Lock,
   Send,
   CreditCard,
+  HelpCircle,
+  Map,
 } from "lucide-react";
 
 import { ThemeToggle, ThemeToggleRow } from "@/components/theme-toggle";
@@ -111,6 +113,13 @@ export function Sidebar({
                 label="Publicar Posts"
                 icon={<Send className="w-4 h-4" />}
                 active={isActive("/publishing")}
+                onClick={() => setIsMobileOpen(false)}
+              />
+              <SidebarItem
+                href="/onboarding"
+                label="Guia Inicial"
+                icon={<Map className="w-4 h-4 text-emerald-500" />}
+                active={isActive("/onboarding")}
                 onClick={() => setIsMobileOpen(false)}
               />
             </SidebarSection>
@@ -222,6 +231,13 @@ export function Sidebar({
                 label="Estratégia de Imagens"
                 icon={<ImageIcon className="w-4 h-4 text-[#8B5CF6]" />}
                 active={isActive("/settings/images")}
+                onClick={() => setIsMobileOpen(false)}
+              />
+              <SidebarItem
+                href="/help"
+                label="Central de Ajuda"
+                icon={<HelpCircle className="w-4 h-4 text-blue-500 dark:text-blue-400" />}
+                active={isActive("/help")}
                 onClick={() => setIsMobileOpen(false)}
               />
             </SidebarSection>

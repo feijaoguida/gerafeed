@@ -262,7 +262,7 @@ export default function SettingsImagesPage() {
           </CardHeader>
 
           <CardContent className="p-0">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {/* Opção 1: ORIGINAL */}
               <label
                 className={`p-4 rounded-xl border cursor-pointer transition-all flex flex-col justify-between space-y-3 ${
@@ -325,9 +325,10 @@ export default function SettingsImagesPage() {
                 </p>
               </label>
 
-              {/* Opção 3: AI_GENERATED */}
+              {/* Opção 3: AI_GENERATED (Oculto temporariamente para produção) */}
               <label
-                className={`p-4 rounded-xl border cursor-pointer transition-all flex flex-col justify-between space-y-3 ${
+                style={{ display: "none" }}
+                className={`hidden p-4 rounded-xl border cursor-pointer transition-all flex flex-col justify-between space-y-3 ${
                   defaultStrategy === "AI_GENERATED"
                     ? "bg-purple-500/10 border-purple-500 shadow-xs ring-1 ring-purple-500/30 text-foreground"
                     : "bg-surface border-border hover:border-muted-foreground/30 text-muted-foreground hover:text-foreground"
@@ -384,13 +385,15 @@ export default function SettingsImagesPage() {
               ).map((styleKey) => {
                 const def = IMAGE_STYLE_DEFINITIONS[styleKey];
                 const isSelected = imageStyle === styleKey;
+                const isCartoonOption = styleKey === "CARTOON" || styleKey === "SATIRICAL_CARTOON";
 
                 return (
                   <button
                     key={styleKey}
                     type="button"
                     onClick={() => setImageStyle(styleKey)}
-                    className={`p-3.5 rounded-xl border text-left transition-all flex flex-col justify-between space-y-2 ${
+                    style={isCartoonOption ? { display: "none" } : undefined}
+                    className={`${isCartoonOption ? "hidden " : ""}p-3.5 rounded-xl border text-left transition-all flex flex-col justify-between space-y-2 ${
                       isSelected
                         ? "bg-primary/5 border-primary shadow-xs ring-1 ring-primary/20"
                         : "bg-surface border-border hover:border-muted-foreground/30"

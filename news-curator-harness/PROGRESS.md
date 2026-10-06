@@ -1,12 +1,19 @@
 # PROGRESS.md
 
 ## Current Phase
-Phase 33. Geração de Imagens com IA Baseada no Contexto da Notícia e Estratégia Visual (DONE)
+Phase 34. Onboarding de Usuários e Central de Ajuda (DONE)
 
 ## Current Task
-Nenhuma tarefa pendente na Phase 33 (todas as tasks 267 a 272 concluídas).
+Nenhuma tarefa pendente na Phase 34.
 
 ## Status
+DONE — Phase 34 concluída com sucesso. Criada página de onboarding passo-a-passo e página de ajuda com guia completo de IA integrado. Layouts centralizados e alinhados com o padrão do sistema (`p-6 md:p-8 max-w-5xl mx-auto w-full`). Evidências validadas e testadas (Lint e TypeCheck PASS).
+
+## Phase 33 (DONE)
+
+Geração de Imagens com IA Baseada no Contexto da Notícia e Estratégia Visual.
+
+## Phase 33 Final Evidence
 DONE — Phase 33 concluída com 100% de sucesso em todas as frentes (contratos, adapters, engenharia de prompt, pipeline condicional, interface de configurações, editor de notícias, WordPress e testes E2E).
 
 ## Phase 31 (DONE)
