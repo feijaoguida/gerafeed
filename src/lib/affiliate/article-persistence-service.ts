@@ -221,7 +221,7 @@ export class ArticlePersistenceService {
     if (typeof payload.status === "string" && ["PENDING", "PUBLISHED", "REJECTED"].includes(payload.status.toUpperCase())) {
       dataToUpdate.status = payload.status.toUpperCase() as ArticleStatus;
     }
-    if (typeof payload.selectedImage === "string" && ["ORIGINAL", "MODIFIED"].includes(payload.selectedImage.toUpperCase())) {
+    if (typeof payload.selectedImage === "string" && ["ORIGINAL", "MODIFIED", "AI_GENERATED"].includes(payload.selectedImage.toUpperCase())) {
       dataToUpdate.selectedImage = payload.selectedImage.toUpperCase();
     }
     if (typeof payload.aiScore === "number") dataToUpdate.aiScore = payload.aiScore;

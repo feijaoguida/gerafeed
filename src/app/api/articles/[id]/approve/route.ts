@@ -20,7 +20,7 @@ export async function POST(
 
     try {
       const body = await request.json();
-      if (typeof body?.selectedImage === "string" && ["ORIGINAL", "MODIFIED"].includes(body.selectedImage.toUpperCase())) {
+      if (typeof body?.selectedImage === "string" && ["ORIGINAL", "MODIFIED", "AI_GENERATED"].includes(body.selectedImage.toUpperCase())) {
         await prisma.article.update({
           where: { id: existing.id },
           data: { selectedImage: body.selectedImage.toUpperCase() },

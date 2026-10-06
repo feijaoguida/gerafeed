@@ -4,6 +4,11 @@ import { PromptSettings, GeneratedArticle } from "./ai/types";
 import { getActiveAIProvider } from "./ai/service";
 import { processAndStoreImage } from "./imageProcessor";
 import { scrapeArticleContent } from "@/lib/scraper";
+import {
+  ImageSettingsStored,
+  ImageGenerationService,
+  buildImagePrompt,
+} from "@/lib/images";
 
 export * from "./ai/index";
 
@@ -86,7 +91,7 @@ export async function processArticleWithAi(
   }
 
   // Process image if originalImageUrl is present
-  const imageConfig = await getConfig<{ defaultStrategy: "ORIGINAL" | "MODIFIED" }>(
+  const imageConfig = await getConfig<ImageSettingsStored>(
     "imageSettings",
     effectiveWorkspaceId
   );
@@ -133,6 +138,42 @@ export async function processArticleWithAi(
     throw new Error("A IA não retornou título ou conteúdo válidos para o artigo.");
   }
 
+  let generatedImageUrl: string | null = article.generatedImageUrl;
+  let imagePrompt: string | null = article.imagePrompt;
+
+  // REGRA DE OURO: A imagem com IA SÓ é gerada se a estratégia for AI_GENERATED
+  if (defaultStrategy === "AI_GENERATED") {
+    try {
+      const prompt = await buildImagePrompt({
+        title: aiResult.title || article.title || article.originalTitle || "",
+        summary: aiResult.summary || article.summary || article.originalDescription,
+        content: aiResult.content || article.content || originalContent,
+        originalTitle: article.originalTitle,
+        originalImageUrl: article.originalImageUrl,
+        style: imageConfig?.imageStyle || "REALISTIC",
+        customStyle: imageConfig?.customImageStyle,
+        promptTemplate: imageConfig?.imagePromptTemplate,
+      });
+
+      imagePrompt = prompt;
+
+      const genResult = await ImageGenerationService.generateImage({
+        prompt,
+        articleId,
+        workspaceId: effectiveWorkspaceId,
+        style: imageConfig?.imageStyle || "REALISTIC",
+        customStyle: imageConfig?.customImageStyle,
+        originalImageUrl: article.originalImageUrl,
+      });
+
+      if (genResult?.imageUrl) {
+        generatedImageUrl = genResult.imageUrl;
+      }
+    } catch (imgErr) {
+      console.warn(`[AI Process] Falha ao gerar imagem com IA para o artigo ${articleId}:`, imgErr);
+    }
+  }
+
   const updatedArticle = await prisma.article.update({
     where: { id: articleId },
     data: {
@@ -146,6 +187,8 @@ export async function processArticleWithAi(
       seoTitle: aiResult.seoTitle,
       seoDescription: aiResult.seoDescription,
       modifiedImageUrl,
+      generatedImageUrl,
+      imagePrompt,
       selectedImage: defaultStrategy,
       processedAt: new Date(),
     },
@@ -198,7 +241,7 @@ export async function applyAiResultToArticle(
     validCategoryId = aiResult.suggestedCategoryId;
   }
 
-  const imageConfig = await getConfig<{ defaultStrategy: "ORIGINAL" | "MODIFIED" }>(
+  const imageConfig = await getConfig<ImageSettingsStored>(
     "imageSettings",
     effectiveWorkspaceId
   );
@@ -209,6 +252,41 @@ export async function applyAiResultToArticle(
     const processedUrl = await processAndStoreImage(article.originalImageUrl, articleId);
     if (processedUrl) {
       modifiedImageUrl = processedUrl;
+    }
+  }
+
+  // Se a estratégia for AI_GENERATED e ainda não tiver sido gerada imagem por IA, gera agora
+  let generatedImageUrl: string | null = article.generatedImageUrl;
+  let imagePrompt: string | null = article.imagePrompt;
+
+  if (defaultStrategy === "AI_GENERATED" && !generatedImageUrl) {
+    try {
+      const prompt = await buildImagePrompt({
+        title: aiResult.title,
+        content: aiResult.content || article.content || article.originalContent || "",
+        originalTitle: article.originalTitle,
+        originalImageUrl: article.originalImageUrl,
+        style: imageConfig?.imageStyle || "REALISTIC",
+        customStyle: imageConfig?.customImageStyle,
+        promptTemplate: imageConfig?.imagePromptTemplate,
+      });
+
+      imagePrompt = prompt;
+
+      const genResult = await ImageGenerationService.generateImage({
+        prompt,
+        articleId,
+        workspaceId: effectiveWorkspaceId,
+        style: imageConfig?.imageStyle || "REALISTIC",
+        customStyle: imageConfig?.customImageStyle,
+        originalImageUrl: article.originalImageUrl,
+      });
+
+      if (genResult?.imageUrl) {
+        generatedImageUrl = genResult.imageUrl;
+      }
+    } catch (imgErr) {
+      console.warn(`[applyAiResultToArticle] Falha ao gerar imagem com IA para o artigo ${articleId}:`, imgErr);
     }
   }
 
@@ -225,6 +303,8 @@ export async function applyAiResultToArticle(
       seoTitle: aiResult.seoTitle,
       seoDescription: aiResult.seoDescription,
       modifiedImageUrl,
+      generatedImageUrl,
+      imagePrompt,
       selectedImage: defaultStrategy,
       processedAt: new Date(),
     },

@@ -98,7 +98,19 @@ export async function uploadMediaToWordPress(
     let filename = `article-media-${articleId}.jpg`;
     let contentType = "image/jpeg";
 
-    if (imageUrl.startsWith("/")) {
+    if (imageUrl.startsWith("data:")) {
+      // Data URI (base64)
+      const match = imageUrl.match(/^data:([^;]+);base64,([\s\S]+)$/);
+      if (match) {
+        contentType = match[1];
+        imageBuffer = Buffer.from(match[2], "base64");
+        const ext = contentType.split("/")[1]?.replace("jpeg", "jpg") || "png";
+        filename = `article-media-${articleId}.${ext}`;
+      } else {
+        console.warn(`Invalid data URI format for article ${articleId}`);
+        return null;
+      }
+    } else if (imageUrl.startsWith("/")) {
       // Local file in public directory
       const localPath = path.join(process.cwd(), "public", imageUrl);
       if (!fs.existsSync(localPath)) {
@@ -512,7 +524,10 @@ export async function publishArticleToWordPress(
 
   // 2. Resolve selected featured media image
   let selectedImageUrl: string | null = null;
-  if (article.selectedImage === "MODIFIED" && article.modifiedImageUrl) {
+  const articleWithAi = article as typeof article & { generatedImageUrl?: string | null };
+  if (article.selectedImage === "AI_GENERATED" && articleWithAi.generatedImageUrl) {
+    selectedImageUrl = articleWithAi.generatedImageUrl;
+  } else if (article.selectedImage === "MODIFIED" && article.modifiedImageUrl) {
     selectedImageUrl = article.modifiedImageUrl;
   } else if (article.originalImageUrl) {
     selectedImageUrl = article.originalImageUrl;

@@ -3224,5 +3224,42 @@ Sequência detalhada em `news-curator-harness/PLAN-phase32-password-recovery.md`
 - [x] Task 264: Página `/forgot-password` e componente de visualização em 2 passos com timer regressivo e UX GeraFeed.
 - [x] Task 265: Integração end-to-end, testes de segurança (anti-flood, anti-enumeração, expiração), lint, tipos e evidências.
 
+# Phase 33. Geração de Imagens com IA Baseada no Contexto da Notícia e Estratégia Visual
+
+## 1. Estado e autorização
+Autorizada pelo usuário em 2026-10-06.
+Em andamento: Task 267 TODO.
+
+## 2. Objetivo e escopo
+1. Manter a funcionalidade existente de imagem original e imagem invertida (com Sharp) sem alterações.
+2. Adicionar a opção de geração de nova imagem por IA (`AI_GENERATED`) em Estratégia de Imagens.
+3. Extrair personagens, contexto factual, cenário e atmosfera da matéria a partir do conteúdo RSS/raspado, referenciando a imagem de origem.
+4. Permitir que o usuário escolha o estilo visual da nova imagem:
+   - `REALISTIC`: Fotográfico / Estilo fotojornalismo.
+   - `CARTOON`: Cartoon 3D / Animação.
+   - `DRAWING`: Ilustração artística / Desenho editorial.
+   - `SATIRICAL_CARTOON`: Charge / Caricatura editorial satírica.
+   - `CUSTOM`: Estilo customizado.
+5. Regra de herança de chave da LLM de texto:
+   - Se a LLM for **OpenAI**: usa a mesma chave e ativa **DALL-E 3**, com indicação visual clara e opção de chave dedicada.
+   - Se a LLM for **Google Gemini**: usa a mesma chave e ativa **Google Imagen 3**, com indicação visual clara e opção de chave dedicada.
+   - Se a LLM for **OpenRouter / OpenAI-Compatible**: usa a mesma chave e ativa **FLUX.1 via OpenRouter**, com indicação visual clara e opção de chave dedicada.
+   - Se a LLM for **Anthropic**: nenhum provedor vem selecionado e um aviso/tooltip explica que Claude não gera imagens e orienta o cadastro de uma chave de imagem.
+6. Regra de Ouro (Consumo Condicional de Tokens):
+   - A imagem gerada por IA **só será criada se a estratégia `AI_GENERATED` estiver marcada** ou se solicitada via botão avulso no editor.
+7. Editor e Publicação WordPress:
+   - Suporte a 3 imagens no card de Mídia Destacada em `/articles/[id]` (Original, Invertida, Gerada por IA).
+   - Envio automático de `AI_GENERATED` como `featured_media` ao publicar no WordPress.
+
+## 3. Plano de tasks e Definition of Done
+Sequência detalhada em `news-curator-harness/PLAN-phase33-ai-image-generation.md` e tasks 267 a 272:
+- [ ] Task 267: Schema Prisma (`generatedImageUrl`, `imagePrompt`), contratos de configuração de imagem e herança de chave.
+- [ ] Task 268: Serviço central de imagens (`src/lib/images/`) com adapters para DALL-E 3, Google Imagen 3 e OpenRouter FLUX.1.
+- [ ] Task 269: Motor de extração de contexto (personagens, cenário, notícia, foto de origem) e síntese de prompt visual.
+- [ ] Task 270: Processamento condicional no pipeline de IA (`src/lib/ai.ts`) e endpoint avulso de geração (`/api/articles/[id]/generate-image`).
+- [ ] Task 271: Interface em `/settings/images` com seletor de estilos, detecção de herança de chave da LLM e tooltip informativo para Anthropic.
+- [ ] Task 272: Mídia destacada com 3 opções em `/articles/[id]`, botão de geração avulsa, envio de `AI_GENERATED` para o WordPress, testes E2E, tsc e build.
+
+
 
 

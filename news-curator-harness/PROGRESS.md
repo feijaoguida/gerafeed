@@ -1,13 +1,13 @@
 # PROGRESS.md
 
 ## Current Phase
-Phase 31. Sistema de Log de Erros, Diagnóstico e Auditoria no Backoffice (DONE)
+Phase 33. Geração de Imagens com IA Baseada no Contexto da Notícia e Estratégia Visual (DONE)
 
 ## Current Task
-None (Phase 31 Complete)
+Nenhuma tarefa pendente na Phase 33 (todas as tasks 267 a 272 concluídas).
 
 ## Status
-DONE — Todas as tasks da Phase 31 (255 a 260) concluídas com sucesso.
+DONE — Phase 33 concluída com 100% de sucesso em todas as frentes (contratos, adapters, engenharia de prompt, pipeline condicional, interface de configurações, editor de notícias, WordPress e testes E2E).
 
 ## Phase 31 (DONE)
 
@@ -764,3 +764,96 @@ Publicação de Artigos de Afiliados no WordPress e Seleção de Categoria/Site 
   categoria, mantendo ofertas resolvidas pelo sistema.
 - Os demais formatos comerciais permanecem fora desta atualização; revisar em
   task própria o envio de seus system prompts pelo gerador de roundups.
+
+## Phase 33 — Geração de Imagens com IA Baseada no Contexto da Notícia e Estratégia Visual (IN_PROGRESS)
+
+- **Estado**: Autorizada pelo usuário em 2026-10-06.
+- **Plano**: `news-curator-harness/PLAN-phase33-ai-image-generation.md`
+- **Spec**: `news-curator-harness/SPEC.md#phase-33-geração-de-imagens-com-ia-baseada-no-contexto-da-notícia-e-estratégia-visual`
+
+| Task | Status | Entrega |
+|---|---|---|
+| [267](tasks/267-image-strategy-schema-and-contracts.md) | DONE | Schema Prisma (`generatedImageUrl`, `imagePrompt`), contratos de configuração de imagem e herança de chave |
+| [268](tasks/268-image-generation-service-and-adapters.md) | DONE | Serviço central de imagens (`src/lib/images/`) com adapters para DALL-E 3, Google Imagen 3 e OpenRouter FLUX.1 |
+| [269](tasks/269-context-aware-image-prompt-engine.md) | DONE | Motor de extração de contexto (personagens, cenário, notícia, foto de origem) e síntese de prompt visual |
+| [270](tasks/270-conditional-image-processing-pipeline.md) | DONE | Processamento condicional no pipeline de IA (`src/lib/ai.ts`) e endpoint avulso de geração (`/api/articles/[id]/generate-image`) |
+| [271](tasks/271-image-strategy-settings-ui.md) | DONE | Interface em `/settings/images` com seletor de estilos, detecção de herança de chave da LLM e tooltip informativo para Anthropic |
+| [272](tasks/272-article-editor-wordpress-and-e2e.md) | DONE | Mídia destacada com 3 opções em `/articles/[id]`, botão de geração avulsa, envio de `AI_GENERATED` para o WordPress, testes E2E, tsc e build |
+
+### Resumo da Entrega da Task 272
+- **Editor de Notícias (`/articles/[id]`)**: Card de Mídia Destacada reestruturado em grid de 3 opções: Original (RSS), Invertida (Sharp) e Gerada por IA. Exibição de badge ATIVA, preview instantâneo, botão retrátil para inspecionar o prompt de IA gerado e botão no cabeçalho com spinner para gerar ou regenerar imagens sob demanda.
+- **Integração WordPress**: Suporte nativo a Data URIs (`data:image/...;base64,...`) em `uploadMediaToWordPress` e priorização de `generatedImageUrl` quando `selectedImage === "AI_GENERATED"` em `publishArticleToWordPress`.
+- **Validação Automatizada E2E**: `scripts/phase33/test-phase33-e2e.ts` PASS (100% de sucesso cobrindo os 6 cenários de aceitação: ORIGINAL zero token waste, MODIFIED zero token waste, AI_GENERATED com estilos e entidades, endpoint sob demanda, barreira amigável da Anthropic e publicação WordPress).
+- **Qualidade e Estabilidade**: `npx tsc --noEmit` PASS (0 erros), `npm run lint` PASS (0 erros), `npm run build` PASS (95/95 rotas Next.js geradas com sucesso).
+
+### Resumo da Entrega da Task 271
+- **Interface Completa em `/settings/images`**: Desenvolvida com design system do GeraFeed, cards explicativos com badges para as estratégias `ORIGINAL`, `MODIFIED` e `AI_GENERATED`.
+- **Seletor de Estilos Visuais**: Grade com os 5 estilos (`REALISTIC`, `CARTOON`, `DRAWING`, `SATIRICAL_CARTOON`, `CUSTOM`) com ícones, descrições ricas e campo de texto livre para estilo personalizado.
+- **Detecção Inteligente de Chave & Tratamento Anthropic**: Indicação visual de reaproveitamento da mesma chave da LLM (OpenAI, Gemini, OpenRouter), com alerta explícito e orientação detalhada quando a LLM ativa for Anthropic. Suporte a toggle de chave dedicada e edição de template de prompt com restauração padrão.
+- **Validação Automatizada**: `scripts/phase33/test-settings-ui-flow.ts` PASS (100% de sucesso). `tsc --noEmit` PASS (0 erros), `npm run lint` PASS (0 erros).
+
+### Resumo da Entrega da Task 270
+- **Pipeline Condicional com Zero Token Waste**: Em `src/lib/ai.ts` (`processArticleWithAi` e `applyAiResultToArticle`), verificação estrita de `defaultStrategy === "AI_GENERATED"`. Caso configurado como `ORIGINAL` ou `MODIFIED`, a API de IA de imagem nunca é chamada.
+- **Endpoint Sob Demanda**: Rota `POST /api/articles/[id]/generate-image` com autenticação de sessão e tenant isolado, permitindo geração avulsa ou override de estilo/prompt template diretamente no editor de notícias.
+- **Validação Automatizada**: `scripts/phase33/test-conditional-pipeline.ts` PASS (100% de sucesso validando zero chamadas para ORIGINAL/MODIFIED, síntese para AI_GENERATED e persistência em banco). `tsc --noEmit` PASS (0 erros), `npm run lint` PASS (0 erros).
+
+### Resumo da Entrega da Task 269
+- **Extração Semântica**: `src/lib/images/prompt-builder.ts` implementado com extração de atores/personagens (`extractKeyEntities`) e cenários/ambientes da notícia (`extractSceneContext`).
+- **Composição Visual para IA**: Mapeamento dos 5 estilos visuais (`REALISTIC`, `CARTOON`, `DRAWING`, `SATIRICAL_CARTOON`, `CUSTOM`), inclusão de referência jornalística à foto de origem e regras universais de qualidade e moderação ("No text, no typography, no watermarks, no distorted faces").
+- **Validação Automatizada**: `scripts/phase33/test-prompt-builder.ts` PASS (100% de sucesso validando todos os estilos e cenários). `tsc --noEmit` PASS (0 erros), `npm run lint` PASS (0 erros).
+
+
+### Resumo da Entrega da Task 268
+- **Resolução de Credenciais & Herança**: `src/lib/images/credentials.ts` implementado com herança inteligente (OpenAI -> DALL-E 3, Gemini -> Imagen 3, OpenRouter -> FLUX.1) e proteção amigável quando a LLM ativa for Anthropic.
+- **Adapters de Provedores de Imagem**: `OpenAiDalleAdapter` (DALL-E 3 com b64_json/Data URI), `GoogleImagenAdapter` (Imagen 3 via REST predict) e `OpenRouterFluxAdapter` (FLUX.1 com conversão de buffer/Data URI).
+- **Serviço Central**: `ImageGenerationService` em `src/lib/images/service.ts` com `generateImage` e `checkProviderStatus`.
+- **Validação Automatizada**: `scripts/phase33/test-image-adapters.ts` PASS (100% dos 5 cenários aprovados). `tsc --noEmit` PASS (0 erros), `npm run lint` PASS (0 erros).
+
+### Resumo da Entrega da Task 267
+- **Prisma Schema & Banco**: Adicionados campos `generatedImageUrl` e `imagePrompt` no model `Article`. Banco PostgreSQL sincronizado com `npx prisma db push` e tipos do Prisma Client gerados.
+- **Contratos e Tipos TypeScript**: `src/lib/images/types.ts` criado com `ImageStrategy` (`ORIGINAL` | `MODIFIED` | `AI_GENERATED`), `ImageStyle` (`REALISTIC`, `CARTOON`, `DRAWING`, `SATIRICAL_CARTOON`, `CUSTOM`), `ImageProviderType`, `IMAGE_STYLE_DEFINITIONS` e configurações salvas `ImageSettingsStored`.
+- **Endpoints de Configuração (`/api/images/config`)**: Implementados métodos `GET` (com contexto da LLM ativa, suporte e indicação de herança) e `POST` (com validação estrita, salvamento e criptografia).
+- **Validação Automatizada**: `scripts/phase33/test-schema-contracts.ts` aprovado com 100% de sucesso. `tsc --noEmit` PASS (0 erros), `npm run lint` PASS (0 erros).
+
+
+
+
+
+## Documentação de chaves de IA — DONE (2026-10-06)
+
+- Task: [docs-ai-api-keys](tasks/docs-ai-api-keys.md). Usuário confirmou somente
+  arquivos de documentação; cabeçalho da Phase 33 em edição paralela preservado.
+- [Guia completo](docs/guia-chaves-ia.md): criação de chaves em OpenAI, Gemini,
+  Anthropic, OpenRouter, DeepSeek e Kimi/Moonshot; tabela dos campos, links
+  oficiais, cobrança, restrições de plano, cadastro, teste e problemas comuns.
+- [Textos de ajuda](docs/ajuda-cadastro-chaves-ia.md): chamada para o site e ajuda
+  por campo/provedor, preparados para integração futura, sem alterar a interface.
+- Fontes oficiais conferidas em 2026-10-06; fluxo de salvar e testar conferido
+  contra tela, rotas e adapters atuais. Não promete suporte a todos os modelos.
+- Revisão Python: PASS (2 documentos, 23 links locais/âncoras, sem padrões de
+  chaves reais e sem whitespace final). Painéis privados exigem login do usuário;
+  passos fundamentados na documentação pública, sem criação real de credenciais.
+- `npx tsc --noEmit`: PASS (exit 0).
+- `npm run lint`: PASS (exit 0; 0 erros, 5 warnings em arquivos não alterados).
+- Build/testes de execução/integração real não aplicáveis à alteração Markdown.
+  Sem alteração de código, banco, dependências, consumo pago ou publicação.
+
+### Discovered Work — Cadastro de chaves de IA
+
+- **Descrição:** alinhar leitura do retorno de salvar/testar em
+  `src/app/(app)/settings/ai/page.tsx` com as APIs. O save retorna flags em
+  `config`, mas o client lê na raiz; o teste retorna `message`, mas a UI lê
+  `reply` e procura `error` nas falhas.
+  **Motivo:** divergência encontrada ao documentar o fluxo.
+  **Impacto:** status pode parecer pendente após salvar, teste bem-sucedido pode
+  mostrar `undefined` e detalhes de falha são substituídos por texto genérico.
+  **Próxima ação:** task própria para corrigir o contrato e validar no navegador.
+- **Descrição:** revisar exemplos/defaults de modelos e compatibilidade dos
+  adapters (incluindo parâmetros de teste).
+  **Motivo:** a interface sugere IDs antigos; catálogos dos provedores evoluem.
+  **Impacto:** obter uma chave não garante que o modelo padrão esteja disponível.
+  **Próxima ação:** validar modelos em task específica antes de atualizar defaults.
+- **Descrição:** integrar os guias ao site e à configuração de IA.
+  **Motivo:** usuário escolheu explicitamente somente arquivos nesta entrega.
+  **Impacto:** os textos ainda não estão acessíveis na aplicação.
+  **Próxima ação:** implementar rotas/links e ajuda quando solicitado.

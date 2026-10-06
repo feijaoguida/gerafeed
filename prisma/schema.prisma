@@ -300,6 +300,8 @@ model Article {
   wordpressSiteId     String?
   wordpressSite       WordPressSite?         @relation(fields: [wordpressSiteId], references: [id], onDelete: SetNull)
   modifiedImageUrl    String?
+  generatedImageUrl   String?
+  imagePrompt         String?
   selectedImage       String?                @default("ORIGINAL")
   processedAt         DateTime?
   renderedContentHash String?

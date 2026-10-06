@@ -72,6 +72,8 @@ interface ArticleDetail {
   wordpressSiteId?: string | null;
   originalImageUrl?: string | null;
   modifiedImageUrl?: string | null;
+  generatedImageUrl?: string | null;
+  imagePrompt?: string | null;
   selectedImage?: string | null;
   source?: { id: string; name: string; rssUrl?: string } | null;
   suggestedCategory: Category | null;
@@ -98,12 +100,14 @@ export default function ReviewArticlePage({ params }: { params: Promise<{ id: st
   const [seoFocusKeyword, setSeoFocusKeyword] = useState("");
   const [seoTitle, setSeoTitle] = useState("");
   const [seoDescription, setSeoDescription] = useState("");
-  const [selectedImage, setSelectedImage] = useState<"ORIGINAL" | "MODIFIED">("ORIGINAL");
+  const [selectedImage, setSelectedImage] = useState<"ORIGINAL" | "MODIFIED" | "AI_GENERATED">("ORIGINAL");
 
   // Loading & Action states
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isProcessingAi, setIsProcessingAi] = useState(false);
+  const [isGeneratingImage, setIsGeneratingImage] = useState(false);
+  const [showPromptModal, setShowPromptModal] = useState(false);
   const [isApproving, setIsApproving] = useState(false);
   const [isRejecting, setIsRejecting] = useState(false);
 
@@ -146,7 +150,7 @@ export default function ReviewArticlePage({ params }: { params: Promise<{ id: st
           setSeoFocusKeyword(artData.seoFocusKeyword || "");
           setSeoTitle(artData.seoTitle || "");
           setSeoDescription(artData.seoDescription || "");
-          setSelectedImage((artData.selectedImage as "ORIGINAL" | "MODIFIED") || "ORIGINAL");
+          setSelectedImage((artData.selectedImage as "ORIGINAL" | "MODIFIED" | "AI_GENERATED") || "ORIGINAL");
         } else {
           setErrorMessage("Erro ao carregar os dados da notícia.");
         }
@@ -301,6 +305,46 @@ export default function ReviewArticlePage({ params }: { params: Promise<{ id: st
       setErrorMessage(err instanceof Error ? err.message : "Erro na IA.");
     } finally {
       setIsProcessingAi(false);
+    }
+  };
+
+  // Action: Generate or Regenerate Image with AI on-demand
+  const handleGenerateImage = async () => {
+    setIsGeneratingImage(true);
+    setErrorMessage(null);
+    setSuccessMessage(null);
+
+    try {
+      const res = await fetch(`/api/articles/${id}/generate-image`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Erro ao gerar imagem com IA.");
+
+      setSelectedImage("AI_GENERATED");
+      if (data.article) {
+        setArticle((prev) => (prev ? { ...prev, ...data.article } : null));
+      } else if (data.imageUrl) {
+        setArticle((prev) =>
+          prev
+            ? {
+                ...prev,
+                generatedImageUrl: data.imageUrl,
+                imagePrompt: data.prompt,
+                selectedImage: "AI_GENERATED",
+              }
+            : null
+        );
+      }
+
+      setSuccessMessage("Nova imagem gerada com sucesso pela IA!");
+    } catch (err) {
+      setErrorMessage(err instanceof Error ? err.message : "Erro ao gerar imagem com IA.");
+    } finally {
+      setIsGeneratingImage(false);
     }
   };
 
@@ -739,101 +783,196 @@ export default function ReviewArticlePage({ params }: { params: Promise<{ id: st
             {/* Featured Media Selection Panel */}
             <Card className="p-6 space-y-4 shadow-xs">
               <CardHeader className="p-0 border-b border-border pb-3 flex flex-row items-center justify-between">
-                <CardTitle className="text-sm font-semibold text-foreground flex items-center gap-2">
-                  <ImageIcon className="w-4 h-4 text-primary" />
-                  Mídia Destacada
-                </CardTitle>
-                <Badge variant="outline" size="sm">
-                  Ativa: <strong className="uppercase ml-1 text-primary">{selectedImage}</strong>
-                </Badge>
+                <div className="flex items-center gap-2">
+                  <CardTitle className="text-sm font-semibold text-foreground flex items-center gap-2">
+                    <ImageIcon className="w-4 h-4 text-primary" />
+                    Mídia Destacada
+                  </CardTitle>
+                  <Badge variant="outline" size="sm">
+                    Ativa: <strong className="uppercase ml-1 text-primary">{selectedImage}</strong>
+                  </Badge>
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={handleGenerateImage}
+                  isLoading={isGeneratingImage}
+                  leadingIcon={<Sparkles className="w-3.5 h-3.5 text-purple-500" />}
+                >
+                  {article.generatedImageUrl ? "Regenerar com IA" : "Gerar com IA"}
+                </Button>
               </CardHeader>
 
-              {article.originalImageUrl || article.modifiedImageUrl ? (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {/* Option 1: Original Image */}
-                  {article.originalImageUrl && (
-                    <div
-                      onClick={() => setSelectedImage("ORIGINAL")}
-                      className={`p-3 rounded-xl border cursor-pointer transition-all flex flex-col justify-between space-y-2 ${
-                        selectedImage === "ORIGINAL"
-                          ? "bg-primary/5 border-primary shadow-xs"
-                          : "bg-surface border-border hover:border-muted-foreground/40"
-                      }`}
-                    >
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs font-semibold flex items-center gap-1.5 text-foreground">
-                          <input
-                            type="radio"
-                            name="selectedImage"
-                            checked={selectedImage === "ORIGINAL"}
-                            onChange={() => setSelectedImage("ORIGINAL")}
-                            className="accent-primary"
-                          />
-                          Original
-                        </span>
-                        {selectedImage === "ORIGINAL" && (
-                          <Badge variant="purple" size="sm">
-                            ATIVA
-                          </Badge>
-                        )}
-                      </div>
-                      <div className="relative aspect-video w-full overflow-hidden rounded-lg bg-surface-muted border border-border">
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img
-                          src={article.originalImageUrl}
-                          alt="Imagem Original"
-                          className="object-cover w-full h-full"
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                {/* Option 1: Original Image */}
+                {article.originalImageUrl ? (
+                  <div
+                    onClick={() => setSelectedImage("ORIGINAL")}
+                    className={`p-3 rounded-xl border cursor-pointer transition-all flex flex-col justify-between space-y-2 ${
+                      selectedImage === "ORIGINAL"
+                        ? "bg-primary/5 border-primary shadow-xs ring-1 ring-primary/20"
+                        : "bg-surface border-border hover:border-muted-foreground/40"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-semibold flex items-center gap-1.5 text-foreground">
+                        <input
+                          type="radio"
+                          name="selectedImage"
+                          checked={selectedImage === "ORIGINAL"}
+                          onChange={() => setSelectedImage("ORIGINAL")}
+                          className="accent-primary"
                         />
-                      </div>
+                        Original (RSS)
+                      </span>
+                      {selectedImage === "ORIGINAL" && (
+                        <Badge variant="outline" size="sm">
+                          ATIVA
+                        </Badge>
+                      )}
                     </div>
-                  )}
+                    <div className="relative aspect-video w-full overflow-hidden rounded-lg bg-surface-muted border border-border">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={article.originalImageUrl}
+                        alt="Imagem Original"
+                        className="object-cover w-full h-full"
+                      />
+                    </div>
+                  </div>
+                ) : (
+                  <div className="p-3 rounded-xl bg-surface-muted/30 border border-border flex items-center justify-center text-center">
+                    <p className="text-[11px] text-muted-foreground italic">Sem imagem original no RSS.</p>
+                  </div>
+                )}
 
-                  {/* Option 2: Modified Image */}
-                  {article.modifiedImageUrl ? (
-                    <div
-                      onClick={() => setSelectedImage("MODIFIED")}
-                      className={`p-3 rounded-xl border cursor-pointer transition-all flex flex-col justify-between space-y-2 ${
-                        selectedImage === "MODIFIED"
-                          ? "bg-primary/5 border-primary shadow-xs"
-                          : "bg-surface border-border hover:border-muted-foreground/40"
-                      }`}
-                    >
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs font-semibold flex items-center gap-1.5 text-foreground">
-                          <input
-                            type="radio"
-                            name="selectedImage"
-                            checked={selectedImage === "MODIFIED"}
-                            onChange={() => setSelectedImage("MODIFIED")}
-                            className="accent-primary"
-                          />
-                          Processada
-                        </span>
-                        {selectedImage === "MODIFIED" && (
-                          <Badge variant="purple" size="sm">
-                            ATIVA
-                          </Badge>
-                        )}
-                      </div>
-                      <div className="relative aspect-video w-full overflow-hidden rounded-lg bg-surface-muted border border-border">
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img
-                          src={article.modifiedImageUrl}
-                          alt="Imagem Modificada"
-                          className="object-cover w-full h-full"
+                {/* Option 2: Modified Image (Sharp) */}
+                {article.modifiedImageUrl ? (
+                  <div
+                    onClick={() => setSelectedImage("MODIFIED")}
+                    className={`p-3 rounded-xl border cursor-pointer transition-all flex flex-col justify-between space-y-2 ${
+                      selectedImage === "MODIFIED"
+                        ? "bg-primary/5 border-primary shadow-xs ring-1 ring-primary/20"
+                        : "bg-surface border-border hover:border-muted-foreground/40"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-semibold flex items-center gap-1.5 text-foreground">
+                        <input
+                          type="radio"
+                          name="selectedImage"
+                          checked={selectedImage === "MODIFIED"}
+                          onChange={() => setSelectedImage("MODIFIED")}
+                          className="accent-primary"
                         />
+                        Invertida (Sharp)
+                      </span>
+                      {selectedImage === "MODIFIED" && (
+                        <Badge variant="outline" size="sm">
+                          ATIVA
+                        </Badge>
+                      )}
+                    </div>
+                    <div className="relative aspect-video w-full overflow-hidden rounded-lg bg-surface-muted border border-border">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={article.modifiedImageUrl}
+                        alt="Imagem Modificada"
+                        className="object-cover w-full h-full"
+                      />
+                    </div>
+                  </div>
+                ) : (
+                  <div className="p-3 rounded-xl bg-surface-muted/30 border border-border flex items-center justify-center text-center">
+                    <p className="text-[11px] text-muted-foreground italic">
+                      Inversão Sharp não gerada ainda.
+                    </p>
+                  </div>
+                )}
+
+                {/* Option 3: AI Generated Image */}
+                {article.generatedImageUrl ? (
+                  <div
+                    onClick={() => setSelectedImage("AI_GENERATED")}
+                    className={`p-3 rounded-xl border cursor-pointer transition-all flex flex-col justify-between space-y-2 ${
+                      selectedImage === "AI_GENERATED"
+                        ? "bg-purple-500/10 border-purple-500 shadow-xs ring-1 ring-purple-500/30"
+                        : "bg-surface border-border hover:border-muted-foreground/40"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-semibold flex items-center gap-1.5 text-foreground">
+                        <input
+                          type="radio"
+                          name="selectedImage"
+                          checked={selectedImage === "AI_GENERATED"}
+                          onChange={() => setSelectedImage("AI_GENERATED")}
+                          className="accent-purple-500"
+                        />
+                        Gerada por IA
+                      </span>
+                      {selectedImage === "AI_GENERATED" ? (
+                        <Badge variant="purple" size="sm">
+                          ATIVA
+                        </Badge>
+                      ) : (
+                        <Badge variant="outline" size="sm">
+                          IA
+                        </Badge>
+                      )}
+                    </div>
+                    <div className="relative aspect-video w-full overflow-hidden rounded-lg bg-surface-muted border border-border">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={article.generatedImageUrl}
+                        alt="Imagem Gerada com IA"
+                        className="object-cover w-full h-full"
+                      />
+                    </div>
+                    {article.imagePrompt && (
+                      <div className="pt-1 flex justify-end">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setShowPromptModal(!showPromptModal);
+                          }}
+                          className="text-[10px] text-purple-600 dark:text-purple-400 hover:underline"
+                        >
+                          {showPromptModal ? "Ocultar Prompt" : "Ver Prompt"}
+                        </button>
                       </div>
-                    </div>
-                  ) : (
-                    <div className="p-3 rounded-xl bg-surface-muted/50 border border-border flex items-center justify-center text-center">
-                      <p className="text-[11px] text-muted-foreground italic">
-                        Imagem processada não gerada. Clique em &quot;Reescrever com IA&quot;.
-                      </p>
-                    </div>
-                  )}
+                    )}
+                  </div>
+                ) : (
+                  <div className="p-3 rounded-xl bg-purple-500/5 border border-dashed border-purple-500/30 flex flex-col items-center justify-center text-center space-y-2">
+                    <Sparkles className="w-5 h-5 text-purple-500" />
+                    <p className="text-[11px] text-muted-foreground">
+                      Nenhuma imagem IA gerada ainda.
+                    </p>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={handleGenerateImage}
+                      isLoading={isGeneratingImage}
+                      className="text-xs"
+                    >
+                      Gerar com IA
+                    </Button>
+                  </div>
+                )}
+              </div>
+
+              {/* Prompt Expandível */}
+              {showPromptModal && article.imagePrompt && (
+                <div className="p-3 rounded-xl bg-surface-muted/60 border border-border space-y-1">
+                  <p className="text-[11px] font-semibold text-foreground">Prompt de IA Utilizado:</p>
+                  <p className="text-[10px] text-muted-foreground font-mono leading-relaxed bg-surface p-2 rounded-md border border-border">
+                    {article.imagePrompt}
+                  </p>
                 </div>
-              ) : (
-                <p className="text-xs text-muted-foreground italic">Sem mídia destacada no RSS.</p>
               )}
             </Card>
 
