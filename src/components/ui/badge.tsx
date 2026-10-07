@@ -65,7 +65,7 @@ const statusVariantMap: Record<SystemStatus, VariantProps<typeof badgeVariants>[
 };
 
 export interface BadgeProps
-  extends React.HTMLAttributes<HTMLDivElement>,
+  extends React.HTMLAttributes<HTMLSpanElement>,
     VariantProps<typeof badgeVariants> {
   status?: SystemStatus;
   dot?: boolean;
@@ -83,7 +83,7 @@ export function Badge({
   const resolvedVariant = status ? statusVariantMap[status] : variant;
 
   return (
-    <div
+    <span
       className={cn(badgeVariants({ variant: resolvedVariant, size }), className)}
       {...props}
     >
@@ -94,6 +94,6 @@ export function Badge({
         />
       )}
       {children}
-    </div>
+    </span>
   );
 }

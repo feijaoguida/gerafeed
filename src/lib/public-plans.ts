@@ -30,7 +30,10 @@ export interface PublicPlan {
  */
 export async function getPublicPlans(): Promise<PublicPlan[]> {
   try {
-    await BillingService.ensureDefaultPlans();
+    const count = await prisma.plan.count();
+    if (count === 0) {
+      await BillingService.ensureDefaultPlans();
+    }
 
     const dbPlans = await prisma.plan.findMany({
       where: { active: true },

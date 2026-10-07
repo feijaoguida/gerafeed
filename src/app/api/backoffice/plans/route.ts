@@ -112,9 +112,11 @@ export async function POST(request: Request) {
       },
     });
 
-    // Invalida o cache da Home para sincronizar os planos imediatamente
+    // Invalida o cache da Home e do backoffice para sincronizar os planos imediatamente
     try {
       revalidatePath("/");
+      revalidatePath("/", "page");
+      revalidatePath("/backoffice/plans");
     } catch {
       // Falha graciosa caso ocorra fora do contexto de request
     }

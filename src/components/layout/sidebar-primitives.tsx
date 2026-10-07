@@ -91,7 +91,7 @@ export function SidebarSection({
 }
 
 export interface SidebarSectionLabelProps
-  extends React.HTMLAttributes<HTMLParagraphElement> {
+  extends React.HTMLAttributes<HTMLDivElement> {
   children: React.ReactNode;
 }
 
@@ -101,7 +101,7 @@ export function SidebarSectionLabel({
   ...props
 }: SidebarSectionLabelProps) {
   return (
-    <p
+    <div
       className={cn(
         "font-heading px-3 pb-1 text-[11px] font-bold uppercase tracking-wider text-muted-foreground",
         className
@@ -109,7 +109,7 @@ export function SidebarSectionLabel({
       {...props}
     >
       {children}
-    </p>
+    </div>
   );
 }
 

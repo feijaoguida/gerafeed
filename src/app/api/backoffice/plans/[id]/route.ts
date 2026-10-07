@@ -146,9 +146,11 @@ export async function PATCH(
       },
     });
 
-    // Invalida o cache da Home para sincronizar os planos imediatamente
+    // Invalida o cache da Home e do backoffice para sincronizar os planos imediatamente
     try {
       revalidatePath("/");
+      revalidatePath("/", "page");
+      revalidatePath("/backoffice/plans");
     } catch {
       // Falha graciosa caso ocorra fora do contexto de request
     }
@@ -184,9 +186,11 @@ export async function DELETE(
       where: { id },
     });
 
-    // Invalida o cache da Home para sincronizar os planos imediatamente
+    // Invalida o cache da Home e do backoffice para sincronizar os planos imediatamente
     try {
       revalidatePath("/");
+      revalidatePath("/", "page");
+      revalidatePath("/backoffice/plans");
     } catch {
       // Falha graciosa caso ocorra fora do contexto de request
     }
