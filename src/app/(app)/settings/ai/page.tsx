@@ -10,6 +10,7 @@ import {
   Sliders,
   FileText,
   Lock,
+  Image as ImageIcon,
 } from "lucide-react";
 import { DEFAULT_PROMPT_SETTINGS } from "@/lib/ai/types";
 import {
@@ -17,6 +18,11 @@ import {
   ALLOWED_STYLES_RESTRICTED,
   ALLOWED_PROVIDERS_RESTRICTED,
 } from "@/lib/billing-constants";
+import {
+  ImageProviderType,
+  ImageStrategy,
+  ImageStyle,
+} from "@/lib/images/types";
 
 import { PageHeader } from "@/components/design-system/page-header";
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from "@/components/ui/card";
@@ -29,7 +35,7 @@ import { Alert } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton";
 
 type AIProviderType = "openai" | "gemini" | "anthropic" | "openai-compatible";
-type TabType = "connection" | "prompt";
+type TabType = "connection" | "images" | "prompt";
 
 const PORTAL_AREAS = [
   "Tecnologia",
@@ -79,7 +85,28 @@ export default function SettingsAiPage() {
   const [connectionError, setConnectionError] = useState<string | null>(null);
   const [connectionSuccess, setConnectionSuccess] = useState<string | null>(null);
 
-  // Tab 2: Prompt Editorial
+  // Tab 2: IA de Imagens
+  const [imageProvider, setImageProvider] = useState<ImageProviderType>("huggingface");
+  const [useSameKeyAsTextAi, setUseSameKeyAsTextAi] = useState(false);
+  const [imageApiKey, setImageApiKey] = useState("");
+  const [imageModel, setImageModel] = useState("");
+  const [imageStrategy, setImageStrategy] = useState<ImageStrategy>("AI_GENERATED");
+  const [imageStyle, setImageStyle] = useState<ImageStyle>("REALISTIC");
+  const [customImageStyle, setCustomImageStyle] = useState("");
+  const [hasImageApiKey, setHasImageApiKey] = useState(false);
+  const [isImageConfigured, setIsImageConfigured] = useState(false);
+  const [isImageFromEnv, setIsImageFromEnv] = useState(false);
+  const [isLoadingImage, setIsLoadingImage] = useState(true);
+  const [isSavingImage, setIsSavingImage] = useState(false);
+  const [isTestingImage, setIsTestingImage] = useState(false);
+  const [imageError, setImageError] = useState<string | null>(null);
+  const [imageSuccess, setImageSuccess] = useState<string | null>(null);
+  const [imageTestResult, setImageTestResult] = useState<{
+    imageUrl?: string;
+    message?: string;
+  } | null>(null);
+
+  // Tab 3: Prompt Editorial
   const [portalArea, setPortalArea] = useState(DEFAULT_PROMPT_SETTINGS.portalArea);
   const [customPortalArea, setCustomPortalArea] = useState(DEFAULT_PROMPT_SETTINGS.customPortalArea);
   const [writingStyles, setWritingStyles] = useState<string[]>(DEFAULT_PROMPT_SETTINGS.writingStyles);
@@ -187,6 +214,41 @@ export default function SettingsAiPage() {
     };
   }, []);
 
+  // Load image settings
+  useEffect(() => {
+    let active = true;
+
+    async function loadImageConfig() {
+      try {
+        const res = await fetch("/api/images/config");
+        if (!res.ok) throw new Error("Erro ao buscar configurações de imagem.");
+        const data = await res.json();
+
+        if (!active) return;
+
+        setImageProvider(data.imageProvider || "huggingface");
+        setUseSameKeyAsTextAi(Boolean(data.useSameKeyAsTextAi));
+        setImageModel(data.customModel || "");
+        setImageStrategy(data.defaultStrategy || "AI_GENERATED");
+        setImageStyle(data.imageStyle || "REALISTIC");
+        setCustomImageStyle(data.customImageStyle || "");
+        setHasImageApiKey(Boolean(data.hasCustomApiKey));
+        setIsImageConfigured(Boolean(data.isConfigured));
+        setIsImageFromEnv(Boolean(data.isFromEnv));
+      } catch (err) {
+        if (!active) return;
+        console.error("Error loading image settings:", err);
+      } finally {
+        if (active) setIsLoadingImage(false);
+      }
+    }
+
+    loadImageConfig();
+    return () => {
+      active = false;
+    };
+  }, []);
+
   const handleSaveConnection = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSavingConnection(true);
@@ -236,6 +298,74 @@ export default function SettingsAiPage() {
       setConnectionError(err instanceof Error ? err.message : "Falha ao testar IA.");
     } finally {
       setIsTestingConnection(false);
+    }
+  };
+
+  const handleSaveImage = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSavingImage(true);
+    setImageError(null);
+    setImageSuccess(null);
+
+    try {
+      const payload: Record<string, unknown> = {
+        defaultStrategy: imageStrategy,
+        imageStyle,
+        customImageStyle: imageStyle === "CUSTOM" ? customImageStyle : undefined,
+        useSameKeyAsTextAi,
+        imageProvider,
+        customModel: imageModel.trim() || undefined,
+      };
+
+      if (imageApiKey.trim()) {
+        payload.customApiKey = imageApiKey.trim();
+      }
+
+      const res = await fetch("/api/images/config", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Erro ao salvar configurações de imagem.");
+
+      setImageSuccess("Configurações da IA de Imagens salvas com sucesso!");
+      if (imageApiKey.trim()) {
+        setHasImageApiKey(true);
+        setImageApiKey("");
+      }
+      setIsImageConfigured(true);
+    } catch (err) {
+      setImageError(err instanceof Error ? err.message : "Erro ao salvar configurações de imagem.");
+    } finally {
+      setIsSavingImage(false);
+    }
+  };
+
+  const handleTestImage = async () => {
+    setIsTestingImage(true);
+    setImageError(null);
+    setImageSuccess(null);
+    setImageTestResult(null);
+
+    try {
+      const res = await fetch("/api/images/test", { method: "POST" });
+      const data = await res.json();
+
+      if (!res.ok) throw new Error(data.error || "Falha no teste de geração de imagem.");
+
+      setImageSuccess(data.message || "Imagem gerada com sucesso!");
+      if (data.imageUrl) {
+        setImageTestResult({
+          imageUrl: data.imageUrl,
+          message: data.message,
+        });
+      }
+    } catch (err) {
+      setImageError(err instanceof Error ? err.message : "Falha ao testar IA de imagens.");
+    } finally {
+      setIsTestingImage(false);
     }
   };
 
@@ -305,7 +435,24 @@ export default function SettingsAiPage() {
     }
   };
 
-  if (isLoadingConnection && isLoadingPrompt) {
+  const getImageModelPlaceholder = () => {
+    switch (imageProvider) {
+      case "huggingface":
+        return "black-forest-labs/FLUX.1-schnell";
+      case "pollinations":
+        return "flux";
+      case "openai":
+        return "dall-e-3";
+      case "gemini":
+        return "imagen-3.0-generate-002";
+      case "openrouter":
+        return "black-forest-labs/flux.2-klein-4b";
+      default:
+        return "";
+    }
+  };
+
+  if (isLoadingConnection && isLoadingPrompt && isLoadingImage) {
     return (
       <div className="p-6 sm:p-8 max-w-4xl mx-auto space-y-6">
         <Skeleton className="h-10 w-64" />
@@ -334,7 +481,17 @@ export default function SettingsAiPage() {
           leadingIcon={<Sliders className="w-4 h-4" />}
           className={activeTab === "connection" ? "font-bold text-primary shadow-xs" : "text-muted-foreground"}
         >
-          Conexão & Provedor
+          Conexão & Provedor (Texto)
+        </Button>
+        <Button
+          type="button"
+          variant={activeTab === "images" ? "secondary" : "ghost"}
+          size="sm"
+          onClick={() => setActiveTab("images")}
+          leadingIcon={<ImageIcon className="w-4 h-4" />}
+          className={activeTab === "images" ? "font-bold text-primary shadow-xs" : "text-muted-foreground"}
+        >
+          IA de Imagens (Hugging Face / DALL-E)
         </Button>
         <Button
           type="button"
@@ -487,7 +644,246 @@ export default function SettingsAiPage() {
         </div>
       )}
 
-      {/* TAB 2: PROMPT EDITORIAL */}
+      {/* TAB 2: IA DE IMAGENS */}
+      {activeTab === "images" && (
+        <div className="space-y-6">
+          {/* Image Connection Status Card */}
+          <Card className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-xs bg-surface-muted/30">
+            <div className="flex items-center gap-3">
+              <ShieldCheck className={`w-5 h-5 ${isImageConfigured ? "text-[#00C2A8]" : "text-amber-500"}`} />
+              <div>
+                <p className="font-heading text-xs font-semibold text-foreground">
+                  Provedor de Imagens:{" "}
+                  <span className="uppercase text-primary font-bold">
+                    {useSameKeyAsTextAi ? `Herdado (${provider})` : imageProvider}
+                  </span>{" "}
+                  ({isImageConfigured ? "Configurado" : "Pendente"})
+                </p>
+                <p className="font-sans text-[11px] text-muted-foreground">
+                  {imageProvider === "pollinations"
+                    ? "Pollinations.ai — 100% gratuito e sem necessidade de chave de API"
+                    : isImageFromEnv
+                    ? "Utilizando HUGGINGFACE_API_KEY das variáveis de ambiente (.env) como fallback"
+                    : hasImageApiKey
+                    ? "Chave de API criptografada com AES-256-GCM ativa no banco de dados"
+                    : "Configure o token de acesso (Bearer Token) para geração de imagens"}
+                </p>
+              </div>
+            </div>
+
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleTestImage}
+              isLoading={isTestingImage}
+              leadingIcon={<RefreshCw className="w-3.5 h-3.5" />}
+            >
+              Testar IA de Imagens
+            </Button>
+          </Card>
+
+          {/* Alerts */}
+          {imageError && (
+            <Alert variant="destructive" onClose={() => setImageError(null)}>
+              {imageError}
+            </Alert>
+          )}
+
+          {imageSuccess && (
+            <Alert variant="success" onClose={() => setImageSuccess(null)}>
+              {imageSuccess}
+            </Alert>
+          )}
+
+          {/* Image Test Result Preview */}
+          {imageTestResult?.imageUrl && (
+            <Card className="p-4 bg-surface-muted/40 border border-emerald-500/30 space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold text-emerald-700 dark:text-emerald-300">
+                  {imageTestResult.message || "Resultado do Teste de Imagem"}
+                </span>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setImageTestResult(null)}
+                >
+                  Fechar
+                </Button>
+              </div>
+              <div className="max-w-xs mx-auto rounded-lg overflow-hidden border border-border">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={imageTestResult.imageUrl}
+                  alt="Preview do Teste de Imagem"
+                  className="w-full h-auto object-cover"
+                />
+              </div>
+            </Card>
+          )}
+
+          <form onSubmit={handleSaveImage}>
+            <Card className="p-6 space-y-5 shadow-xs">
+              <CardHeader className="p-0 border-b border-border pb-3">
+                <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                  <ImageIcon className="w-4 h-4 text-primary" />
+                  Configuração e Credenciais da IA de Imagens
+                </CardTitle>
+                <p className="font-sans text-[11px] text-muted-foreground mt-0.5">
+                  Escolha o provedor de imagens, modelo, estilo padrão e configure sua chave de acesso.
+                </p>
+              </CardHeader>
+
+              <CardContent className="p-0 space-y-4">
+                {/* Herança ou Chave Dedicada */}
+                <div className="flex items-center gap-2 pt-1">
+                  <input
+                    type="checkbox"
+                    id="inheritKeyCheckbox"
+                    checked={useSameKeyAsTextAi}
+                    disabled={provider === "anthropic"}
+                    onChange={(e) => setUseSameKeyAsTextAi(e.target.checked)}
+                    className="accent-primary rounded-sm"
+                  />
+                  <label htmlFor="inheritKeyCheckbox" className="text-xs font-medium cursor-pointer">
+                    Reaproveitar a mesma chave da IA de Texto ({provider.toUpperCase()})
+                  </label>
+                  {provider === "anthropic" && (
+                    <span className="text-[10px] text-amber-600 dark:text-amber-400">
+                      (Anthropic não gera imagens; utilize Hugging Face, Pollinations, OpenAI ou Gemini)
+                    </span>
+                  )}
+                </div>
+
+                {!useSameKeyAsTextAi && (
+                  <>
+                    <FormField label="Selecione o Provedor de Imagens" required>
+                      <Select
+                        value={imageProvider}
+                        onChange={(e) => setImageProvider(e.target.value as ImageProviderType)}
+                      >
+                        <option value="huggingface">Hugging Face (FLUX.1 Schnell — Gratuito com Token HF)</option>
+                        <option value="pollinations">Pollinations.ai (FLUX — Gratuito Sem Chave)</option>
+                        <option value="openai">OpenAI (DALL-E 3)</option>
+                        <option value="gemini">Google Gemini (Imagen 3)</option>
+                        <option value="openrouter">OpenRouter (FLUX.1 / FLUX.2)</option>
+                      </Select>
+                    </FormField>
+
+                    <FormField label="Modelo de Imagem (Model)">
+                      <Input
+                        type="text"
+                        value={imageModel}
+                        onChange={(e) => setImageModel(e.target.value)}
+                        placeholder={`Ex: ${getImageModelPlaceholder()}`}
+                      />
+                      <p className="text-[11px] text-muted-foreground mt-1">
+                        Deixe em branco para utilizar o modelo padrão recomendado ({getImageModelPlaceholder()}).
+                      </p>
+                    </FormField>
+
+                    {imageProvider !== "pollinations" ? (
+                      <FormField
+                        label={`API Key / Token de Acesso ${
+                          hasImageApiKey ? "(Chave criptografada em uso)" : ""
+                        }`}
+                        required={!hasImageApiKey}
+                      >
+                        <Input
+                          type="password"
+                          value={imageApiKey}
+                          onChange={(e) => setImageApiKey(e.target.value)}
+                          placeholder={
+                            hasImageApiKey
+                              ? "•••••••••••••••• (Deixe em branco para manter a chave atual)"
+                              : imageProvider === "huggingface"
+                              ? "hf_..."
+                              : "sk-..."
+                          }
+                        />
+                        <p className="text-[11px] text-muted-foreground mt-1">
+                          A chave é armazenada de forma segura com criptografia autenticada AES-256-GCM.
+                        </p>
+                      </FormField>
+                    ) : (
+                      <div className="p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-xs text-emerald-700 dark:text-emerald-300">
+                        ✓ A Pollinations.ai é 100% gratuita e de código aberto. Não exige cadastro nem chave de API.
+                      </div>
+                    )}
+                  </>
+                )}
+
+                {/* Estratégia de Imagem */}
+                <FormField label="Estratégia Padrão para Matérias RSS">
+                  <Select
+                    value={imageStrategy}
+                    onChange={(e) => setImageStrategy(e.target.value as ImageStrategy)}
+                  >
+                    <option value="AI_GENERATED">Gerar Nova Imagem com IA (Contextualizada)</option>
+                    <option value="ORIGINAL">Imagem Original (RSS — Sem IA)</option>
+                    <option value="MODIFIED">Processar com Sharp (Inversão Local — Sem Custo)</option>
+                  </Select>
+                </FormField>
+
+                {/* Estilo Visual */}
+                <FormField label="Estilo Visual Padrão da Imagem">
+                  <Select
+                    value={imageStyle}
+                    onChange={(e) => setImageStyle(e.target.value as ImageStyle)}
+                  >
+                    <option value="REALISTIC">Realista / Fotojornalismo (DSLR, 35mm, 8k)</option>
+                    <option value="CARTOON">Cartoon / 3D (Estilo Pixar, cores vibrantes)</option>
+                    <option value="DRAWING">Desenho / Ilustração (2D vetorial editorial)</option>
+                    <option value="SATIRICAL_CARTOON">Sátira Cartoon / Charge Editorial</option>
+                    <option value="CUSTOM">Personalizado</option>
+                  </Select>
+                </FormField>
+
+                {imageStyle === "CUSTOM" && (
+                  <FormField label="Descrição do Estilo Personalizado" required>
+                    <Input
+                      type="text"
+                      value={customImageStyle}
+                      onChange={(e) => setCustomImageStyle(e.target.value)}
+                      placeholder="Ex: retro synthwave editorial photography, cinematic lighting..."
+                    />
+                  </FormField>
+                )}
+              </CardContent>
+
+              <CardFooter className="p-0 pt-3 border-t border-border flex flex-col sm:flex-row items-center justify-between gap-3">
+                <Link
+                  href="/settings/images"
+                  className="text-xs text-primary hover:underline font-medium"
+                >
+                  Configurações avançadas e template de prompt →
+                </Link>
+                <div className="flex items-center gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={handleTestImage}
+                    isLoading={isTestingImage}
+                    leadingIcon={<RefreshCw className="w-3.5 h-3.5" />}
+                  >
+                    Testar IA de Imagens
+                  </Button>
+                  <Button
+                    type="submit"
+                    variant="gradient"
+                    isLoading={isSavingImage}
+                    leadingIcon={<Save className="w-4 h-4" />}
+                  >
+                    Salvar Configurações de Imagem
+                  </Button>
+                </div>
+              </CardFooter>
+            </Card>
+          </form>
+        </div>
+      )}
+
+      {/* TAB 3: PROMPT EDITORIAL */}
       {activeTab === "prompt" && (
         <div className="space-y-6">
           {promptError && (

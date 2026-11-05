@@ -41,6 +41,81 @@ function cleanText(text?: string | null): string | undefined {
 }
 
 /**
+ * Cleans product descriptions preserving paragraphs and removing platform boilerplate.
+ */
+export function cleanDescriptionText(text?: string | null): string | undefined {
+  if (!text) return undefined;
+
+  let formatted = text
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<\/(p|div|li|tr|h[1-6])>/gi, "\n\n")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&quot;/g, '"')
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&#39;/g, "'")
+    .replace(/&nbsp;/g, " ");
+
+  const boilerplatePatterns = [
+    /Frete\s+gr[áa]tis\s+no\s+dia\s+[^\n.]+[.!]?/gi,
+    /Compre\s+[^\n.]*\s+parcelado\s+sem\s+juros[!.]?/gi,
+    /Saiba\s+mais\s+sobre\s+nossas\s+incr[íi]veis\s+ofertas[^\n.]*[.!]?/gi,
+    /Conhe[çc]a\s+as\s+nossas\s+incr[íi]veis\s+ofertas[^\n.]*[.!]?/gi,
+    /Achadinho\s+do\s+Mercado\s+Livre[^\n.]*[.!]?/gi,
+    /Compre\s+com\s+seguran[çc]a\s+e\s+garantia[^\n.]*[.!]?/gi,
+    /Aproveite\s+frete\s+gr[áa]tis[^\n.]*[.!]?/gi,
+    /Garantia\s+do\s+vendedor:[^\n.]*[.!]?/gi,
+    /Devolu[çc][ãa]o\s+gr[áa]tis[^\n.]*[.!]?/gi,
+    /Enviado\s+pelo\s+[^\n.]*[.!]?/gi,
+    /Confira\s+os\s+meios\s+de\s+pagamento[^\n.]*[.!]?/gi,
+  ];
+
+  for (const pattern of boilerplatePatterns) {
+    formatted = formatted.replace(pattern, "");
+  }
+
+  const lines = formatted
+    .split(/\r?\n/)
+    .map((l) => l.replace(/[ \t]+/g, " ").trim())
+    .filter((l) => l.length > 0);
+
+  const cleaned = lines.join("\n\n").trim();
+  return cleaned.length > 10 ? cleaned : undefined;
+}
+
+export function buildFallbackDescription(
+  name?: string,
+  brand?: string,
+  specs?: Record<string, string>
+): string | undefined {
+  if (!name) return undefined;
+  const parts: string[] = [];
+  if (brand) {
+    parts.push(`${name} da marca ${brand}.`);
+  } else {
+    parts.push(`${name}.`);
+  }
+
+  if (specs && Object.keys(specs).length > 0) {
+    const highlights = specs["O que você precisa saber"];
+    if (highlights) {
+      parts.push(`Destaques do produto:\n${highlights}`);
+    }
+    const otherSpecs = Object.entries(specs)
+      .filter(([k]) => k !== "O que você precisa saber")
+      .slice(0, 8)
+      .map(([k, v]) => `• ${k}: ${v}`)
+      .join("\n");
+    if (otherSpecs) {
+      parts.push(`Especificações principais:\n${otherSpecs}`);
+    }
+  }
+
+  return parts.join("\n\n");
+}
+
+/**
  * Normalizes price number from strings or numbers.
  */
 function parsePrice(val: unknown): number | undefined {
@@ -158,7 +233,7 @@ export function extractJsonLd(html: string): RawExtractedMetadata | null {
 
         if (isProduct && !productResult) {
           const name = cleanText(item.name);
-          const description = cleanText(item.description);
+          const description = cleanDescriptionText(item.description);
 
           // Image extraction
           let imageUrl: string | undefined;
@@ -341,7 +416,7 @@ export function extractMetaTags(html: string): RawExtractedMetadata {
       return titleMatch ? cleanText(titleMatch[1]) : undefined;
     })();
 
-  const description = getMeta("og:description") || getMeta("description") || getMeta("twitter:description");
+  const description = cleanDescriptionText(getMeta("og:description") || getMeta("description") || getMeta("twitter:description"));
   const imageUrl = getMeta("og:image") || getMeta("twitter:image");
   const brand = getMeta("product:brand") || getMeta("og:brand");
   const seller = getMeta("og:site_name");
@@ -501,7 +576,7 @@ function extractHtmlEnrichments(html: string): Partial<RawExtractedMetadata> {
     /id=["']description-section["'][^>]*>[\s\S]*?class=["'][^"']*(?:ui-pdp-description__content|item-description__text)[^"']*["'][^>]*>([\s\S]*?)<\/div>/i.exec(html) ||
     /class=["'][^"']*(?:ui-pdp-description__content|item-description__text)[^"']*["'][^>]*>([\s\S]*?)<\/(?:p|div)>/i.exec(html);
   if (descMatch) {
-    const descVal = cleanText(descMatch[1]);
+    const descVal = cleanDescriptionText(descMatch[1]);
     if (descVal && descVal.length > 10) {
       result.description = descVal;
       result.sourceDescription = descVal;
@@ -701,10 +776,17 @@ export function extractProductMetadata(
 
   // Combine data prioritizing JSON-LD > Embedded State > HTML Enriched > Meta Tags
   const name = jsonLd?.name || embeddedState.name || metaTags.name;
-  const sourceDescription = jsonLd?.sourceDescription || htmlEnriched.sourceDescription || metaTags.sourceDescription;
-  const description = jsonLd?.description || htmlEnriched.description || metaTags.description;
-  const imageUrl = jsonLd?.imageUrl || embeddedState.imageUrl || metaTags.imageUrl;
   const brand = jsonLd?.brand || htmlEnriched.brand || metaTags.brand;
+  let sourceDescription = jsonLd?.sourceDescription || htmlEnriched.sourceDescription || metaTags.sourceDescription;
+  let description = jsonLd?.description || htmlEnriched.description || metaTags.description;
+  if (!description || description.length < 25) {
+    const fallbackDesc = buildFallbackDescription(name, brand, mergedSpecs);
+    if (fallbackDesc) {
+      description = fallbackDesc;
+      if (!sourceDescription) sourceDescription = fallbackDesc;
+    }
+  }
+  const imageUrl = jsonLd?.imageUrl || embeddedState.imageUrl || metaTags.imageUrl;
   const seller = jsonLd?.seller || embeddedState.seller || htmlEnriched.seller || metaTags.seller;
   const price =
     jsonLd?.price !== undefined

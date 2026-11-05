@@ -14,6 +14,10 @@ import {
   Star,
   Layers,
   FileText,
+  Sparkles,
+  ShoppingBag,
+  ExternalLink,
+  RotateCcw,
 } from "lucide-react";
 import type { PreviewImportResult } from "@/lib/affiliate/service";
 
@@ -29,6 +33,10 @@ export function AffiliateImporter({ onSuccess }: AffiliateImporterProps) {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
+  // Sales Copy State
+  const [autoSalesCopy, setAutoSalesCopy] = useState(true);
+  const [isGeneratingCopy, setIsGeneratingCopy] = useState(false);
+
   // Preview State
   const [previewData, setPreviewData] = useState<PreviewImportResult | null>(null);
 
@@ -37,10 +45,33 @@ export function AffiliateImporter({ onSuccess }: AffiliateImporterProps) {
   const [brand, setBrand] = useState("");
   const [seller, setSeller] = useState("");
   const [description, setDescription] = useState("");
+  const [shortDescription, setShortDescription] = useState("");
+  const [pros, setPros] = useState<string[]>([]);
   const [imageUrl, setImageUrl] = useState("");
   const [price, setPrice] = useState<string>("");
   const [oldPrice, setOldPrice] = useState<string>("");
   const [overwriteExisting, setOverwriteExisting] = useState(false);
+
+  // WooCommerce Publishing State
+  const [wordpressSites, setWordpressSites] = useState<Array<{ id: string; name: string; url: string; isDefault: boolean }>>([]);
+  const [publishToWc, setPublishToWc] = useState(false);
+  const [selectedWpSiteId, setSelectedWpSiteId] = useState("");
+  const [wcProductType, setWcProductType] = useState<"external" | "simple">("external");
+  const [wcStatus, setWcStatus] = useState<"publish" | "draft">("publish");
+  const [wcButtonText, setWcButtonText] = useState("");
+  const [publishedWcUrl, setPublishedWcUrl] = useState<string | null>(null);
+
+  React.useEffect(() => {
+    fetch("/api/wordpress/sites")
+      .then((res) => (res.ok ? res.json() : { sites: [] }))
+      .then((data) => {
+        const sites = Array.isArray(data) ? data : Array.isArray(data?.sites) ? data.sites : [];
+        setWordpressSites(sites);
+        const def = sites.find((s: { isDefault: boolean }) => s.isDefault) || sites[0];
+        if (def) setSelectedWpSiteId(def.id);
+      })
+      .catch(() => {});
+  }, []);
 
   const handleFetchPreview = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -52,13 +83,18 @@ export function AffiliateImporter({ onSuccess }: AffiliateImporterProps) {
     setIsLoadingPreview(true);
     setErrorMessage(null);
     setSuccessMessage(null);
+    setPublishedWcUrl(null);
     setPreviewData(null);
 
     try {
       const res = await fetch("/api/affiliate/import/preview", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ affiliateUrl: affiliateUrl.trim(), providerCode }),
+        body: JSON.stringify({
+          affiliateUrl: affiliateUrl.trim(),
+          providerCode,
+          generateSalesCopy: autoSalesCopy,
+        }),
       });
 
       const data = await res.json();
@@ -69,18 +105,71 @@ export function AffiliateImporter({ onSuccess }: AffiliateImporterProps) {
       if (data.metadata?.status === "FAILED") throw new Error(data.metadata.warnings.join(" "));
       setPreviewData(data);
       const meta = data.metadata;
+      const copy = data.salesCopy;
+
       setName(meta.name || "");
       setBrand(meta.brand || "");
       setSeller(meta.seller || "");
-      setDescription(meta.description || "");
+      setDescription(copy?.description || meta.description || "");
+      setShortDescription(copy?.shortDescription || meta.shortDescription || "");
+      setPros(
+        Array.isArray(copy?.pros) && copy.pros.length > 0
+          ? copy.pros
+          : Array.isArray(meta.pros)
+          ? meta.pros
+          : []
+      );
       setImageUrl(meta.imageUrl || "");
       setPrice(meta.price !== undefined && meta.price !== null ? String(meta.price) : "");
       setOldPrice(meta.oldPrice !== undefined && meta.oldPrice !== null ? String(meta.oldPrice) : "");
       setOverwriteExisting(data.isDuplicate);
+      if (meta.providerCode === "SHOPEE") {
+        setWcButtonText("Compre na Shopee");
+      } else {
+        setWcButtonText("Compre no Mercado Livre");
+      }
     } catch (err) {
       setErrorMessage((err as Error).message);
     } finally {
       setIsLoadingPreview(false);
+    }
+  };
+
+  const handleGenerateSalesCopy = async () => {
+    if (!previewData) return;
+    setIsGeneratingCopy(true);
+    setErrorMessage(null);
+    try {
+      const res = await fetch("/api/affiliate/import/sales-copy", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: name.trim(),
+          brand: brand.trim() || undefined,
+          seller: seller.trim() || undefined,
+          price: price ? parseFloat(price) : undefined,
+          sourceDescription: previewData.metadata.sourceDescription || previewData.metadata.description || "",
+          specs: previewData.metadata.specs || previewData.metadata.sourceSpecs || {},
+          providerCode,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Erro ao gerar copy de vendas com IA.");
+
+      if (data.shortDescription) setShortDescription(data.shortDescription);
+      if (data.description) setDescription(data.description);
+      if (Array.isArray(data.pros) && data.pros.length > 0) setPros(data.pros);
+    } catch (err) {
+      setErrorMessage((err as Error).message);
+    } finally {
+      setIsGeneratingCopy(false);
+    }
+  };
+
+  const handleRestoreSourceDescription = () => {
+    if (previewData?.metadata?.sourceDescription || previewData?.metadata?.description) {
+      setDescription(previewData.metadata.sourceDescription || previewData.metadata.description || "");
     }
   };
 
@@ -95,6 +184,7 @@ export function AffiliateImporter({ onSuccess }: AffiliateImporterProps) {
 
     setIsSaving(true);
     setErrorMessage(null);
+    setPublishedWcUrl(null);
 
     try {
       const res = await fetch("/api/affiliate/import/confirm", {
@@ -109,6 +199,8 @@ export function AffiliateImporter({ onSuccess }: AffiliateImporterProps) {
           name: name.trim(),
           brand: brand.trim() || undefined,
           description: description.trim() || undefined,
+          shortDescription: shortDescription.trim() || undefined,
+          pros: pros.length > 0 ? pros : undefined,
           sourceDescription: previewData.metadata.sourceDescription || description.trim() || undefined,
           imageUrl: imageUrl.trim() || undefined,
           images: previewData.metadata.images || undefined,
@@ -126,6 +218,15 @@ export function AffiliateImporter({ onSuccess }: AffiliateImporterProps) {
           metadataSource: previewData.metadata.metadataSource,
           overwriteExistingProductId:
             overwriteExisting && previewData.existingProduct ? previewData.existingProduct.id : undefined,
+          publishToWooCommerce: publishToWc
+            ? {
+                enabled: true,
+                wordpressSiteId: selectedWpSiteId || undefined,
+                productType: wcProductType,
+                status: wcStatus,
+                buttonText: wcButtonText.trim() || undefined,
+              }
+            : undefined,
         }),
       });
 
@@ -134,7 +235,12 @@ export function AffiliateImporter({ onSuccess }: AffiliateImporterProps) {
         throw new Error(data.error || "Erro ao salvar produto no catálogo.");
       }
 
-      setSuccessMessage(`Produto "${data.product.name}" salvo com sucesso no catálogo!`);
+      let successMsg = `Produto "${data.product.name}" salvo com sucesso no catálogo!`;
+      if (data.publishedWooCommerceUrl) {
+        setPublishedWcUrl(data.publishedWooCommerceUrl);
+        successMsg += ` E publicado no WooCommerce com sucesso!`;
+      }
+      setSuccessMessage(successMsg);
       setPreviewData(null);
       setAffiliateUrl("");
       if (onSuccess) onSuccess(data.product);
@@ -161,11 +267,25 @@ export function AffiliateImporter({ onSuccess }: AffiliateImporterProps) {
           </div>
         </div>
 
-        <label className="block text-sm font-medium">Marketplace
-          <select aria-label="Marketplace" value={providerCode} disabled={isLoadingPreview || isSaving} onChange={e => { setProviderCode(e.target.value); setPreviewData(null); setErrorMessage(null); }} className="ml-3 rounded-lg border bg-background p-2">
-            <option value="MERCADO_LIVRE">Mercado Livre</option><option value="SHOPEE">Shopee</option>
-          </select>
-        </label>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-1">
+          <label className="block text-sm font-medium">Marketplace
+            <select aria-label="Marketplace" value={providerCode} disabled={isLoadingPreview || isSaving} onChange={e => { setProviderCode(e.target.value); setPreviewData(null); setErrorMessage(null); }} className="ml-3 rounded-lg border bg-background p-2">
+              <option value="MERCADO_LIVRE">Mercado Livre</option><option value="SHOPEE">Shopee</option>
+            </select>
+          </label>
+
+          <label className="inline-flex items-center gap-2 cursor-pointer text-xs font-medium text-foreground bg-primary/5 hover:bg-primary/10 border border-primary/20 px-3 py-1.5 rounded-lg transition-colors">
+            <input
+              type="checkbox"
+              checked={autoSalesCopy}
+              onChange={(e) => setAutoSalesCopy(e.target.checked)}
+              disabled={isLoadingPreview || isSaving}
+              className="rounded text-primary focus:ring-primary"
+            />
+            <Sparkles className="w-3.5 h-3.5 text-primary" />
+            <span>Criar descrição focada em vendas com IA (AIDA)</span>
+          </label>
+        </div>
         <form onSubmit={handleFetchPreview} className="space-y-4">
           <div className="flex flex-col sm:flex-row gap-3 items-stretch">
             <div className="relative flex-1">
@@ -209,9 +329,22 @@ export function AffiliateImporter({ onSuccess }: AffiliateImporterProps) {
       )}
 
       {successMessage && (
-        <div className="p-4 bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 rounded-xl flex items-start space-x-3 text-sm">
-          <CheckCircle2 className="w-5 h-5 shrink-0 mt-0.5" />
-          <span>{successMessage}</span>
+        <div className="p-4 bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-sm">
+          <div className="flex items-start space-x-3">
+            <CheckCircle2 className="w-5 h-5 shrink-0 mt-0.5" />
+            <span>{successMessage}</span>
+          </div>
+          {publishedWcUrl && (
+            <a
+              href={publishedWcUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 text-white rounded-lg text-xs font-semibold hover:bg-emerald-700 transition-colors shrink-0"
+            >
+              <span>Ver Produto na Loja</span>
+              <ExternalLink className="w-3.5 h-3.5" />
+            </a>
+          )}
         </div>
       )}
 
@@ -395,18 +528,89 @@ export function AffiliateImporter({ onSuccess }: AffiliateImporterProps) {
                   </div>
                 </div>
 
+                {/* Short Description (Hook / Resumo de Vendas) */}
                 <div>
-                  <label className="block text-xs font-medium text-muted-foreground mb-1">
-                    Descrição do Produto
-                  </label>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                      Descrição Curta / Gancho de Vendas (AIDA)
+                    </label>
+                    <span className="text-[11px] text-muted-foreground">Exibida no topo da página do WooCommerce</span>
+                  </div>
                   <textarea
-                    rows={3}
-                    value={description}
-                    onChange={(e) => setDescription(e.target.value)}
-                    placeholder="Descrição do item..."
-                    className="w-full px-3 py-2 bg-background border rounded-lg text-xs"
+                    rows={2}
+                    value={shortDescription}
+                    onChange={(e) => setShortDescription(e.target.value)}
+                    placeholder="Frase de impacto destacando o benefício principal e a oferta..."
+                    className="w-full px-3 py-2 bg-background border rounded-lg text-xs focus:ring-2 focus:ring-primary focus:outline-hidden"
                   />
                 </div>
+
+                {/* Main Sales Description */}
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                      Descrição Completa do Produto
+                    </label>
+                    <div className="flex items-center gap-2">
+                      {previewData.metadata.sourceDescription && (
+                        <button
+                          type="button"
+                          onClick={handleRestoreSourceDescription}
+                          className="inline-flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground transition-colors"
+                          title="Restaurar o texto bruto original do marketplace"
+                        >
+                          <RotateCcw className="w-3 h-3" />
+                          <span>Restaurar Original</span>
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={handleGenerateSalesCopy}
+                        disabled={isGeneratingCopy}
+                        className="inline-flex items-center gap-1 text-xs font-semibold text-primary hover:text-primary/80 transition-colors"
+                      >
+                        {isGeneratingCopy ? (
+                          <>
+                            <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                            <span>Gerando Copy...</span>
+                          </>
+                        ) : (
+                          <>
+                            <Sparkles className="w-3.5 h-3.5" />
+                            <span>Reescrever com IA Vendedora</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                  <textarea
+                    rows={5}
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                    placeholder="Descrição detalhada do produto, vantagens e chamada para ação..."
+                    className="w-full px-3 py-2 bg-background border rounded-lg text-xs focus:ring-2 focus:ring-primary focus:outline-hidden font-mono text-[11px]"
+                  />
+                </div>
+
+                {/* Pros / Benefícios de Conversão */}
+                {pros.length > 0 && (
+                  <div className="space-y-1.5 pt-1">
+                    <label className="block text-xs font-semibold text-muted-foreground">
+                      Destaques & Benefícios de Conversão ({pros.length})
+                    </label>
+                    <div className="flex flex-wrap gap-1.5">
+                      {pros.map((pro, idx) => (
+                        <span
+                          key={idx}
+                          className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded-full bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20"
+                        >
+                          <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                          <span>{pro}</span>
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
                 {(previewData.metadata.sourceSpecs || previewData.metadata.specs) && (
                   <div className="space-y-1.5 pt-2 border-t">
@@ -429,6 +633,85 @@ export function AffiliateImporter({ onSuccess }: AffiliateImporterProps) {
                   </div>
                 )}
               </div>
+            </div>
+
+            {/* WooCommerce Publishing Section */}
+            <div className="p-4 bg-muted/20 border rounded-xl space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-2">
+                  <ShoppingBag className="w-4 h-4 text-primary" />
+                  <span className="text-sm font-semibold text-foreground">Publicação no WordPress / WooCommerce</span>
+                </div>
+                <label className="flex items-center space-x-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={publishToWc}
+                    onChange={(e) => setPublishToWc(e.target.checked)}
+                    className="rounded text-primary focus:ring-primary"
+                  />
+                  <span className="text-xs font-medium text-foreground">Publicar no WooCommerce ao salvar</span>
+                </label>
+              </div>
+
+              {publishToWc && (
+                <div className="pt-2 border-t border-border/60 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
+                  <div>
+                    <label className="block text-muted-foreground mb-1 font-medium">Site WordPress</label>
+                    <select
+                      value={selectedWpSiteId}
+                      onChange={(e) => setSelectedWpSiteId(e.target.value)}
+                      className="w-full px-2.5 py-1.5 bg-background border rounded-md"
+                    >
+                      {wordpressSites.length === 0 ? (
+                        <option value="">Nenhum site configurado</option>
+                      ) : (
+                        wordpressSites.map((site) => (
+                          <option key={site.id} value={site.id}>
+                            {site.name} {site.isDefault ? "(Padrão)" : ""}
+                          </option>
+                        ))
+                      )}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-muted-foreground mb-1 font-medium">Tipo de Produto</label>
+                    <select
+                      value={wcProductType}
+                      onChange={(e) => setWcProductType(e.target.value as "external" | "simple")}
+                      className="w-full px-2.5 py-1.5 bg-background border rounded-md"
+                    >
+                      <option value="external">Externo / Afiliado (Recomendado)</option>
+                      <option value="simple">Simples (Loja Local)</option>
+                    </select>
+                  </div>
+
+                  {wcProductType === "external" && (
+                    <div>
+                      <label className="block text-muted-foreground mb-1 font-medium">Texto do Botão de Compra</label>
+                      <input
+                        type="text"
+                        value={wcButtonText}
+                        onChange={(e) => setWcButtonText(e.target.value)}
+                        placeholder="Ex: Compre no Mercado Livre"
+                        className="w-full px-2.5 py-1.5 bg-background border rounded-md"
+                      />
+                    </div>
+                  )}
+
+                  <div>
+                    <label className="block text-muted-foreground mb-1 font-medium">Status do Produto</label>
+                    <select
+                      value={wcStatus}
+                      onChange={(e) => setWcStatus(e.target.value as "publish" | "draft")}
+                      className="w-full px-2.5 py-1.5 bg-background border rounded-md"
+                    >
+                      <option value="publish">Publicado Imediatamente</option>
+                      <option value="draft">Rascunho (Revisar no WP)</option>
+                    </select>
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="flex items-center justify-end space-x-3 pt-4 border-t">

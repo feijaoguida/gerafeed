@@ -15,6 +15,7 @@ export interface ConfirmImportInput {
   slug?: string;
   brand?: string;
   description?: string;
+  shortDescription?: string;
   sourceDescription?: string;
   imageUrl?: string;
   images?: string[];
@@ -33,11 +34,29 @@ export interface ConfirmImportInput {
   trackingLabel?: string;
   metadataSource?: string;
   overwriteExistingProductId?: string;
+  pros?: string[];
+  cons?: string[];
+  wordpressSiteId?: string | null;
+  woocommerceProductId?: number | null;
+  woocommerceProductUrl?: string | null;
+  woocommerceProductType?: string | null;
+  publishToWooCommerce?: {
+    enabled: boolean;
+    wordpressSiteId?: string;
+    productType?: "external" | "simple";
+    status?: "publish" | "draft";
+    buttonText?: string;
+  };
 }
 
 export interface PreviewImportResult {
   metadata: NormalizedProductImport;
   isDuplicate: boolean;
+  salesCopy?: {
+    shortDescription: string;
+    description: string;
+    pros: string[];
+  };
   existingProduct?: {
     id: string;
     name: string;
@@ -45,11 +64,13 @@ export interface PreviewImportResult {
     brand: string | null;
     imageUrl: string | null;
     description: string | null;
+    shortDescription?: string | null;
     sourceDescription: string | null;
     specs: unknown;
     sourceSpecs: unknown;
     rating: number | null;
     sourceRating: number | null;
+    pros?: string[];
   };
   suggestedCategory?: {
     id: string;
@@ -80,7 +101,7 @@ export class AffiliateService {
    */
   static async previewImport(
     workspaceId: string,
-    input: { affiliateUrl: string; providerCode?: string }
+    input: { affiliateUrl: string; providerCode?: string; generateSalesCopy?: boolean }
   ): Promise<PreviewImportResult> {
     await BillingService.assertFeature(
       workspaceId,
@@ -131,11 +152,13 @@ export class AffiliateService {
         brand: existingOffer.product.brand,
         imageUrl: existingOffer.product.imageUrl,
         description: existingOffer.product.description,
+        shortDescription: existingOffer.product.shortDescription,
         sourceDescription: existingOffer.product.sourceDescription,
         specs: existingOffer.product.specs,
         sourceSpecs: existingOffer.product.sourceSpecs,
         rating: existingOffer.product.rating,
         sourceRating: existingOffer.product.sourceRating,
+        pros: existingOffer.product.pros,
       };
     }
 
@@ -157,9 +180,32 @@ export class AffiliateService {
       }
     }
 
+    let salesCopy: { shortDescription: string; description: string; pros: string[] } | undefined;
+    if (input.generateSalesCopy !== false && metadata.name) {
+      try {
+        const { ProductSalesCopyService } = await import("./sales-copy-service");
+        salesCopy = await ProductSalesCopyService.generateSalesCopy(workspaceId, {
+          name: metadata.name,
+          brand: metadata.brand,
+          sourceDescription: metadata.sourceDescription || metadata.description,
+          specs: metadata.specs || metadata.sourceSpecs,
+          price: metadata.price,
+          oldPrice: metadata.oldPrice,
+          currency: metadata.currency,
+          seller: metadata.seller,
+          sourceRating: metadata.sourceRating,
+          sourceReviewCount: metadata.sourceReviewCount,
+          reviewSamples: metadata.reviewSamples,
+        });
+      } catch (copyErr) {
+        console.warn("Falha ao gerar copy de vendas no preview:", copyErr);
+      }
+    }
+
     return {
       metadata,
       isDuplicate: Boolean(existingOffer),
+      salesCopy,
       existingProduct: existingProduct || undefined,
       suggestedCategory,
       existingOffer: existingOffer
@@ -268,7 +314,8 @@ export class AffiliateService {
           data: {
             name: trimmedName,
             brand: input.brand !== undefined ? input.brand?.trim() || null : existing.brand,
-            description: existing.description,
+            description: input.description !== undefined ? input.description?.trim() || null : existing.description,
+            shortDescription: input.shortDescription !== undefined ? input.shortDescription?.trim() || null : existing.shortDescription,
             sourceDescription: input.sourceDescription !== undefined ? input.sourceDescription?.trim() || null : existing.sourceDescription,
             imageUrl: input.imageUrl !== undefined ? input.imageUrl?.trim() || null : existing.imageUrl,
             images: input.images !== undefined ? input.images : (existing as { images?: string[] }).images || [],
@@ -276,10 +323,16 @@ export class AffiliateService {
             sourceSpecs: input.sourceSpecs !== undefined ? input.sourceSpecs : existing.sourceSpecs || undefined,
             marketplaceCategoryId: input.marketplaceCategoryId !== undefined ? input.marketplaceCategoryId?.trim() || null : existing.marketplaceCategoryId,
             marketplaceCategoryName: input.marketplaceCategoryName !== undefined ? input.marketplaceCategoryName?.trim() || null : existing.marketplaceCategoryName,
+            pros: input.pros !== undefined ? input.pros : existing.pros,
+            cons: input.cons !== undefined ? input.cons : existing.cons,
             sourceRating: input.sourceRating !== undefined ? (input.sourceRating !== null ? Number(input.sourceRating) : null) : existing.sourceRating,
             sourceReviewCount: input.sourceReviewCount !== undefined ? (input.sourceReviewCount !== null ? Number(input.sourceReviewCount) : null) : existing.sourceReviewCount,
             categoryId: input.categoryId !== undefined ? input.categoryId : existing.categoryId,
             status: "ACTIVE",
+            wordpressSiteId: input.wordpressSiteId !== undefined ? input.wordpressSiteId : existing.wordpressSiteId,
+            woocommerceProductId: input.woocommerceProductId !== undefined ? input.woocommerceProductId : existing.woocommerceProductId,
+            woocommerceProductUrl: input.woocommerceProductUrl !== undefined ? input.woocommerceProductUrl : existing.woocommerceProductUrl,
+            woocommerceProductType: input.woocommerceProductType !== undefined ? input.woocommerceProductType : existing.woocommerceProductType,
           },
         });
       } else {
@@ -302,6 +355,7 @@ export class AffiliateService {
             slug: finalSlug,
             brand: input.brand?.trim() || null,
             description: input.description?.trim() || null,
+            shortDescription: input.shortDescription?.trim() || null,
             sourceDescription: input.sourceDescription?.trim() || null,
             imageUrl: input.imageUrl?.trim() || null,
             images: input.images || [],
@@ -309,10 +363,16 @@ export class AffiliateService {
             sourceSpecs: input.sourceSpecs || undefined,
             marketplaceCategoryId: input.marketplaceCategoryId?.trim() || null,
             marketplaceCategoryName: input.marketplaceCategoryName?.trim() || null,
+            pros: input.pros || [],
+            cons: input.cons || [],
             sourceRating: input.sourceRating !== undefined && input.sourceRating !== null ? Number(input.sourceRating) : null,
             sourceReviewCount: input.sourceReviewCount !== undefined && input.sourceReviewCount !== null ? Number(input.sourceReviewCount) : null,
             categoryId: input.categoryId || null,
             status: "ACTIVE",
+            wordpressSiteId: input.wordpressSiteId || null,
+            woocommerceProductId: input.woocommerceProductId !== undefined ? input.woocommerceProductId : null,
+            woocommerceProductUrl: input.woocommerceProductUrl || null,
+            woocommerceProductType: input.woocommerceProductType || "external",
           },
         });
         productId = newProduct.id;
@@ -379,6 +439,33 @@ export class AffiliateService {
         );
       } catch (err) {
         console.warn("Falha ao salvar amostras de reviews durante importação:", err);
+      }
+    }
+
+    // Publish to WooCommerce if requested
+    if (input.publishToWooCommerce?.enabled) {
+      try {
+        const { WooCommercePublisherService } = await import("./woocommerce-publisher");
+        await WooCommercePublisherService.publishProductToWooCommerce(
+          workspaceId,
+          result.product.id,
+          {
+            wordpressSiteId: input.publishToWooCommerce.wordpressSiteId,
+            productType: input.publishToWooCommerce.productType || "external",
+            status: input.publishToWooCommerce.status || "publish",
+            buttonText: input.publishToWooCommerce.buttonText,
+            offerId: result.offer?.id,
+          }
+        );
+        const refreshed = await prisma.product.findUnique({
+          where: { id: result.product.id },
+          include: { category: true, offers: true, reviewSamples: true },
+        });
+        if (refreshed) {
+          result.product = refreshed as typeof result.product;
+        }
+      } catch (wcErr) {
+        console.warn("Aviso ao publicar no WooCommerce durante confirmação da importação:", wcErr);
       }
     }
 

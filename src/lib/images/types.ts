@@ -11,7 +11,12 @@ export type ImageStyle =
   | "SATIRICAL_CARTOON"
   | "CUSTOM";
 
-export type ImageProviderType = "openai" | "gemini" | "openrouter";
+export type ImageProviderType =
+  | "openai"
+  | "gemini"
+  | "openrouter"
+  | "huggingface"
+  | "pollinations";
 
 export interface ImageSettingsStored {
   defaultStrategy: ImageStrategy;
@@ -43,19 +48,19 @@ export const IMAGE_STYLE_DEFINITIONS: Record<
     label: "Realista / Fotojornalismo",
     description: "Estilo fotográfico realista, iluminação natural de imprensa e alta definição.",
     promptModifier:
-      "photorealistic, photojournalism style, authentic news photography, natural lighting, highly detailed, 8k resolution",
+      "photorealistic, photojournalism style, authentic news photography, 35mm lens, natural lighting, DSLR camera photo, highly detailed, 8k resolution, visible skin and texture details",
   },
   CARTOON: {
     label: "Cartoon / 3D",
     description: "Estilo animação 3D moderna, personagens expressivos e cores vibrantes.",
     promptModifier:
-      "modern 3D animation cartoon style, expressive characters, vibrant lighting, smooth textures, Pixar-inspired aesthetic",
+      "modern 3D animation cartoon style, expressive characters, vibrant lighting, smooth textures, clay and 3D rendering, Pixar-inspired aesthetic",
   },
   DRAWING: {
     label: "Desenho / Ilustração",
     description: "Ilustração editorial artística, traços estilizados e paleta sofisticada.",
     promptModifier:
-      "artistic editorial illustration, elegant hand-drawn linework, textured background, sophisticated color palette, vector graphic aesthetic",
+      "2D cartoon illustration style, artistic editorial illustration, clean lines, elegant hand-drawn linework, vector graphic aesthetic, flat design, textured background, sophisticated color palette",
   },
   SATIRICAL_CARTOON: {
     label: "Sátira Cartoon / Charge",

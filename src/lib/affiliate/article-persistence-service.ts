@@ -27,6 +27,10 @@ export interface UpdateArticlePayload {
   seoDescription?: string;
   status?: ArticleStatus;
   selectedImage?: string;
+  originalImageUrl?: string | null;
+  modifiedImageUrl?: string | null;
+  generatedImageUrl?: string | null;
+  imagePrompt?: string | null;
   aiScore?: number;
   items?: AttachProductItemInput[];
   products?: AttachProductItemInput[];
@@ -223,6 +227,18 @@ export class ArticlePersistenceService {
     }
     if (typeof payload.selectedImage === "string" && ["ORIGINAL", "MODIFIED", "AI_GENERATED"].includes(payload.selectedImage.toUpperCase())) {
       dataToUpdate.selectedImage = payload.selectedImage.toUpperCase();
+    }
+    if (payload.originalImageUrl !== undefined) {
+      dataToUpdate.originalImageUrl = payload.originalImageUrl;
+    }
+    if (payload.modifiedImageUrl !== undefined) {
+      dataToUpdate.modifiedImageUrl = payload.modifiedImageUrl;
+    }
+    if (payload.generatedImageUrl !== undefined) {
+      dataToUpdate.generatedImageUrl = payload.generatedImageUrl;
+    }
+    if (payload.imagePrompt !== undefined) {
+      dataToUpdate.imagePrompt = payload.imagePrompt;
     }
     if (typeof payload.aiScore === "number") dataToUpdate.aiScore = payload.aiScore;
 

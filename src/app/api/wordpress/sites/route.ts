@@ -5,17 +5,21 @@ import {
   getWordPressSites,
   sanitizeWordPressSite,
 } from "@/lib/wordpress-sites";
-import { BillingService } from "@/lib/billing";
+import { BillingService, AFFILIATE_FEATURES } from "@/lib/billing";
 
 export async function GET() {
   try {
     const workspaceId = await getSessionWorkspaceId();
-    const sites = await getWordPressSites(workspaceId);
+    const [sites, canConfigureWooCommerce] = await Promise.all([
+      getWordPressSites(workspaceId),
+      BillingService.hasFeature(workspaceId, AFFILIATE_FEATURES.MODULE),
+    ]);
     const sanitized = sites.map((s: Parameters<typeof sanitizeWordPressSite>[0]) => sanitizeWordPressSite(s));
 
     return NextResponse.json({
       success: true,
       sites: sanitized,
+      canConfigureWooCommerce,
     });
   } catch (error) {
     console.error("GET /api/wordpress/sites error:", error);
@@ -40,7 +44,17 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json();
-    const { name, url, username, applicationPassword, defaultPromptType, active, isDefault } = body;
+    const {
+      name,
+      url,
+      username,
+      applicationPassword,
+      defaultPromptType,
+      active,
+      isDefault,
+      woocommerceConsumerKey,
+      woocommerceConsumerSecret,
+    } = body;
 
     if (!name || !name.trim()) {
       return NextResponse.json(
@@ -61,6 +75,20 @@ export async function POST(request: Request) {
       );
     }
 
+    // Se informou chaves do WooCommerce, validar se o plano do workspace possui o módulo de afiliados
+    const hasWcKeyInput = Boolean(
+      (woocommerceConsumerKey && woocommerceConsumerKey.trim()) ||
+      (woocommerceConsumerSecret && woocommerceConsumerSecret.trim())
+    );
+
+    if (hasWcKeyInput) {
+      await BillingService.assertFeature(
+        workspaceId,
+        AFFILIATE_FEATURES.MODULE,
+        "A configuração do WooCommerce está disponível apenas para planos com o módulo de Afiliados ativado."
+      );
+    }
+
     const created = await createWordPressSite({
       workspaceId,
       name: name.trim(),
@@ -70,6 +98,8 @@ export async function POST(request: Request) {
       defaultPromptType: defaultPromptType || null,
       active: active !== undefined ? active : true,
       isDefault: isDefault === true,
+      woocommerceConsumerKey: woocommerceConsumerKey ? woocommerceConsumerKey.trim() : null,
+      woocommerceConsumerSecret: woocommerceConsumerSecret ? woocommerceConsumerSecret.trim() : null,
     });
 
     return NextResponse.json({
@@ -80,6 +110,7 @@ export async function POST(request: Request) {
   } catch (error: unknown) {
     console.error("POST /api/wordpress/sites error:", error);
     const message = error instanceof Error ? error.message : "Erro ao criar site WordPress.";
-    return NextResponse.json({ error: message }, { status: 400 });
+    const status = message.includes("módulo de Afiliados") ? 403 : 400;
+    return NextResponse.json({ error: message }, { status });
   }
 }

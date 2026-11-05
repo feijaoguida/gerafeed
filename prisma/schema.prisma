@@ -348,6 +348,8 @@ model WordPressSite {
   url                          String
   username                     String
   encryptedApplicationPassword String
+  woocommerceConsumerKey       String?
+  encryptedWooCommerceSecret   String?
   defaultPromptType            String?
   active                       Boolean               @default(true)
   isDefault                    Boolean               @default(false)
@@ -356,6 +358,7 @@ model WordPressSite {
   sources                      WordPressSiteSource[]
   categories                   WordPressCategory[]
   articles                     Article[]
+  products                     Product[]
 
   @@unique([workspaceId, name])
   @@index([workspaceId])
@@ -431,6 +434,7 @@ model Product {
   slug        String
   brand       String?
   description             String?
+  shortDescription        String?          @db.Text
   sourceDescription       String?          @db.Text
   imageUrl                String?
   images                  String[]         @default([])
@@ -444,6 +448,12 @@ model Product {
   sourceRating            Float?
   sourceReviewCount       Int?
   status                  ProductStatus    @default(ACTIVE)
+  wordpressSiteId         String?
+  wordpressSite           WordPressSite?   @relation(fields: [wordpressSiteId], references: [id], onDelete: SetNull)
+  woocommerceProductId    Int?
+  woocommerceProductUrl   String?
+  woocommerceProductType  String?          @default("external")
+  woocommerceLastSyncedAt DateTime?
   createdAt   DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
   offers           ProductOffer[]
@@ -456,6 +466,8 @@ model Product {
   @@unique([workspaceId, slug])
   @@index([workspaceId])
   @@index([categoryId])
+  @@index([wordpressSiteId])
+  @@index([woocommerceProductId])
 }
 
 enum OfferStatus {

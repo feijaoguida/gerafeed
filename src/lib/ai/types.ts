@@ -1,14 +1,23 @@
+import {
+  CompletionLevel,
+  buildManualArticlePrompts,
+} from "./manual-prompts";
+
+export type { CompletionLevel };
+
 export interface GenerateArticleInput {
   originalTitle: string;
   originalDescription?: string | null;
   originalContent?: string | null;
   categories: Array<{ id: string; name: string; slug: string }>;
   promptSettings?: PromptSettings;
+  /** Optional completion level for manual/pauta articles (FORMAT_ONLY, LIGHT, MEDIUM, LARGE). */
+  completionLevel?: CompletionLevel;
   /** Trusted server-side template; never accept this field directly from client input. */
   systemPrompt?: string;
 }
 
-/** Keep the existing RSS prompt unless a server-resolved commercial template is supplied. */
+/** Keep the existing RSS prompt unless a server-resolved commercial template or completionLevel is supplied. */
 export function buildArticlePrompts(input: GenerateArticleInput): { systemPrompt: string; userPrompt: string } {
   const commercialPrompt = input.systemPrompt?.trim();
   if (commercialPrompt) {
@@ -16,6 +25,20 @@ export function buildArticlePrompts(input: GenerateArticleInput): { systemPrompt
       systemPrompt: commercialPrompt,
       userPrompt: input.originalDescription || input.originalTitle,
     };
+  }
+
+  if (input.completionLevel) {
+    const rawText =
+      input.originalContent?.trim() ||
+      input.originalDescription?.trim() ||
+      input.originalTitle;
+    return buildManualArticlePrompts({
+      level: input.completionLevel,
+      titleHint: input.originalTitle,
+      rawText,
+      categories: input.categories,
+      promptSettings: input.promptSettings,
+    });
   }
 
   return {

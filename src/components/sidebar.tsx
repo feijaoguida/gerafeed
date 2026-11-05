@@ -26,6 +26,7 @@ import {
   CreditCard,
   HelpCircle,
   Map,
+  FileEdit,
 } from "lucide-react";
 
 import { ThemeToggle, ThemeToggleRow } from "@/components/theme-toggle";
@@ -112,7 +113,14 @@ export function Sidebar({
                 href="/publishing"
                 label="Publicar Posts"
                 icon={<Send className="w-4 h-4" />}
-                active={isActive("/publishing")}
+                active={pathname === "/publishing" || pathname.startsWith("/publishing/rss") || pathname.startsWith("/publishing/affiliate")}
+                onClick={() => setIsMobileOpen(false)}
+              />
+              <SidebarItem
+                href="/publishing/manual"
+                label="Criar Matéria / Pauta"
+                icon={<FileEdit className="w-4 h-4 text-primary" />}
+                active={isActive("/publishing/manual")}
                 onClick={() => setIsMobileOpen(false)}
               />
               <SidebarItem

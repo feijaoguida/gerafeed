@@ -1,7 +1,7 @@
 import type { AffiliateProvider, AffiliateUrlValidationResult, NormalizedProductImport, ProductMetadataInput, ResolvedAffiliateLink } from './types';
 import { SafeUrlResolver, SafeResolverResult } from './resolver';
 import { ResolverError } from './ssrf';
-import { extractJsonLd, extractMetaTags } from './metadata-extractor';
+import { extractJsonLd, extractMetaTags, cleanDescriptionText, buildFallbackDescription } from './metadata-extractor';
 
 export const SHOPEE_HOSTS = ['shopee.com.br', 'shope.ee', 'shp.ee'];
 export function shopeeProductId(url: string): string | undefined {
@@ -21,8 +21,11 @@ export function extractShopeeMetadata(html: string, affiliateUrl: string, resolv
   if (!ld && !/content=["'](?:product|[0-9][0-9.,]*)["']/i.test(html)) return partial;
   const raw = ld || og;
   const imageUrl = raw.imageUrl && /^https?:\/\//i.test(raw.imageUrl) ? raw.imageUrl : undefined;
+  const cleanedDesc = cleanDescriptionText(raw.description) || raw.description;
+  const fallbackDesc = (!cleanedDesc || cleanedDesc.length < 25) ? buildFallbackDescription(raw.name, raw.brand, ld?.sourceSpecs || og?.sourceSpecs) : undefined;
+  const finalDesc = cleanedDesc || fallbackDesc;
   return { ...base, status: raw.name && imageUrl && raw.price !== undefined ? 'COMPLETE' : 'PARTIAL',
-    name:raw.name, brand:raw.brand, description:raw.description, sourceDescription:raw.description,
+    name:raw.name, brand:raw.brand, description:finalDesc, sourceDescription:finalDesc,
     imageUrl, images:imageUrl ? [imageUrl] : [], price:raw.price, currency:raw.currency,
     // og:site_name names the platform, not the seller.
     seller:ld?.seller, sourceSpecs:ld?.sourceSpecs, sourceRating:ld?.sourceRating, sourceReviewCount:ld?.sourceReviewCount,

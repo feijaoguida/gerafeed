@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { getConfig } from "@/lib/config";
-import { PromptSettings, GeneratedArticle } from "./ai/types";
+import { PromptSettings, GeneratedArticle, CompletionLevel } from "./ai/types";
 import { getActiveAIProvider } from "./ai/service";
 import { processAndStoreImage } from "./imageProcessor";
 import { scrapeArticleContent } from "@/lib/scraper";
@@ -32,7 +32,7 @@ export interface AiProcessResult {
 export async function processArticleWithAi(
   articleId: string,
   workspaceId?: string,
-  options?: { force?: boolean }
+  options?: { force?: boolean; completionLevel?: CompletionLevel }
 ) {
   const article = await prisma.article.findUnique({
     where: {
@@ -82,6 +82,7 @@ export async function processArticleWithAi(
     originalContent,
     categories,
     promptSettings,
+    completionLevel: options?.completionLevel,
   });
 
   // Validate suggested category exists in available list

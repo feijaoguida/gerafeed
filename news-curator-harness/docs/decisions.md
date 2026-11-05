@@ -581,3 +581,88 @@ Decisões:
   enviam suas instruções e o contexto renderizado; sem ele, mantêm o prompt RSS.
 - Review e comparativo adotam o contrato agora. Governança global, versionamento,
   revisão humana, resolução de ofertas e renderização canônica são preservados.
+
+
+## ADR-093 — Criação Manual de Matérias com 4 Níveis de Complemento (`CompletionLevel`), Upload de Fotos e Imagens Inline no WordPress (Phase 35)
+Status: Accepted. Autorização do usuário em 2026-11-03.
+
+Contexto:
+O usuário solicitou a capacidade de publicar/criar matérias a partir de um texto, pedaços de texto, ideias de pauta ou entrevistas, escolhendo entre 4 níveis de complemento com prompts dedicados (`FORMAT_ONLY`, `LIGHT`, `MEDIUM`, `LARGE`), além de poder enviar fotos e imagens (capa e corpo da matéria) e criar fotos através da matéria com IA.
+
+Decisões:
+1. **Motor de Prompts com 4 Níveis de Complemento (`src/lib/ai/manual-prompts.ts`)**:
+   - `FORMAT_ONLY` (**Formatar**): Proíbe qualquer alteração, reescrita ou adição de palavras no corpo da matéria; apenas formata em parágrafos (`<p>`), subtítulos existentes (`<h2>`/`<h3>`) e listas (`<ul>`/`<li>`), gerando resumo, tags e SEO Yoast.
+   - `LIGHT` (**Leve**): Formata e realiza pequenos ajustes de fluidez dentro do estilo configurado (`PromptSettings`), podendo inserir pequenos trechos conectivos.
+   - `MEDIUM` (**Média**): Formata e realiza alterações pontuais dentro do estilo configurado, podendo inserir trechos criados pela IA para contextualizar a pauta/entrevista.
+   - `LARGE` (**Grande**): Formata, reescreve e complementa amplamente a matéria dentro do estilo configurado, podendo inserir grandes partes de trechos criados pela IA.
+2. **Upload Seguro de Imagens (`POST /api/images/upload` e `validateAndOptimizeUploadedImage`)**:
+   - Validação estrita no servidor: sessão autenticada, limite de 8MB, validação de formato binário/magic bytes via `sharp(buffer).metadata()` restrita a `jpeg`, `png` e `webp`, remoção de metadados EXIF/ativos (CDR) via recodificação JPEG (max 1600px) e geração opcional da variante invertida (`modifiedImageUrl`).
+3. **Distribuição e Publicação de Imagens Inline no WordPress**:
+   - Imagens enviadas ou geradas para o corpo da matéria são inseridas em blocos `<figure class="wp-block-image"><img src="..." alt="..." /><figcaption>...</figcaption></figure>` com escape estrito de HTML (`escapeHtmlText`).
+   - No momento da publicação (`publishArticleToWordPress`), `replaceInlineDataUriImagesWithWordPressMedia` identifica todas as tags `<img src="data:image/..." />` no HTML, faz upload de cada imagem para `/wp-json/wp/v2/media` e substitui o Data URI pelo `source_url` final hospedado no WordPress.
+
+
+## ADR-094 — Provedores Gratuitos de Geração de Imagens (Hugging Face ZeroGPU/Router & Pollinations.ai) e Configuração em `/settings/ai` (Phase 36)
+Status: Accepted (Executado e validado em 2026-11-04 nas tasks 278 a 281).
+
+Contexto:
+O usuário solicitou a inclusão de geração de imagens gratuita via Hugging Face (avaliando `Freepik/flux.1-lite-8B` e alternativas gratuitas documentadas no guia de APIs gratuitas), mantendo os provedores atuais (`openai`, `gemini`, `openrouter`), adicionando um espaço para configurar a IA de Imagens na tela `/settings/ai` e pré-configurando sua chave `hf_...` através do `prisma/seed.ts`.
+
+Decisões:
+1. **Validação de Gratuidade no Hugging Face**:
+   - `Freepik/flux.1-lite-8B` não possui provedor de inferência serverless gratuito ativo no Hugging Face (`inferenceProviderMapping: {}`).
+   - O `HuggingFaceFluxAdapter` utilizará como padrão o modelo oficial `black-forest-labs/FLUX.1-schnell`, autenticando com `Authorization: Bearer hf_...` via endpoint oficial ZeroGPU/Gradio (`https://black-forest-labs-flux-1-schnell.hf.space/gradio_api/call/infer`) — validado gratuitamente em ~6s — e suportando também `https://router.huggingface.co/hf-inference/models/{model}`.
+2. **Adição da Pollinations.ai como Opção Gratuita Sem Chave**:
+   - O `PollinationsFluxAdapter` consumirá `https://image.pollinations.ai/prompt/{prompt}?model=flux&width=1024&height=1024&nologo=true` e converterá o resultado em Data URI.
+3. **Configuração Centralizada em `/settings/ai` e Seed**:
+   - A tela `/settings/ai` ganhará um espaço dedicado para configurar e testar a IA de Imagens (`/api/images/config` e `/api/images/test`), além de manter `/settings/images` sincronizada.
+   - O `prisma/seed.ts` gravará `imageSettings` com `imageProvider: "huggingface"`, `useSameKeyAsTextAi: false`, `customModel: "black-forest-labs/FLUX.1-schnell"` e a chave `HUGGINGFACE_API_KEY` criptografada com AES-256-GCM.
+
+
+## ADR-095 — Copywriting de Produtos com IA Focado em Vendas (AIDA) e Publicação Direta no WordPress / WooCommerce (Phase 37)
+Status: Accepted (Executado e validado em 2026-11-04 nas tasks 282 a 285).
+
+Contexto:
+O usuário solicitou duas evoluções centrais no fluxo de Importação de Produtos (`/affiliates/import` e catálogo):
+1. Melhorar a qualidade da descrição do produto importado, permitindo que a IA crie uma descrição persuasiva com **foco em vender**;
+2. Ter a opção de fazer a publicação do produto no WordPress para que seja lido pelo **WooCommerce**.
+
+Decisões:
+1. **Motor de Copywriting Comercial com IA (`src/lib/affiliate/sales-copy-service.ts`)**:
+   - Utiliza o provedor de IA ativo do Workspace (`getActiveAIProvider`) com engenharia de prompt voltada para conversão em e-commerce (Framework AIDA: Atenção, Interesse, Desejo, Ação), gerando `shortDescription` (resumo de impacto para o topo do WooCommerce), `description` (texto completo focado em benefícios reais, argumentos de venda, ficha técnica traduzida em valor e chamada para ação) e `pros` (pontos fortes objetivos).
+   - Preserva fidelidade factual estrita: a IA não inventa especificações, medidas, garantias ou descontos que não constem nos metadados extraídos (`sourceDescription`, `specs`, `sourceRating`, `reviewSamples`).
+   - Possui fallback determinístico estruturado quando o Workspace não tiver chave de IA configurada.
+2. **Publicação Híbrida no WooCommerce (`src/lib/affiliate/woocommerce-publisher.ts`)**:
+   - Reaproveita as credenciais `WordPressSite` já cadastradas (Basic Auth com Application Password do WordPress, que é nativamente suportado pela REST API do WooCommerce em conexões HTTPS/HTTP autenticadas).
+   - **Caminho Primário (`/wp-json/wc/v3/products`)**: Cria ou atualiza (`PUT /wp-json/wc/v3/products/{id}`) o produto no WooCommerce suportando:
+     - `type: "external"` (Produto Externo/Afiliado nativo do WooCommerce, preenchendo `external_url` com `affiliateUrl` e `button_text` com o CTA da loja, ex: *"Comprar no Mercado Livre"* / *"Comprar na Shopee"*);
+     - `type: "simple"` (Produto Simples);
+     - Preços (`regular_price` e `sale_price` derivados de `oldPrice` e `price`);
+     - Imagens enviadas para `/wp-json/wp/v2/media` e associadas ao produto;
+     - Especificações técnicas (`specs`) mapeadas como `attributes` visíveis na aba de informações adicionais do WooCommerce.
+   - **Fallback (`/wp-json/wp/v2/product`)**: Caso a rota `/wc/v3/products` retorne 404, publica no Custom Post Type `product` via WP REST API preenchendo as meta keys padrão do WooCommerce (`_regular_price`, `_sale_price`, `_price`, `_product_url`, `_button_text`, `_sku`).
+   - **Persistência Idempotente**: O modelo `Product` armazena `wordpressSiteId`, `woocommerceProductId`, `woocommerceProductUrl`, `woocommerceProductType` e `woocommerceLastSyncedAt`, evitando duplicação em republicações.
+
+
+## ADR-096 — Chaves da API do WooCommerce nos Destinos WordPress (Multi-Site) com Guardrail de Plano de Afiliados (Phase 38)
+Status: Accepted (Planejado e em execução em 2026-11-04).
+
+Contexto:
+O usuário solicitou um local explícito para configuração das chaves da API do WooCommerce, sugerindo a página "Destinos WordPress (Multi-Site)" (`/settings/wordpress`). Além disso, exigiu que esse campo para inserir as chaves da API do WooCommerce esteja habilitado **somente se o plano do Workspace tiver o módulo de Afiliados ativo**.
+
+Decisões:
+1. **Localização Centralizada em Destinos WordPress (`/settings/wordpress`)**:
+   - A configuração pertence ao nível de cada site/destino WordPress individual (`WordPressSite`), visto que cada destino cadastrado pode ser uma loja WooCommerce independente com suas próprias credenciais REST.
+2. **Modelo de Chaves e Criptografia**:
+   - Adicionar ao modelo `WordPressSite`:
+     - `woocommerceConsumerKey String?`
+     - `encryptedWooCommerceSecret String?`
+   - O segredo do consumidor (`Consumer Secret`, `cs_...`) é criptografado via AES-256-GCM (`encrypt()`) antes de salvar no banco e nunca é trafegado para o cliente em respostas de API (`sanitizeWordPressSite` expõe apenas `hasWooCommerceSecret: boolean` e `woocommerceConsumerKey`).
+3. **Condição de Acesso pelo Plano de Afiliados**:
+   - Verificado via `BillingService.hasFeature(workspaceId, AFFILIATE_FEATURES.MODULE)`.
+   - **No Front-End (`/settings/wordpress`)**: A seção "Integração WooCommerce" fica interativa para planos com o módulo de afiliados e bloqueada/desabilitada com badge explicativo para planos que não possuem afiliados.
+   - **No Back-End (`/api/wordpress/sites` e `/api/wordpress/sites/[id]`)**: Caso o usuário envie chaves WooCommerce sem ter o módulo de afiliados no plano, a API rejeita com erro 403 e mensagem clara.
+4. **Priorização de Autenticação no Publicador (`WooCommercePublisherService`)**:
+   - Quando `woocommerceConsumerKey` e `woocommerceConsumerSecret` estiverem preenchidos no site selecionado, a REST API do WooCommerce é autenticada com as credenciais diretas do WooCommerce (`Basic base64(consumer_key:consumer_secret)`).
+   - Se não estiverem preenchidos, preserva o fallback transparente para o par `username:applicationPassword` do WordPress.
+

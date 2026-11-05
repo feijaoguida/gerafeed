@@ -2,6 +2,8 @@ import { resolveImageCredentials } from "./credentials";
 import { OpenAiDalleAdapter } from "./adapters/openai-dalle";
 import { GoogleImagenAdapter } from "./adapters/gemini-imagen";
 import { OpenRouterFluxAdapter } from "./adapters/openrouter-flux";
+import { HuggingFaceFluxAdapter } from "./adapters/huggingface-flux";
+import { PollinationsFluxAdapter } from "./adapters/pollinations-flux";
 import {
   ImageGeneratorProvider,
   GenerateImageInput,
@@ -18,6 +20,10 @@ export function createImageGenerator(credentials: ImageCredentialsResolved): Ima
       return new GoogleImagenAdapter(credentials.apiKey, credentials.baseUrl);
     case "openrouter":
       return new OpenRouterFluxAdapter(credentials.apiKey, credentials.baseUrl);
+    case "huggingface":
+      return new HuggingFaceFluxAdapter(credentials.apiKey, credentials.baseUrl);
+    case "pollinations":
+      return new PollinationsFluxAdapter(credentials.baseUrl);
     default:
       throw new Error(`Provedor de imagem não suportado: ${credentials.provider}`);
   }

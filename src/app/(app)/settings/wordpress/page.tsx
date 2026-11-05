@@ -16,6 +16,7 @@ import {
   ArrowLeft,
   Check,
   X,
+  ShoppingBag,
 } from "lucide-react";
 
 import { PageHeader } from "@/components/design-system/page-header";
@@ -41,6 +42,8 @@ interface WordPressSiteItem {
   isDefault: boolean;
   createdAt: string;
   updatedAt: string;
+  woocommerceConsumerKey?: string | null;
+  hasWooCommerceSecret?: boolean;
 }
 
 interface SourceItem {
@@ -65,6 +68,7 @@ export default function SettingsWordPressPage() {
   const [sites, setSites] = useState<WordPressSiteItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedSiteId, setSelectedSiteId] = useState<string | null>(null);
+  const [canConfigureWooCommerce, setCanConfigureWooCommerce] = useState(false);
 
   // Edit / Details State
   const [siteDetails, setSiteDetails] = useState<WordPressSiteItem | null>(null);
@@ -80,6 +84,9 @@ export default function SettingsWordPressPage() {
   const [defaultPromptType, setDefaultPromptType] = useState("");
   const [active, setActive] = useState(true);
   const [isDefault, setIsDefault] = useState(false);
+  const [woocommerceConsumerKey, setWoocommerceConsumerKey] = useState("");
+  const [woocommerceConsumerSecret, setWoocommerceConsumerSecret] = useState("");
+  const [hasWooCommerceSecret, setHasWooCommerceSecret] = useState(false);
 
   // Modal / Create Site State
   const [isCreatingSite, setIsCreatingSite] = useState(false);
@@ -89,6 +96,8 @@ export default function SettingsWordPressPage() {
   const [newSitePassword, setNewSitePassword] = useState("");
   const [newSitePromptType, setNewSitePromptType] = useState("");
   const [newSiteIsDefault, setNewSiteIsDefault] = useState(false);
+  const [newSiteWcConsumerKey, setNewSiteWcConsumerKey] = useState("");
+  const [newSiteWcConsumerSecret, setNewSiteWcConsumerSecret] = useState("");
 
   // Quick-create feed state
   const [isAddingNewFeed, setIsAddingNewFeed] = useState(false);
@@ -100,6 +109,7 @@ export default function SettingsWordPressPage() {
   // Action loaders and feedback
   const [isSaving, setIsSaving] = useState(false);
   const [isTesting, setIsTesting] = useState(false);
+  const [isTestingWooCommerce, setIsTestingWooCommerce] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -109,6 +119,9 @@ export default function SettingsWordPressPage() {
     const res = await fetch("/api/wordpress/sites");
     if (res.ok) {
       const data = await res.json();
+      if (typeof data.canConfigureWooCommerce === "boolean") {
+        setCanConfigureWooCommerce(data.canConfigureWooCommerce);
+      }
       return data.sites || [];
     }
     throw new Error("Erro ao buscar sites");
@@ -134,6 +147,9 @@ export default function SettingsWordPressPage() {
       const data = await res.json();
 
       setSiteDetails(data.site);
+      if (typeof data.canConfigureWooCommerce === "boolean") {
+        setCanConfigureWooCommerce(data.canConfigureWooCommerce);
+      }
       setAssignedSources(data.assignedSources || []);
       setAllSources(data.allSources || []);
       setCategoryCount(data.categoryCount || 0);
@@ -145,6 +161,9 @@ export default function SettingsWordPressPage() {
       setActive(data.site.active);
       setIsDefault(data.site.isDefault || false);
       setApplicationPassword("");
+      setWoocommerceConsumerKey(data.site.woocommerceConsumerKey || "");
+      setWoocommerceConsumerSecret("");
+      setHasWooCommerceSecret(Boolean(data.site.hasWooCommerceSecret));
       setSelectedSiteId(id);
     } catch (err) {
       console.error(err);
@@ -189,17 +208,28 @@ export default function SettingsWordPressPage() {
     setSuccessMessage(null);
 
     try {
+      const createPayload: Record<string, unknown> = {
+        name: newSiteName.trim(),
+        url: newSiteUrl.trim(),
+        username: newSiteUsername.trim(),
+        applicationPassword: newSitePassword.trim(),
+        defaultPromptType: newSitePromptType.trim() || null,
+        isDefault: newSiteIsDefault,
+      };
+
+      if (canConfigureWooCommerce) {
+        if (newSiteWcConsumerKey.trim()) {
+          createPayload.woocommerceConsumerKey = newSiteWcConsumerKey.trim();
+        }
+        if (newSiteWcConsumerSecret.trim()) {
+          createPayload.woocommerceConsumerSecret = newSiteWcConsumerSecret.trim();
+        }
+      }
+
       const res = await fetch("/api/wordpress/sites", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: newSiteName.trim(),
-          url: newSiteUrl.trim(),
-          username: newSiteUsername.trim(),
-          applicationPassword: newSitePassword.trim(),
-          defaultPromptType: newSitePromptType.trim() || null,
-          isDefault: newSiteIsDefault,
-        }),
+        body: JSON.stringify(createPayload),
       });
 
       const data = await res.json();
@@ -214,6 +244,8 @@ export default function SettingsWordPressPage() {
       setNewSitePassword("");
       setNewSitePromptType("");
       setNewSiteIsDefault(false);
+      setNewSiteWcConsumerKey("");
+      setNewSiteWcConsumerSecret("");
 
       await refreshSites();
       if (data.site?.id) {
@@ -248,6 +280,13 @@ export default function SettingsWordPressPage() {
         bodyPayload.applicationPassword = applicationPassword.trim();
       }
 
+      if (canConfigureWooCommerce) {
+        bodyPayload.woocommerceConsumerKey = woocommerceConsumerKey.trim() || null;
+        if (woocommerceConsumerSecret.trim()) {
+          bodyPayload.woocommerceConsumerSecret = woocommerceConsumerSecret.trim();
+        }
+      }
+
       const res = await fetch(`/api/wordpress/sites/${selectedSiteId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -259,12 +298,34 @@ export default function SettingsWordPressPage() {
 
       setSuccessMessage("Configurações atualizadas com sucesso!");
       setApplicationPassword("");
+      setWoocommerceConsumerSecret("");
       await refreshSites();
       loadSiteDetails(selectedSiteId);
     } catch (err) {
       setErrorMessage(err instanceof Error ? err.message : "Erro ao salvar.");
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleTestWooCommerce = async () => {
+    if (!selectedSiteId) return;
+    setIsTestingWooCommerce(true);
+    setErrorMessage(null);
+    setSuccessMessage(null);
+
+    try {
+      const res = await fetch(`/api/wordpress/sites/${selectedSiteId}/test-woocommerce`, {
+        method: "POST",
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Falha na conexão com a REST API do WooCommerce.");
+
+      setSuccessMessage(data.message || "Conexão com a WooCommerce REST API realizada com sucesso!");
+    } catch (err) {
+      setErrorMessage(err instanceof Error ? err.message : "Erro ao testar WooCommerce.");
+    } finally {
+      setIsTestingWooCommerce(false);
     }
   };
 
@@ -540,6 +601,42 @@ export default function SettingsWordPressPage() {
                 />
               </FormField>
 
+              {/* Seção WooCommerce no Modal */}
+              {canConfigureWooCommerce && (
+                <div className="pt-2 border-t border-border space-y-3">
+                  <div className="flex items-center gap-2">
+                    <ShoppingBag className="w-4 h-4 text-primary" />
+                    <span className="font-heading text-xs font-bold text-foreground">
+                      WooCommerce REST API (Opcional)
+                    </span>
+                    <Badge variant="purple" size="sm">
+                      Afiliados
+                    </Badge>
+                  </div>
+                  <p className="text-[11px] text-muted-foreground">
+                    Preencha caso este portal seja uma loja WooCommerce e você queira publicar produtos do catálogo de afiliados.
+                  </p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <FormField label="Consumer Key">
+                      <Input
+                        type="text"
+                        placeholder="ck_..."
+                        value={newSiteWcConsumerKey}
+                        onChange={(e) => setNewSiteWcConsumerKey(e.target.value)}
+                      />
+                    </FormField>
+                    <FormField label="Consumer Secret">
+                      <Input
+                        type="password"
+                        placeholder="cs_..."
+                        value={newSiteWcConsumerSecret}
+                        onChange={(e) => setNewSiteWcConsumerSecret(e.target.value)}
+                      />
+                    </FormField>
+                  </div>
+                </div>
+              )}
+
               <div className="flex items-center gap-3 pt-2">
                 <input
                   type="checkbox"
@@ -804,6 +901,87 @@ export default function SettingsWordPressPage() {
                   </label>
                 </div>
               </div>
+
+              {/* Integração WooCommerce */}
+              {canConfigureWooCommerce ? (
+                <div className="p-4 rounded-xl border border-primary/30 bg-primary/5 space-y-4">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-primary/20 pb-3">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <ShoppingBag className="w-4 h-4 text-primary" />
+                        <h4 className="font-heading text-sm font-bold text-foreground">
+                          Integração WooCommerce (Loja & Catálogo de Afiliados)
+                        </h4>
+                        <Badge variant="purple" size="sm">
+                          Afiliados
+                        </Badge>
+                      </div>
+                      <p className="font-sans text-xs text-muted-foreground mt-0.5">
+                        Permite publicar produtos físicos ou externos como produtos da sua loja WooCommerce.
+                      </p>
+                    </div>
+
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={handleTestWooCommerce}
+                      isLoading={isTestingWooCommerce}
+                      leadingIcon={<RefreshCw className="w-3.5 h-3.5 text-primary" />}
+                    >
+                      Testar Conexão WooCommerce
+                    </Button>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <FormField label="Consumer Key (ck_...)">
+                      <Input
+                        type="text"
+                        placeholder="ck_xxxxxxxxxxxxxxxxxxxxxxxx"
+                        value={woocommerceConsumerKey}
+                        onChange={(e) => setWoocommerceConsumerKey(e.target.value)}
+                      />
+                    </FormField>
+
+                    <FormField
+                      label="Consumer Secret (cs_...)"
+                      description={
+                        hasWooCommerceSecret
+                          ? "Chave secreta salva com sucesso. Deixe em branco para manter."
+                          : "Gerada em WooCommerce > Configurações > Avançado > REST API"
+                      }
+                    >
+                      <Input
+                        type="password"
+                        placeholder={
+                          hasWooCommerceSecret
+                            ? "•••••••••••••••• (Salvo — preencha para alterar)"
+                            : "cs_xxxxxxxxxxxxxxxxxxxxxxxx"
+                        }
+                        value={woocommerceConsumerSecret}
+                        onChange={(e) => setWoocommerceConsumerSecret(e.target.value)}
+                      />
+                    </FormField>
+                  </div>
+                </div>
+              ) : (
+                <div className="p-4 rounded-xl border border-dashed border-border bg-surface-muted/30 flex items-start gap-3">
+                  <ShoppingBag className="w-5 h-5 text-muted-foreground shrink-0 mt-0.5" />
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <h4 className="font-heading text-xs font-bold text-muted-foreground">
+                        Integração WooCommerce (Catálogo de Afiliados)
+                      </h4>
+                      <Badge variant="secondary" size="sm">
+                        Recurso de Afiliados
+                      </Badge>
+                    </div>
+                    <p className="font-sans text-xs text-muted-foreground">
+                      A publicação de produtos para o WooCommerce requer o módulo de Afiliados ativo no seu plano. Faça upgrade do seu plano para gerenciar chaves de API e sincronizar sua loja.
+                    </p>
+                  </div>
+                </div>
+              )}
 
               <CardFooter className="p-0 flex justify-end pt-4 border-t border-border">
                 <Button

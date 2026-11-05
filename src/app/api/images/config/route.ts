@@ -55,7 +55,13 @@ export async function GET() {
     const imageProvider =
       config?.imageProvider || (useSameKeyAsTextAi && inheritedImageProvider ? inheritedImageProvider : undefined);
 
-    const hasCustomApiKey = Boolean(config?.customApiKey);
+    const hasCustomApiKey =
+      Boolean(config?.customApiKey) ||
+      (config?.imageProvider === "huggingface" && Boolean(process.env.HUGGINGFACE_API_KEY));
+    const isFromEnv =
+      !Boolean(config?.customApiKey) &&
+      config?.imageProvider === "huggingface" &&
+      Boolean(process.env.HUGGINGFACE_API_KEY);
 
     return NextResponse.json({
       defaultStrategy,
@@ -65,6 +71,7 @@ export async function GET() {
       imageProvider,
       useSameKeyAsTextAi,
       hasCustomApiKey,
+      isFromEnv,
       customModel: config?.customModel || "",
       isConfigured: Boolean(config?.defaultStrategy),
       textAiContext: {
@@ -122,7 +129,13 @@ export async function POST(request: Request) {
     const finalUseSameKey =
       typeof useSameKeyAsTextAi === "boolean" ? useSameKeyAsTextAi : true;
 
-    const validProviders: ImageProviderType[] = ["openai", "gemini", "openrouter"];
+    const validProviders: ImageProviderType[] = [
+      "openai",
+      "gemini",
+      "openrouter",
+      "huggingface",
+      "pollinations",
+    ];
     const finalProvider: ImageProviderType | undefined =
       imageProvider && validProviders.includes(imageProvider) ? imageProvider : existing?.imageProvider;
 

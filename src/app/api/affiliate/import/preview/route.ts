@@ -7,7 +7,7 @@ export async function POST(request: Request) {
   try {
     const workspaceId = await requireAffiliateWorkspace();
     const body = await request.json();
-    const { affiliateUrl, providerCode } = body;
+    const { affiliateUrl, providerCode, generateSalesCopy } = body;
 
     if (!affiliateUrl || typeof affiliateUrl !== "string" || !affiliateUrl.trim()) {
       return NextResponse.json(
@@ -19,6 +19,7 @@ export async function POST(request: Request) {
     const preview = await AffiliateService.previewImport(workspaceId, {
       affiliateUrl: affiliateUrl.trim(),
       providerCode,
+      generateSalesCopy: generateSalesCopy !== undefined ? Boolean(generateSalesCopy) : undefined,
     });
 
     return NextResponse.json(preview);

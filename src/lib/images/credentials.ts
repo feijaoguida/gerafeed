@@ -29,6 +29,18 @@ export async function resolveImageCredentials(
 
   // 1. If user opted for dedicated key or if text provider is Anthropic (which lacks image generation)
   if (!useSameKey || activeTextProvider === "anthropic") {
+    const provider: ImageProviderType = imageSettings?.imageProvider || "openai";
+
+    // Pollinations does not require any API key
+    if (provider === "pollinations") {
+      return {
+        provider: "pollinations",
+        apiKey: "",
+        model: imageSettings?.customModel || "flux",
+        isInheritedFromTextAi: false,
+      };
+    }
+
     let dedicatedKey = "";
     if (imageSettings?.customApiKey) {
       try {
@@ -38,17 +50,21 @@ export async function resolveImageCredentials(
       }
     }
 
+    if (!dedicatedKey && provider === "huggingface") {
+      dedicatedKey = process.env.HUGGINGFACE_API_KEY || "";
+    }
+
     if (!dedicatedKey && activeTextProvider === "anthropic") {
       throw new Error(
-        "A Anthropic (Claude) não possui API de geração de imagens. Para gerar imagens com IA, configure uma chave de API para OpenAI, Gemini ou OpenRouter em Configurações > Imagens."
+        "A Anthropic (Claude) não possui API de geração de imagens. Para gerar imagens com IA, configure um provedor de imagens (Hugging Face, Pollinations, OpenAI, Gemini ou OpenRouter) em Configurações > Inteligência Artificial."
       );
     }
 
     if (dedicatedKey) {
-      const provider: ImageProviderType = imageSettings?.imageProvider || "openai";
       let defaultModel = "dall-e-3";
       if (provider === "gemini") defaultModel = "imagen-3.0-generate-002";
       if (provider === "openrouter") defaultModel = "black-forest-labs/flux-1-schnell";
+      if (provider === "huggingface") defaultModel = "black-forest-labs/FLUX.1-schnell";
 
       return {
         provider,

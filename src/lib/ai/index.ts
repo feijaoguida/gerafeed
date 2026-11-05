@@ -1,4 +1,5 @@
 export * from "./types";
+export * from "./manual-prompts";
 export * from "./factory";
 export * from "./service";
 export * from "./providers/openai";

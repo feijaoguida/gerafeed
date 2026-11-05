@@ -9,6 +9,7 @@ export interface CreateProductInput {
   slug?: string;
   brand?: string | null;
   description?: string | null;
+  shortDescription?: string | null;
   sourceDescription?: string | null;
   imageUrl?: string | null;
   images?: string[];
@@ -23,6 +24,11 @@ export interface CreateProductInput {
   sourceReviewCount?: number | null;
   categoryId?: string | null;
   status?: ProductStatus;
+  wordpressSiteId?: string | null;
+  woocommerceProductId?: number | null;
+  woocommerceProductUrl?: string | null;
+  woocommerceProductType?: string | null;
+  woocommerceLastSyncedAt?: Date | null;
 }
 
 export interface UpdateProductInput {
@@ -30,6 +36,7 @@ export interface UpdateProductInput {
   slug?: string;
   brand?: string | null;
   description?: string | null;
+  shortDescription?: string | null;
   sourceDescription?: string | null;
   imageUrl?: string | null;
   images?: string[];
@@ -44,6 +51,11 @@ export interface UpdateProductInput {
   sourceReviewCount?: number | null;
   categoryId?: string | null;
   status?: ProductStatus;
+  wordpressSiteId?: string | null;
+  woocommerceProductId?: number | null;
+  woocommerceProductUrl?: string | null;
+  woocommerceProductType?: string | null;
+  woocommerceLastSyncedAt?: Date | null;
 }
 
 export interface ListProductsQuery {
@@ -226,6 +238,7 @@ export class ProductCatalogService {
         slug: slugCandidate,
         brand: input.brand?.trim() || null,
         description: input.description?.trim() || null,
+        shortDescription: input.shortDescription?.trim() || null,
         sourceDescription: input.sourceDescription?.trim() || null,
         imageUrl: input.imageUrl?.trim() || null,
         images: input.images || [],
@@ -240,6 +253,11 @@ export class ProductCatalogService {
         sourceReviewCount: input.sourceReviewCount !== undefined && input.sourceReviewCount !== null ? Number(input.sourceReviewCount) : null,
         categoryId: input.categoryId || null,
         status: input.status || "ACTIVE",
+        wordpressSiteId: input.wordpressSiteId || null,
+        woocommerceProductId: input.woocommerceProductId !== undefined ? input.woocommerceProductId : null,
+        woocommerceProductUrl: input.woocommerceProductUrl || null,
+        woocommerceProductType: input.woocommerceProductType || "external",
+        woocommerceLastSyncedAt: input.woocommerceLastSyncedAt || null,
       },
       include: {
         category: true,
@@ -307,6 +325,7 @@ export class ProductCatalogService {
         slug: finalSlug,
         brand: input.brand !== undefined ? input.brand?.trim() || null : undefined,
         description: input.description !== undefined ? input.description?.trim() || null : undefined,
+        shortDescription: input.shortDescription !== undefined ? input.shortDescription?.trim() || null : undefined,
         sourceDescription: input.sourceDescription !== undefined ? input.sourceDescription?.trim() || null : undefined,
         imageUrl: input.imageUrl !== undefined ? input.imageUrl?.trim() || null : undefined,
         images: input.images !== undefined ? input.images : undefined,
@@ -321,6 +340,11 @@ export class ProductCatalogService {
         sourceReviewCount: input.sourceReviewCount !== undefined ? (input.sourceReviewCount !== null ? Number(input.sourceReviewCount) : null) : undefined,
         categoryId: input.categoryId !== undefined ? input.categoryId : undefined,
         status: input.status !== undefined ? input.status : undefined,
+        wordpressSiteId: input.wordpressSiteId !== undefined ? input.wordpressSiteId : undefined,
+        woocommerceProductId: input.woocommerceProductId !== undefined ? input.woocommerceProductId : undefined,
+        woocommerceProductUrl: input.woocommerceProductUrl !== undefined ? input.woocommerceProductUrl : undefined,
+        woocommerceProductType: input.woocommerceProductType !== undefined ? input.woocommerceProductType : undefined,
+        woocommerceLastSyncedAt: input.woocommerceLastSyncedAt !== undefined ? input.woocommerceLastSyncedAt : undefined,
       },
       include: {
         category: true,

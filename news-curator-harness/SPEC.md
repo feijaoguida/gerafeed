@@ -3253,13 +3253,145 @@ Em andamento: Task 267 TODO.
 
 ## 3. Plano de tasks e Definition of Done
 Sequência detalhada em `news-curator-harness/PLAN-phase33-ai-image-generation.md` e tasks 267 a 272:
-- [ ] Task 267: Schema Prisma (`generatedImageUrl`, `imagePrompt`), contratos de configuração de imagem e herança de chave.
-- [ ] Task 268: Serviço central de imagens (`src/lib/images/`) com adapters para DALL-E 3, Google Imagen 3 e OpenRouter FLUX.1.
-- [ ] Task 269: Motor de extração de contexto (personagens, cenário, notícia, foto de origem) e síntese de prompt visual.
-- [ ] Task 270: Processamento condicional no pipeline de IA (`src/lib/ai.ts`) e endpoint avulso de geração (`/api/articles/[id]/generate-image`).
-- [ ] Task 271: Interface em `/settings/images` com seletor de estilos, detecção de herança de chave da LLM e tooltip informativo para Anthropic.
-- [ ] Task 272: Mídia destacada com 3 opções em `/articles/[id]`, botão de geração avulsa, envio de `AI_GENERATED` para o WordPress, testes E2E, tsc e build.
+- [x] Task 267: Schema Prisma (`generatedImageUrl`, `imagePrompt`), contratos de configuração de imagem e herança de chave.
+- [x] Task 268: Serviço central de imagens (`src/lib/images/`) com adapters para DALL-E 3, Google Imagen 3 e OpenRouter FLUX.1.
+- [x] Task 269: Motor de extração de contexto (personagens, cenário, notícia, foto de origem) e síntese de prompt visual.
+- [x] Task 270: Processamento condicional no pipeline de IA (`src/lib/ai.ts`) e endpoint avulso de geração (`/api/articles/[id]/generate-image`).
+- [x] Task 271: Interface em `/settings/images` com seletor de estilos, detecção de herança de chave da LLM e tooltip informativo para Anthropic.
+- [x] Task 272: Mídia destacada com 3 opções em `/articles/[id]`, botão de geração avulsa, envio de `AI_GENERATED` para o WordPress, testes E2E, tsc e build.
 
 
 
+
+
+
+---
+
+# Phase 35. Criação Manual de Matérias (Pauta/Entrevista/Texto), 4 Níveis de Complemento com IA, Upload de Fotos e Geração de Imagens pela Matéria
+
+## 1. Estado e autorização
+Autorizada pelo usuário em 2026-11-03.
+Concluída em 2026-11-03.
+
+## 2. Objetivo e escopo
+1. Permitir criar e publicar matérias com base em um texto ou pedaços de texto fornecidos pelo usuário (ex: ideias de pauta, anotações de entrevista, tópicos, rascunhos).
+2. Disponibilizar **4 níveis de complemento ("Completar" o texto)**, cada um com seu próprio prompt especializado:
+   - **`FORMAT_ONLY` (Formatar)**: Não faz alteração no texto, somente formata, cria parágrafos (`<p>`), listas e estrutura HTML sem alterar o texto original.
+   - **`LIGHT` (Leve)**: Faz a formatação, pequenas alterações dentro do estilo escolhido na configuração do portal (`PromptSettings`), e pode inserir pequenos trechos de coesão/transição.
+   - **`MEDIUM` (Média)**: Faz a formatação, alterações mais pontuais dentro do estilo configurado, podendo inserir trechos criados pela IA para conectar e enriquecer os pontos fornecidos.
+   - **`LARGE` (Grande)**: Faz a formatação, alterações e complementação completa da matéria dentro do estilo configurado, podendo inserir grandes partes de trechos criados pela IA a partir das ideias/pauta.
+3. **Enviar Fotos e Imagens para colocar na matéria**:
+   - Permitir enviar (upload) foto de capa (Imagem Destacada) e fotos para o corpo da matéria (com legenda opcional), tanto na tela de criação da matéria quanto na tela de Revisão Editorial (`/articles/[id]`).
+   - Validar segurança dos arquivos enviados (extensão, MIME type, limite de tamanho, verificação de magic bytes via Sharp, remoção de metadados EXIF).
+   - No momento da publicação no WordPress, enviar automaticamente para a biblioteca de mídia (`/wp-json/wp/v2/media`) tanto a capa quanto imagens embutidas no corpo da matéria.
+4. **Criar Fotos através da Matéria (IA)**:
+   - Permitir gerar fotos com IA contextualizadas a partir do conteúdo da matéria (tanto como Imagem Destacada quanto para inserção no corpo do artigo), escolhendo o estilo visual desejado.
+
+## 3. Plano de tasks e Definition of Done
+Sequência detalhada em `news-curator-harness/PLAN-phase35-manual-article-creation.md` e tasks 273 a 277:
+- [x] Task 273: Contratos e Prompts dos 4 Níveis de Complemento de Matéria (`FORMAT_ONLY`, `LIGHT`, `MEDIUM`, `LARGE`).
+- [x] Task 274: Upload seguro de fotos/imagens (`/api/images/upload`), suporte a Data URI no Sharp e upload de imagens do corpo no WordPress.
+- [x] Task 275: Endpoint `/api/articles/manual` e pipeline de criação de matéria manual com fotos e IA.
+- [x] Task 276: Interface `/publishing/manual`, integração na Central de Publicação e melhorias de fotos/IA na Revisão Editorial (`/articles/[id]`).
+- [x] Task 277: Testes E2E da Phase 35, validação de segurança (Security Scanner & Audit), `tsc --noEmit`, `npm run lint` e `npm run build`.
+
+---
+
+# Phase 36. Geração de Imagens com IA Gratuita (Hugging Face & Pollinations.ai), Configuração em `/settings/ai` e Seed
+
+## 1. Estado e autorização
+Planejada em 2026-11-04. Aguardando autorização para início da implementação (Task 278 TODO).
+
+## 2. Diagnóstico Técnico de Gratuidade Validado
+1. **Token Hugging Face (`HUGGINGFACE_API_KEY`)**:
+   - Validado em `/api/whoami-v2` (usuário `feijaoguida`, token `gerafeed`, permissões `inference.serverless.write` e `inference.endpoints.infer.write`).
+2. **Modelo `Freepik/flux.1-lite-8B`**:
+   - Possui `inferenceProviderMapping: {}` no Hugging Face (a Freepik disponibilizou apenas os pesos de 8B para download local) e o Space oficial `Freepik/F-Lite` encontra-se `PAUSED`. Portanto, retorna `HTTP 400: Model not supported by provider hf-inference` na API serverless.
+3. **Execução Gratuita Funcional no Hugging Face (`black-forest-labs/FLUX.1-schnell`)**:
+   - A API antiga `api-inference.huggingface.co` foi descontinuada em favor de `router.huggingface.co`.
+   - Para contas gratuitas (`isPro: false`, sem créditos pré-pagos), a geração gratuita com token `hf_...` funciona via endpoint oficial ZeroGPU/Gradio do Hugging Face (`https://black-forest-labs-flux-1-schnell.hf.space/gradio_api/call/infer`) autenticado com `Authorization: Bearer hf_...`, gerando imagens 1024x1024 em ~6 segundos, além de suportar `https://router.huggingface.co/hf-inference/models/...` quando houver créditos/suporte.
+4. **Pollinations.ai (`model=flux`)**:
+   - Endpoint `https://image.pollinations.ai/prompt/{prompt}?model=flux&width=1024&height=1024&nologo=true` validado com sucesso (`HTTP 200 image/jpeg`), operando gratuitamente e sem necessidade de chave de API.
+
+## 3. Objetivo e escopo
+1. **Preservar Provedores Existentes**:
+   - Manter integralmente o suporte a **OpenAI (DALL-E 3)**, **Google Gemini (Imagen 3)** e **OpenRouter (FLUX.1 / FLUX.2)**.
+2. **Adicionar Provedores Gratuitos (`huggingface` e `pollinations`)**:
+   - Expandir `ImageProviderType` em `src/lib/images/types.ts` para `"openai" | "gemini" | "openrouter" | "huggingface" | "pollinations"`.
+   - Criar `HuggingFaceFluxAdapter` (`src/lib/images/adapters/huggingface-flux.ts`) com modelo padrão `black-forest-labs/FLUX.1-schnell`, suportando autenticação `Bearer hf_...` via ZeroGPU Space API oficial e `router.huggingface.co/hf-inference`, convertendo a imagem gerada em Data URI.
+   - Criar `PollinationsFluxAdapter` (`src/lib/images/adapters/pollinations-flux.ts`) com modelo padrão `flux` sem exigência de chave, convertendo o binário retornado em Data URI.
+3. **Engenharia de Prompt por Estilo Visual**:
+   - Aprimorar `IMAGE_STYLE_DEFINITIONS` em `src/lib/images/types.ts` com os descritores recomendados para modelos da família FLUX / Stable Diffusion:
+     - `REALISTIC`: lente 35mm, iluminação natural, câmera DSLR, 8k, detalhes visíveis, fotojornalismo.
+     - `CARTOON`: animação 3D estilo Pixar, cores vibrantes, renderização suave/argila, personagens expressivos.
+     - `DRAWING`: desenho animado 2D / ilustração editorial, traços limpos, ilustração vetorial, flat design.
+4. **Espaço para Configurar a IA de Imagens na Tela `/settings/ai`**:
+   - Adicionar na tela **Configurações de Inteligência Artificial** (`/settings/ai`) um espaço/aba dedicado para **Configurar a IA de Imagens** (conectado a `/api/images/config` e `/api/images/test`), permitindo selecionar o provedor de imagem (`huggingface`, `pollinations`, `openai`, `gemini`, `openrouter`), informar a chave de API dedicada (`hf_...`), definir o modelo, escolher a estratégia padrão (`ORIGINAL`, `MODIFIED`, `AI_GENERATED`), o estilo visual e testar a geração de imagem.
+   - Sincronizar também as opções no seletor de `/settings/images`.
+5. **Configuração da Chave via Seed (`prisma/seed.ts`)**:
+   - Configurar no `prisma/seed.ts` (e `.env` / `.env.example` via `HUGGINGFACE_API_KEY`) a chave do Hugging Face criptografada com AES-256-GCM em `imageSettings`, com `imageProvider: "huggingface"`, `useSameKeyAsTextAi: false` e `customModel: "black-forest-labs/FLUX.1-schnell"`.
+
+## 4. Plano de tasks e Definition of Done
+Sequência detalhada em `news-curator-harness/PLAN-phase36-huggingface-free-image-ai.md` e tasks 278 a 281:
+- [x] Task 278: Contratos de Imagem, `HuggingFaceFluxAdapter`, `PollinationsFluxAdapter` e melhorias de Engenharia de Prompt por estilo (`src/lib/images/`).
+- [x] Task 279: Espaço de Configuração da IA de Imagens em `/settings/ai`, atualização de `/settings/images`, `/api/images/config` e endpoint `/api/images/test`.
+- [x] Task 280: Configuração da chave `HUGGINGFACE_API_KEY` no `.env`, `.env.example` e `prisma/seed.ts`.
+- [x] Task 281: Testes E2E da Phase 36 (`scripts/phase36/test-huggingface-image-e2e.ts`), Security Audit (`run-security-scanner`), `npx tsc --noEmit`, `npm run lint` e `npm run build`.
+
+---
+
+# Phase 37. Descrição de Produto com IA Focada em Vendas e Publicação no WordPress (WooCommerce)
+
+## 1. Estado e autorização
+Planejada em 2026-11-04. Aguardando autorização para início da implementação (Task 282 TODO).
+
+## 2. Objetivo e escopo
+1. **Melhoria da Descrição na Importação + Copywriting com IA Focado em Vendas**:
+   - Aprimorar `metadata-extractor.ts` e `shopee.ts` para preservar quebras de parágrafo, filtrar textos genéricos de cabeçalho do marketplace (ex: *"Frete grátis no dia..."*, *"Achadinho do Mercado"*) e estruturar um resumo rico a partir dos destaques e especificações técnicas.
+   - Criar `ProductSalesCopyService` (`src/lib/affiliate/sales-copy-service.ts`) que solicita à IA configurada no Workspace a criação de uma descrição persuasiva com **foco em vendas (Framework AIDA — Atenção, Interesse, Desejo, Ação)**:
+     - **`shortDescription` (Descrição Curta para WooCommerce)**: 2 a 3 frases magnéticas com proposta de valor e benefício principal.
+     - **`description` (Descrição Completa Foco em Vendas)**: texto estruturado com gancho persuasivo, transformação de especificações técnicas reais em benefícios para o comprador, destaque de avaliações e chamada para ação (CTA).
+     - **`pros` (Pontos Positivos)**: 3 a 5 vantagens reais extraídas dos metadados do produto.
+   - **Guardrails de Fidelidade**: A IA tem foco em conversão, mas jamais inventa especificações técnicas, dimensões, garantias ou descontos inexistentes nos metadados extraídos. Possui fallback determinístico caso o Workspace não tenha IA ativa.
+2. **Publicação de Produto no WordPress para Leitura pelo WooCommerce**:
+   - Disponibilizar no **Importador de Produtos (`/affiliates/import`)** e no **Detalhe do Produto (`/affiliates/products/[id]`)** a opção de publicar o produto diretamente no WordPress para ser lido pelo **WooCommerce**.
+   - Criar `WooCommercePublisherService` (`src/lib/affiliate/woocommerce-publisher.ts`):
+     - Reaproveita as credenciais `WordPressSite` já configuradas no Workspace (Application Password).
+     - Publica/atualiza via API oficial do WooCommerce (`/wp-json/wc/v3/products`) com fallback automático para `/wp-json/wp/v2/product` (Custom Post Type `product` + meta fields nativos `_regular_price`, `_sale_price`, `_price`, `_product_url`, `_button_text`, `_sku`).
+     - Suporta tipo **`external` (Produto Externo / Afiliado — Padrão)**, onde o botão de compra no WooCommerce aponta para o `affiliateUrl` do afiliado com texto personalizável (ex: *"Comprar no Mercado Livre"*, *"Comprar na Shopee"*), e tipo **`simple` (Produto Simples)**.
+     - Faz upload da imagem principal e galeria para a Biblioteca de Mídia do WordPress (`/wp-json/wp/v2/media`) e mapeia as especificações técnicas (`specs`) como atributos visíveis na ficha do produto no WooCommerce (`attributes`).
+     - Grava em `Product` os campos `wordpressSiteId`, `woocommerceProductId`, `woocommerceProductUrl`, `woocommerceProductType` e `woocommerceLastSyncedAt`, garantindo atualização idempotente sem duplicar produtos na loja.
+
+## 3. Plano de tasks e Definition of Done
+Sequência detalhada em `news-curator-harness/PLAN-phase37-woocommerce-and-sales-ai.md` e tasks 282 a 285:
+- [x] Task 282: Schema Prisma (`shortDescription` e campos `woocommerce*` em `Product`), melhoria de extração em `metadata-extractor.ts`, serviço `ProductSalesCopyService` e rota `POST /api/affiliate/import/sales-copy`.
+- [x] Task 283: Serviço `WooCommercePublisherService` (`src/lib/affiliate/woocommerce-publisher.ts`), publicação opcional em `/api/affiliate/import/confirm` e rota `POST /api/affiliate/products/[id]/publish-woocommerce`.
+- [x] Task 284: Interface em `AffiliateImporter` (`/affiliates/import`) e `ProductDetail` (`/affiliates/products/[id]`) para descrição vendedora com IA e publicação direta no WooCommerce.
+- [x] Task 285: Testes E2E (`scripts/phase37/test-woocommerce-and-sales-ai-e2e.ts`), Security Audit (`run-security-scanner`), `npx tsc --noEmit`, `npm run lint` e `npm run build`.
+
+
+# Phase 38. Chaves da API do WooCommerce nos Destinos WordPress (Multi-Site) com Guardrail de Plano de Afiliados
+
+## 1. Estado e autorização
+Autorizada e em execução em 2026-11-04 (Task 286 IN_PROGRESS).
+
+## 2. Objetivo e escopo
+1. **Configuração de Chaves da API do WooCommerce por Destino WordPress**:
+   - Disponibilizar na tela **Destinos WordPress (Multi-Site)** (`/settings/wordpress`) campos dedicados para inserir a **Consumer Key** (`ck_...`) e **Consumer Secret** (`cs_...`) da WooCommerce REST API.
+   - Suporte tanto no formulário do site selecionado quanto no modal de criação de novo site.
+   - Encriptação AES-256-GCM para o segredo do consumidor (`encryptedWooCommerceSecret`) e sanitização estrita para o client (`hasWooCommerceSecret: boolean` sem vazar a chave secreta).
+2. **Restrição por Plano (Billing Entitlement)**:
+   - Os campos de API do WooCommerce devem estar disponíveis/habilitados **somente se o Workspace tiver o Afiliado habilitado no seu plano** (`BillingService.hasFeature(workspaceId, AFFILIATE_FEATURES.MODULE)`).
+   - Bloqueio suave na interface com aviso explicativo e badge informativo quando o plano não incluir o módulo.
+   - Validação estrita no back-end (`assertFeature`) em `POST /api/wordpress/sites` e `PUT /api/wordpress/sites/[id]` para impedir envio indevido via API.
+3. **Autenticação Híbrida e Teste de Conexão**:
+   - Atualizar `WooCommercePublisherService` para priorizar autenticação direta via chaves WooCommerce (`Authorization: Basic base64(ck:cs)`) quando configuradas, mantendo fallback suave para `username:applicationPassword`.
+   - Adicionar endpoint `POST /api/wordpress/sites/[id]/test-woocommerce` para validação de conectividade com a API do WooCommerce.
+
+## 3. Plano de tasks e Definition of Done
+Sequência detalhada em `news-curator-harness/PLAN-phase38-woocommerce-site-keys-and-plan-guard.md` e tasks 286 a 289:
+- [ ] Task 286: Schema & Backend de Credenciais WooCommerce em WordPressSite.
+- [ ] Task 287: Validação de Plano e Endpoint de Teste WooCommerce.
+- [ ] Task 288: Interface de Configuração em Destinos WordPress (`/settings/wordpress`).
+- [ ] Task 289: Autenticação no Publicador, Testes E2E Automatizados e Build.
 

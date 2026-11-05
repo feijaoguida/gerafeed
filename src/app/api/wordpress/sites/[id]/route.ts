@@ -8,6 +8,7 @@ import {
   sanitizeWordPressSite,
 } from "@/lib/wordpress-sites";
 import { getSourcesForWordPressSite } from "@/lib/wordpress-site-sources";
+import { BillingService, AFFILIATE_FEATURES } from "@/lib/billing";
 
 export async function GET(
   _request: Request,
@@ -17,7 +18,11 @@ export async function GET(
     const { id } = await params;
     const workspaceId = await getSessionWorkspaceId();
 
-    const site = await getWordPressSiteById(workspaceId, id);
+    const [site, canConfigureWooCommerce] = await Promise.all([
+      getWordPressSiteById(workspaceId, id),
+      BillingService.hasFeature(workspaceId, AFFILIATE_FEATURES.MODULE),
+    ]);
+
     if (!site) {
       return NextResponse.json(
         { error: "Site WordPress não encontrado." },
@@ -44,6 +49,7 @@ export async function GET(
       assignedSources,
       allSources: allWorkspaceSources,
       categoryCount,
+      canConfigureWooCommerce,
     });
   } catch (error) {
     console.error("GET /api/wordpress/sites/[id] error:", error);
@@ -71,6 +77,8 @@ export async function PATCH(
       defaultPromptType?: string | null;
       active?: boolean;
       isDefault?: boolean;
+      woocommerceConsumerKey?: string | null;
+      woocommerceConsumerSecret?: string;
     } = {};
 
     if (body.name !== undefined) updateData.name = body.name;
@@ -83,6 +91,27 @@ export async function PATCH(
       updateData.applicationPassword = body.applicationPassword.trim();
     }
 
+    // WooCommerce keys
+    const hasWcKeyInput = Boolean(
+      (body.woocommerceConsumerKey !== undefined && body.woocommerceConsumerKey && body.woocommerceConsumerKey.trim()) ||
+      (body.woocommerceConsumerSecret !== undefined && body.woocommerceConsumerSecret && body.woocommerceConsumerSecret.trim())
+    );
+
+    if (hasWcKeyInput) {
+      await BillingService.assertFeature(
+        workspaceId,
+        AFFILIATE_FEATURES.MODULE,
+        "A configuração do WooCommerce está disponível apenas para planos com o módulo de Afiliados ativado."
+      );
+    }
+
+    if (body.woocommerceConsumerKey !== undefined) {
+      updateData.woocommerceConsumerKey = body.woocommerceConsumerKey ? body.woocommerceConsumerKey.trim() : null;
+    }
+    if (body.woocommerceConsumerSecret !== undefined) {
+      updateData.woocommerceConsumerSecret = body.woocommerceConsumerSecret.trim();
+    }
+
     const updated = await updateWordPressSite(workspaceId, id, updateData);
 
     return NextResponse.json({
@@ -93,7 +122,8 @@ export async function PATCH(
   } catch (error: unknown) {
     console.error("PATCH /api/wordpress/sites/[id] error:", error);
     const message = error instanceof Error ? error.message : "Erro ao atualizar site WordPress.";
-    return NextResponse.json({ error: message }, { status: 400 });
+    const status = message.includes("módulo de Afiliados") ? 403 : 400;
+    return NextResponse.json({ error: message }, { status });
   }
 }
 

@@ -8,7 +8,7 @@ export function documentToEditorHtml(doc: CanonicalDocument): string {
   return doc.blocks.map(b => b.type === "RICH_TEXT" ? b.data.html ?? b.data.markdown ?? "" : blockMarker(b)).join("");
 }
 export function editorHtmlToDocument(html: string, meta?: CanonicalDocument['meta']): CanonicalDocument {
-  if (html.length > 2_000_000) throw new Error("Documento muito grande.");
+  if (html.length > 10_000_000) throw new Error("Documento muito grande.");
   const blocks: CanonicalBlock[] = [];
   let end = 0;
   for (const match of html.matchAll(/<!-- gerafeed-block:([^\n]*?) -->/g)) {

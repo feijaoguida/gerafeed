@@ -1,5 +1,10 @@
 import { NextResponse } from "next/server";
-import { processArticleWithAi, applyAiResultToArticle } from "@/lib/ai";
+import {
+  processArticleWithAi,
+  applyAiResultToArticle,
+  isValidCompletionLevel,
+  CompletionLevel,
+} from "@/lib/ai";
 import { getSessionWorkspaceId } from "@/lib/workspace";
 import { BillingService } from "@/lib/billing";
 import { handleApiError } from "@/lib/errors/service";
@@ -14,6 +19,11 @@ export async function POST(
     const body = await request.json().catch(() => ({}));
     const force = Boolean(body?.force);
     const existingAiResult = body?.aiResult;
+    const completionLevel: CompletionLevel | undefined = isValidCompletionLevel(
+      body?.completionLevel
+    )
+      ? body.completionLevel
+      : undefined;
 
     // If the user chooses "Processar mesmo assim" and aiResult was already generated with valid content,
     // apply it directly to save AI provider credits and eliminate redundant processing delay.
@@ -49,7 +59,10 @@ export async function POST(
       );
     }
 
-    const result = await processArticleWithAi(id, workspaceId, { force });
+    const result = await processArticleWithAi(id, workspaceId, {
+      force: force || Boolean(completionLevel),
+      completionLevel,
+    });
 
     if (!result.success && result.notRelevant) {
       return NextResponse.json(result, { status: 422 });

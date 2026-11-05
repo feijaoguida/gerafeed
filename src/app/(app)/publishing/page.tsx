@@ -13,6 +13,7 @@ import {
   Lock,
   CheckCircle2,
   Layers,
+  FileEdit,
 } from "lucide-react";
 
 import { PageHeader } from "@/components/design-system/page-header";
@@ -44,8 +45,71 @@ export default async function PublishingCenterPage() {
         icon={<Send className="w-5 h-5" />}
       />
 
-      {/* Two Publishing Flows Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      {/* Three Publishing Flows Grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Flow 0: Manual Article / Pauta / Entrevista */}
+        <Card className="flex flex-col justify-between shadow-xs hover:border-primary/40 transition-colors">
+          <CardHeader className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="p-3 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 rounded-xl border border-emerald-500/20">
+                <FileEdit className="w-6 h-6" />
+              </div>
+              <Badge variant="success">
+                Pauta & Entrevista
+              </Badge>
+            </div>
+
+            <div className="space-y-1.5">
+              <CardTitle className="text-xl">
+                Criar Matéria por Texto / Pauta
+              </CardTitle>
+              <CardDescription className="text-xs leading-relaxed">
+                Escreva ideias de pauta, notas de entrevista ou pedaços de texto, escolha entre 4 níveis de complemento da IA (Formatar, Leve, Média, Grande) e envie ou gere fotos.
+              </CardDescription>
+            </div>
+          </CardHeader>
+
+          <CardContent className="space-y-4">
+            <div className="space-y-2.5 pt-2 border-t border-border">
+              <h4 className="text-[11px] font-heading font-bold text-muted-foreground uppercase tracking-wider">
+                Etapas do Fluxo
+              </h4>
+              <ul className="space-y-2 text-xs text-foreground/90 font-medium">
+                <li className="flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-[#00C2A8] shrink-0" />
+                  <span>1. Cole seu texto, pedaços de pauta ou entrevista</span>
+                </li>
+                <li className="flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-[#00C2A8] shrink-0" />
+                  <span>2. Escolha o nível: Formatar, Leve, Média ou Grande</span>
+                </li>
+                <li className="flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-[#00C2A8] shrink-0" />
+                  <span>3. Envie fotos ou crie fotos pela matéria com IA</span>
+                </li>
+                <li className="flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-[#00C2A8] shrink-0" />
+                  <span>4. Revise e publique direto no WordPress</span>
+                </li>
+              </ul>
+            </div>
+          </CardContent>
+
+          <CardFooter className="pt-4 border-t border-border">
+            <Link href="/publishing/manual" className="w-full">
+              <Button
+                variant="gradient"
+                size="lg"
+                className="w-full"
+                leadingIcon={<FileEdit className="w-4 h-4" />}
+                trailingIcon={<ArrowRight className="w-4 h-4" />}
+              >
+                Criar Matéria / Pauta
+              </Button>
+            </Link>
+          </CardFooter>
+        </Card>
+
         {/* Flow 1: RSS & News Curation */}
         <Card className="flex flex-col justify-between shadow-xs hover:border-primary/40 transition-colors">
           <CardHeader className="space-y-4">

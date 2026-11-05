@@ -19,6 +19,8 @@ import {
   AlertCircle,
   Clock,
   Star,
+  Sparkles,
+  ShoppingBag,
 } from "lucide-react";
 
 interface ProductCategory {
@@ -54,6 +56,7 @@ interface ProductData {
   slug: string;
   brand: string | null;
   description: string | null;
+  shortDescription: string | null;
   sourceDescription: string | null;
   imageUrl: string | null;
   specs: Record<string, string> | null;
@@ -76,6 +79,11 @@ interface ProductData {
   }>;
   categoryId: string | null;
   status: "ACTIVE" | "ARCHIVED" | "DRAFT";
+  wordpressSiteId: string | null;
+  woocommerceProductId: number | null;
+  woocommerceProductUrl: string | null;
+  woocommerceProductType: string | null;
+  woocommerceLastSyncedAt: string | null;
   category: ProductCategory | null;
   offers: ProductOffer[];
   createdAt: string;
@@ -100,11 +108,22 @@ export function ProductDetail({ productId }: { productId: string }) {
   const [categoryId, setCategoryId] = useState("");
   const [status, setStatus] = useState<"ACTIVE" | "ARCHIVED" | "DRAFT">("ACTIVE");
   const [description, setDescription] = useState("");
+  const [shortDescription, setShortDescription] = useState("");
   const [imageUrl, setImageUrl] = useState("");
   const [rating, setRating] = useState<number | "">("");
   const [pros, setPros] = useState<string[]>([]);
   const [cons, setCons] = useState<string[]>([]);
   const [specs, setSpecs] = useState<{ key: string; value: string }[]>([]);
+
+  // Sales Copy & WooCommerce Publishing State
+  const [isGeneratingCopy, setIsGeneratingCopy] = useState(false);
+  const [isPublishingWc, setIsPublishingWc] = useState(false);
+  const [wcPublishSuccess, setWcPublishSuccess] = useState<string | null>(null);
+  const [wordpressSites, setWordpressSites] = useState<Array<{ id: string; name: string; url: string; isDefault: boolean }>>([]);
+  const [wcSiteId, setWcSiteId] = useState("");
+  const [wcProductType, setWcProductType] = useState<"external" | "simple">("external");
+  const [wcStatus, setWcStatus] = useState<"publish" | "draft">("publish");
+  const [wcButtonText, setWcButtonText] = useState("");
 
   // New Offer Modal / Inline Form
   const [showAddOffer, setShowAddOffer] = useState(false);
@@ -130,6 +149,16 @@ export function ProductDetail({ productId }: { productId: string }) {
   const [addingSource, setAddingSource] = useState(false);
   const [processingSourceId, setProcessingSourceId] = useState<string | null>(null);
 
+  useEffect(() => {
+    fetch("/api/wordpress/sites")
+      .then((res) => (res.ok ? res.json() : { sites: [] }))
+      .then((data) => {
+        const sites = Array.isArray(data) ? data : Array.isArray(data?.sites) ? data.sites : [];
+        setWordpressSites(sites);
+      })
+      .catch(() => {});
+  }, []);
+
   const fetchProduct = useCallback(async () => {
     setErrorMsg(null);
     try {
@@ -151,10 +180,15 @@ export function ProductDetail({ productId }: { productId: string }) {
       setCategoryId(prodData.categoryId || "");
       setStatus(prodData.status || "ACTIVE");
       setDescription(prodData.description || "");
+      setShortDescription(prodData.shortDescription || "");
       setImageUrl(prodData.imageUrl || "");
       setRating(prodData.rating !== null ? prodData.rating : "");
       setPros(prodData.pros || []);
       setCons(prodData.cons || []);
+      if (prodData.wordpressSiteId) setWcSiteId(prodData.wordpressSiteId);
+      if (prodData.woocommerceProductType) {
+        setWcProductType((prodData.woocommerceProductType as "external" | "simple") || "external");
+      }
 
       if (resSources.ok) {
         const sourcesData = await resSources.json();
@@ -205,10 +239,15 @@ export function ProductDetail({ productId }: { productId: string }) {
           setCategoryId(prodData.categoryId || "");
           setStatus(prodData.status || "ACTIVE");
           setDescription(prodData.description || "");
+          setShortDescription(prodData.shortDescription || "");
           setImageUrl(prodData.imageUrl || "");
           setRating(prodData.rating !== null ? prodData.rating : "");
           setPros(prodData.pros || []);
           setCons(prodData.cons || []);
+          if (prodData.wordpressSiteId) setWcSiteId(prodData.wordpressSiteId);
+          if (prodData.woocommerceProductType) {
+            setWcProductType((prodData.woocommerceProductType as "external" | "simple") || "external");
+          }
 
           if (prodData.specs && typeof prodData.specs === "object") {
             setSpecs(
@@ -261,6 +300,9 @@ export function ProductDetail({ productId }: { productId: string }) {
           categoryId: categoryId || null,
           status,
           description: description.trim() || null,
+          shortDescription: shortDescription.trim() || null,
+          wordpressSiteId: wcSiteId || null,
+          woocommerceProductType: wcProductType,
           imageUrl: imageUrl.trim() || null,
           rating: rating !== "" ? Number(rating) : null,
           pros: pros.filter((p) => p.trim()),
@@ -281,6 +323,72 @@ export function ProductDetail({ productId }: { productId: string }) {
       setErrorMsg((err as Error).message);
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleGenerateSalesCopy = async () => {
+    if (!product) return;
+    setIsGeneratingCopy(true);
+    setErrorMsg(null);
+    try {
+      const bestOffer = product.offers.find((o) => o.price && o.price > 0) || product.offers[0];
+      const specsObj = Object.fromEntries(specs.map((s) => [s.key, s.value]));
+      const res = await fetch("/api/affiliate/import/sales-copy", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name,
+          brand,
+          seller: bestOffer?.seller || undefined,
+          price: bestOffer?.price || undefined,
+          sourceDescription: product.sourceDescription || description,
+          specs: Object.keys(specsObj).length > 0 ? specsObj : (product.sourceSpecs || {}),
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Erro ao gerar copy de vendas com IA.");
+
+      if (data.shortDescription) setShortDescription(data.shortDescription);
+      if (data.description) setDescription(data.description);
+      if (Array.isArray(data.pros) && data.pros.length > 0) {
+        setPros((prev) => Array.from(new Set([...prev, ...data.pros])));
+      }
+      setSuccessMsg("Copy de vendas persuasiva gerada pela IA!");
+      setTimeout(() => setSuccessMsg(null), 3000);
+    } catch (err) {
+      setErrorMsg((err as Error).message);
+    } finally {
+      setIsGeneratingCopy(false);
+    }
+  };
+
+  const handlePublishWooCommerce = async () => {
+    setIsPublishingWc(true);
+    setErrorMsg(null);
+    setWcPublishSuccess(null);
+    try {
+      const res = await fetch(`/api/affiliate/products/${productId}/publish-woocommerce`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          wordpressSiteId: wcSiteId || undefined,
+          productType: wcProductType,
+          status: wcStatus,
+          buttonText: wcButtonText.trim() || undefined,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Erro ao publicar no WooCommerce.");
+
+      setWcPublishSuccess(`Produto sincronizado com o WooCommerce! (ID #${data.woocommerceProductId})`);
+      fetchProduct();
+      setTimeout(() => setWcPublishSuccess(null), 5000);
+    } catch (err) {
+      setErrorMsg((err as Error).message);
+    } finally {
+      setIsPublishingWc(false);
     }
   };
 
@@ -643,24 +751,62 @@ export function ProductDetail({ productId }: { productId: string }) {
             <div>
               <div className="flex items-center justify-between mb-1">
                 <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
-                  Descrição Editorial / Sinopse do Produto
+                  Descrição Curta / Gancho de Vendas (AIDA)
                 </label>
-                {product.sourceDescription && (
-                  <button
-                    type="button"
-                    onClick={() => setDescription(product.sourceDescription || "")}
-                    className="text-xs text-blue-600 hover:underline font-medium"
-                  >
-                    Copiar descrição de origem
-                  </button>
-                )}
+                <span className="text-[11px] text-slate-500 dark:text-slate-400">
+                  Resumo persuasivo no topo do WooCommerce
+                </span>
               </div>
               <textarea
-                rows={4}
+                rows={2}
+                value={shortDescription}
+                onChange={(e) => setShortDescription(e.target.value)}
+                placeholder="Frase de impacto destacando o benefício principal e a oferta..."
+                className="w-full px-3 py-2 text-sm bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg focus:ring-2 focus:ring-blue-500 dark:text-white"
+              />
+            </div>
+
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
+                  Descrição Editorial / Sinopse do Produto
+                </label>
+                <div className="flex items-center gap-3">
+                  {product.sourceDescription && (
+                    <button
+                      type="button"
+                      onClick={() => setDescription(product.sourceDescription || "")}
+                      className="text-xs text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white transition-colors"
+                    >
+                      Copiar original
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={handleGenerateSalesCopy}
+                    disabled={isGeneratingCopy}
+                    className="inline-flex items-center gap-1 text-xs font-semibold text-blue-600 dark:text-blue-400 hover:underline disabled:opacity-50"
+                  >
+                    {isGeneratingCopy ? (
+                      <>
+                        <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                        <span>Gerando Copy...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="w-3.5 h-3.5" />
+                        <span>Gerar Copy de Vendas com IA</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+              <textarea
+                rows={5}
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 placeholder="Insira detalhes contextuais, veredito e destaques do produto..."
-                className="w-full px-3 py-2 text-sm bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg focus:ring-2 focus:ring-blue-500 dark:text-white"
+                className="w-full px-3 py-2 text-sm bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg focus:ring-2 focus:ring-blue-500 dark:text-white font-mono text-xs"
               />
               {product.sourceDescription && (
                 <div className="p-3 mt-2 bg-slate-50 dark:bg-slate-900/60 rounded-lg border border-slate-200 dark:border-slate-800 text-xs space-y-1">
@@ -780,6 +926,131 @@ export function ProductDetail({ productId }: { productId: string }) {
                 placeholder="https://..."
                 className="w-full px-3 py-1.5 text-xs bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg dark:text-white"
               />
+            </div>
+
+            {/* WooCommerce Integration Card */}
+            <div className="bg-white dark:bg-slate-800 p-5 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-xs font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+                  <ShoppingBag className="w-4 h-4 text-blue-600" />
+                  <span>WordPress / WooCommerce</span>
+                </h3>
+                {product.woocommerceProductId ? (
+                  <span className="text-[11px] px-2 py-0.5 rounded-full font-medium bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
+                    ID #{product.woocommerceProductId}
+                  </span>
+                ) : (
+                  <span className="text-[11px] px-2 py-0.5 rounded-full font-medium bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-300">
+                    Não publicado
+                  </span>
+                )}
+              </div>
+
+              {product.woocommerceProductUrl && (
+                <div className="p-2.5 bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800 rounded-lg text-xs space-y-1">
+                  <div className="flex items-center justify-between">
+                    <span className="font-medium text-blue-900 dark:text-blue-200">Disponível na Loja</span>
+                    <a
+                      href={product.woocommerceProductUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 text-blue-700 dark:text-blue-300 hover:underline font-semibold"
+                    >
+                      <span>Ver Produto</span>
+                      <ExternalLink className="w-3 h-3" />
+                    </a>
+                  </div>
+                  {product.woocommerceLastSyncedAt && (
+                    <p className="text-[11px] text-blue-600 dark:text-blue-400">
+                      Última sincronização: {new Date(product.woocommerceLastSyncedAt).toLocaleString("pt-BR")}
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {wcPublishSuccess && (
+                <div className="p-2.5 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 text-emerald-800 dark:text-emerald-300 rounded-lg text-xs flex items-center gap-1.5">
+                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                  <span>{wcPublishSuccess}</span>
+                </div>
+              )}
+
+              <div className="space-y-3 pt-1 text-xs">
+                <div>
+                  <label className="block text-slate-700 dark:text-slate-300 mb-1 font-medium">Site WordPress</label>
+                  <select
+                    value={wcSiteId}
+                    onChange={(e) => setWcSiteId(e.target.value)}
+                    className="w-full px-2.5 py-1.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-md dark:text-white"
+                  >
+                    {wordpressSites.length === 0 ? (
+                      <option value="">Nenhum site configurado</option>
+                    ) : (
+                      wordpressSites.map((site) => (
+                        <option key={site.id} value={site.id}>
+                          {site.name} {site.isDefault ? "(Padrão)" : ""}
+                        </option>
+                      ))
+                    )}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-slate-700 dark:text-slate-300 mb-1 font-medium">Tipo de Produto</label>
+                  <select
+                    value={wcProductType}
+                    onChange={(e) => setWcProductType(e.target.value as "external" | "simple")}
+                    className="w-full px-2.5 py-1.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-md dark:text-white"
+                  >
+                    <option value="external">Externo / Afiliado (Link Direto)</option>
+                    <option value="simple">Simples (Loja Local)</option>
+                  </select>
+                </div>
+
+                {wcProductType === "external" && (
+                  <div>
+                    <label className="block text-slate-700 dark:text-slate-300 mb-1 font-medium">Texto do Botão</label>
+                    <input
+                      type="text"
+                      value={wcButtonText}
+                      onChange={(e) => setWcButtonText(e.target.value)}
+                      placeholder="Ex: Compre na Shopee / Ver no ML"
+                      className="w-full px-2.5 py-1.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-md dark:text-white"
+                    />
+                  </div>
+                )}
+
+                <div>
+                  <label className="block text-slate-700 dark:text-slate-300 mb-1 font-medium">Status de Publicação</label>
+                  <select
+                    value={wcStatus}
+                    onChange={(e) => setWcStatus(e.target.value as "publish" | "draft")}
+                    className="w-full px-2.5 py-1.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-md dark:text-white"
+                  >
+                    <option value="publish">Publicado Imediatamente</option>
+                    <option value="draft">Rascunho no WordPress</option>
+                  </select>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handlePublishWooCommerce}
+                  disabled={isPublishingWc || wordpressSites.length === 0}
+                  className="w-full mt-2 py-2 px-3 bg-slate-900 dark:bg-slate-100 hover:bg-slate-800 dark:hover:bg-white text-white dark:text-slate-900 font-semibold rounded-lg transition-colors flex items-center justify-center gap-1.5 disabled:opacity-50"
+                >
+                  {isPublishingWc ? (
+                    <>
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                      <span>Sincronizando...</span>
+                    </>
+                  ) : (
+                    <>
+                      <ShoppingBag className="w-3.5 h-3.5" />
+                      <span>{product.woocommerceProductId ? "Atualizar no WooCommerce" : "Publicar no WooCommerce"}</span>
+                    </>
+                  )}
+                </button>
+              </div>
             </div>
 
             {/* Status & Rating */}

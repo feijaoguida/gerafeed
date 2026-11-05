@@ -15,6 +15,7 @@ import {
   Calendar,
   Layers,
   Sparkles,
+  FileEdit,
 } from "lucide-react";
 
 import { PageHeader } from "@/components/design-system/page-header";
@@ -382,6 +383,16 @@ function RssPublishingQueueContent() {
         }
         actions={
           <div className="flex flex-wrap items-center gap-3">
+            <Link href="/publishing/manual">
+              <Button
+                variant="secondary"
+                size="sm"
+                leadingIcon={<FileEdit className="w-3.5 h-3.5 text-primary" />}
+              >
+                Criar Matéria / Pauta
+              </Button>
+            </Link>
+
             <Button
               variant="outline"
               size="sm"
@@ -572,7 +583,7 @@ function RssPublishingQueueContent() {
                   <div className="space-y-2 flex-1 min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
                       <Badge variant="outline" size="sm">
-                        {art.source?.name || "Feed RSS"}
+                        {art.source?.name || (art.originalUrl ? "Feed RSS" : "Pauta Manual")}
                       </Badge>
                       {art.wordpressSite && (
                         <Badge variant="secondary" size="sm" className="flex items-center gap-1">
@@ -613,14 +624,16 @@ function RssPublishingQueueContent() {
                         : new Date(art.createdAt).toLocaleDateString("pt-BR")}
                     </div>
 
-                    <a
-                      href={art.originalUrl}
-                      target="_blank"
-                      rel="noreferrer noopener"
-                      className="text-[11px] text-primary hover:underline flex items-center gap-1 font-medium"
-                    >
-                      Fonte Original <ExternalLink className="w-3 h-3" />
-                    </a>
+                    {art.originalUrl && (
+                      <a
+                        href={art.originalUrl}
+                        target="_blank"
+                        rel="noreferrer noopener"
+                        className="text-[11px] text-primary hover:underline flex items-center gap-1 font-medium"
+                      >
+                        Fonte Original <ExternalLink className="w-3 h-3" />
+                      </a>
+                    )}
                   </div>
                 </div>
 

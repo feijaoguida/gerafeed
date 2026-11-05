@@ -8,6 +8,9 @@ export interface CreateWordPressSiteInput {
   username: string;
   applicationPassword?: string;
   encryptedApplicationPassword?: string;
+  woocommerceConsumerKey?: string | null;
+  woocommerceConsumerSecret?: string | null;
+  encryptedWooCommerceSecret?: string | null;
   defaultPromptType?: string | null;
   active?: boolean;
   isDefault?: boolean;
@@ -19,6 +22,9 @@ export interface UpdateWordPressSiteInput {
   username?: string;
   applicationPassword?: string;
   encryptedApplicationPassword?: string;
+  woocommerceConsumerKey?: string | null;
+  woocommerceConsumerSecret?: string | null;
+  encryptedWooCommerceSecret?: string | null;
   defaultPromptType?: string | null;
   active?: boolean;
   isDefault?: boolean;
@@ -31,6 +37,8 @@ export interface WordPressSiteClientSafe {
   url: string;
   username: string;
   hasPassword: boolean;
+  woocommerceConsumerKey: string | null;
+  hasWooCommerceSecret: boolean;
   defaultPromptType: string | null;
   active: boolean;
   isDefault: boolean;
@@ -45,6 +53,8 @@ export interface WordPressSiteDecryptedConfig {
   url: string;
   username: string;
   applicationPassword: string;
+  woocommerceConsumerKey?: string | null;
+  woocommerceConsumerSecret?: string | null;
   defaultPromptType: string | null;
   active: boolean;
 }
@@ -59,6 +69,8 @@ export function sanitizeWordPressSite(site: {
   url: string;
   username: string;
   encryptedApplicationPassword: string;
+  woocommerceConsumerKey?: string | null;
+  encryptedWooCommerceSecret?: string | null;
   defaultPromptType: string | null;
   active: boolean;
   isDefault: boolean;
@@ -72,6 +84,8 @@ export function sanitizeWordPressSite(site: {
     url: site.url,
     username: site.username,
     hasPassword: !!site.encryptedApplicationPassword,
+    woocommerceConsumerKey: site.woocommerceConsumerKey || null,
+    hasWooCommerceSecret: !!site.encryptedWooCommerceSecret,
     defaultPromptType: site.defaultPromptType,
     active: site.active,
     isDefault: site.isDefault,
@@ -102,6 +116,11 @@ export async function createWordPressSite(input: CreateWordPressSiteInput) {
     encryptedPassword = encrypt(input.applicationPassword);
   }
 
+  let encryptedWcSecret = input.encryptedWooCommerceSecret || null;
+  if (input.woocommerceConsumerSecret && input.woocommerceConsumerSecret.trim()) {
+    encryptedWcSecret = encrypt(input.woocommerceConsumerSecret.trim());
+  }
+
   const site = await prisma.wordPressSite.create({
     data: {
       workspaceId: input.workspaceId,
@@ -109,6 +128,8 @@ export async function createWordPressSite(input: CreateWordPressSiteInput) {
       url: input.url.trim().replace(/\/+$/, ""),
       username: input.username.trim(),
       encryptedApplicationPassword: encryptedPassword,
+      woocommerceConsumerKey: input.woocommerceConsumerKey?.trim() || null,
+      encryptedWooCommerceSecret: encryptedWcSecret,
       defaultPromptType: input.defaultPromptType || null,
       active: input.active !== undefined ? input.active : true,
       isDefault: input.isDefault || false,
@@ -186,6 +207,15 @@ export async function getWordPressSiteConfig(
     }
   }
 
+  let plainWcSecret: string | null = null;
+  if (site.encryptedWooCommerceSecret) {
+    try {
+      plainWcSecret = decrypt(site.encryptedWooCommerceSecret);
+    } catch (err) {
+      console.error(`Erro ao descriptografar segredo do WooCommerce do WordPressSite ${siteId}:`, err);
+    }
+  }
+
   return {
     id: site.id,
     workspaceId: site.workspaceId,
@@ -193,6 +223,8 @@ export async function getWordPressSiteConfig(
     url: site.url,
     username: site.username,
     applicationPassword: plainPassword,
+    woocommerceConsumerKey: site.woocommerceConsumerKey || null,
+    woocommerceConsumerSecret: plainWcSecret,
     defaultPromptType: site.defaultPromptType,
     active: site.active,
   };
@@ -221,6 +253,8 @@ export async function updateWordPressSite(
     url?: string;
     username?: string;
     encryptedApplicationPassword?: string;
+    woocommerceConsumerKey?: string | null;
+    encryptedWooCommerceSecret?: string | null;
     defaultPromptType?: string | null;
     active?: boolean;
     isDefault?: boolean;
@@ -237,6 +271,20 @@ export async function updateWordPressSite(
     data.encryptedApplicationPassword = encrypt(input.applicationPassword);
   } else if (input.encryptedApplicationPassword !== undefined) {
     data.encryptedApplicationPassword = input.encryptedApplicationPassword;
+  }
+
+  if (input.woocommerceConsumerKey !== undefined) {
+    data.woocommerceConsumerKey = input.woocommerceConsumerKey?.trim() || null;
+  }
+
+  if (input.woocommerceConsumerSecret !== undefined) {
+    if (input.woocommerceConsumerSecret && input.woocommerceConsumerSecret.trim()) {
+      data.encryptedWooCommerceSecret = encrypt(input.woocommerceConsumerSecret.trim());
+    } else {
+      data.encryptedWooCommerceSecret = null;
+    }
+  } else if (input.encryptedWooCommerceSecret !== undefined) {
+    data.encryptedWooCommerceSecret = input.encryptedWooCommerceSecret;
   }
 
   const updated = await prisma.wordPressSite.update({

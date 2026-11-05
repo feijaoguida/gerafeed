@@ -1,13 +1,13 @@
 # PROGRESS.md
 
 ## Current Phase
-Phase 34. Onboarding de Usuários e Central de Ajuda (DONE)
+Phase 38. Chaves da API do WooCommerce nos Destinos WordPress (Multi-Site) com Guardrail de Plano de Afiliados (IN_PROGRESS)
 
 ## Current Task
-Nenhuma tarefa pendente na Phase 34.
+Task 287: Validação de Plano e Endpoint de Teste WooCommerce (IN_PROGRESS)
 
 ## Status
-DONE — Phase 34 concluída com sucesso. Criada página de onboarding passo-a-passo e página de ajuda com guia completo de IA integrado. Layouts centralizados e alinhados com o padrão do sistema (`p-6 md:p-8 max-w-5xl mx-auto w-full`). Evidências validadas e testadas (Lint e TypeCheck PASS).
+IN_PROGRESS — Phase 38 iniciada em 2026-11-04. Task 286 concluída (schema Prisma e serviço de credenciais WooCommerce com encriptação AES-256 e sanitização). Em andamento Task 287 (validação de plano de afiliados e endpoint de teste).
 
 ## Phase 33 (DONE)
 
@@ -864,3 +864,101 @@ Publicação de Artigos de Afiliados no WordPress e Seleção de Categoria/Site 
   **Motivo:** usuário escolheu explicitamente somente arquivos nesta entrega.
   **Impacto:** os textos ainda não estão acessíveis na aplicação.
   **Próxima ação:** implementar rotas/links e ajuda quando solicitado.
+
+
+## Phase 35 — Criação Manual de Matérias (Pauta/Entrevista/Texto), 4 Níveis de Complemento com IA, Upload de Fotos e Geração de Fotos pela Matéria (DONE — 2026-11-03)
+
+- **Estado**: Concluída em 2026-11-03.
+- **Plano**: `news-curator-harness/PLAN-phase35-manual-article-creation.md`
+- **Spec**: `news-curator-harness/SPEC.md` (Phase 35)
+
+| Task | Status | Entrega |
+|---|---|---|
+| [273](tasks/273-manual-article-prompts-and-contracts.md) | DONE | Contratos `CompletionLevel` (`FORMAT_ONLY`, `LIGHT`, `MEDIUM`, `LARGE`), `COMPLETION_LEVEL_DEFINITIONS` e motor de prompts `buildManualArticlePrompts` em `src/lib/ai/manual-prompts.ts` |
+| [274](tasks/274-image-upload-and-wordpress-inline-media.md) | DONE | Endpoint `POST /api/images/upload` com validação de magic bytes via Sharp (`validateAndOptimizeUploadedImage`), suporte a Data URI em `processAndStoreImage`, distribuição de fotos no corpo (`distributeImagesInHtmlContent`) e upload automático de imagens inline para o WordPress (`replaceInlineDataUriImagesWithWordPressMedia`) |
+| [275](tasks/275-manual-article-creation-api-and-pipeline.md) | DONE | Endpoint `POST /api/articles/manual` e suporte a `completionLevel` em `POST /api/articles/[id]/process-ai` |
+| [276](tasks/276-manual-article-ui-and-review-enhancements.md) | DONE | Tela `/publishing/manual` (`ManualArticleCreator`), atalhos em `/publishing`, `/articles` e Sidebar, e melhorias na Revisão Editorial (`/articles/[id]`) com seletor dos 4 níveis de complemento, envio de fotos (capa e corpo) e criação de fotos através da matéria com IA |
+| [277](tasks/277-phase35-e2e-tests-and-security-audit.md) | DONE | Suíte E2E `scripts/phase35/test-phase35-e2e.ts` PASS, auditoria de segurança (`walkthrough.md`), `npx tsc --noEmit` PASS, `npm run lint` PASS e `npm run build` PASS |
+
+### Evidências Verificáveis — Phase 35
+- `src/lib/ai/manual-prompts.ts` criado com os 4 estilos de complemento de matéria:
+  - **Formatar (`FORMAT_ONLY`)**: Não altera o texto, somente formata parágrafos (`<p>`), listas e subtítulos existentes.
+  - **Leve (`LIGHT`)**: Formata, faz pequenas alterações dentro do estilo configurado e pode inserir pequenos trechos.
+  - **Média (`MEDIUM`)**: Formata, faz alterações pontuais dentro do estilo configurado e pode inserir trechos criados pela IA.
+  - **Grande (`LARGE`)**: Formata, faz alterações e complementação ampla da matéria dentro do estilo configurado, podendo inserir grandes partes de trechos criados pela IA.
+- `src/app/api/images/upload/route.ts` e `src/lib/imageProcessor.ts`: upload seguro de imagens (JPG, PNG, WEBP até 8MB) com inspeção de magic bytes via Sharp, remoção de EXIF e geração opcional da variante invertida.
+- `src/lib/wordpress.ts`: `replaceInlineDataUriImagesWithWordPressMedia` envia imagens inline (`<img src="data:image/..." />`) do corpo do artigo para `/wp-json/wp/v2/media` durante a publicação e substitui pelo `source_url` final.
+- `src/app/api/articles/manual/route.ts` e `src/components/publishing/manual-article-creator.tsx`: fluxo completo para criar matérias a partir de texto/pauta/entrevista em `/publishing/manual`.
+- `src/app/(app)/articles/[id]/page.tsx`: seletor dos 4 níveis de complemento ao reprocessar com IA, botões para enviar foto de capa, enviar foto no corpo do texto, e criar fotos através da matéria com IA (como capa ou no corpo).
+- `npx tsx scripts/phase35/test-phase35-e2e.ts`: PASS.
+- `npx tsc --noEmit`: PASS (0 erros).
+- `npm run lint`: PASS (0 erros).
+- `npm run build`: PASS (100/100 páginas geradas).
+
+
+## Phase 36 — Geração de Imagens com IA Gratuita (Hugging Face & Pollinations.ai), Configuração em `/settings/ai` e Seed (DONE — 2026-11-04)
+
+- **Estado**: Concluída em 2026-11-04.
+- **Plano**: `news-curator-harness/PLAN-phase36-huggingface-free-image-ai.md`
+- **Spec**: `news-curator-harness/SPEC.md` (Phase 36)
+
+| Task | Status | Entrega |
+|---|---|---|
+| [278](tasks/278-huggingface-and-pollinations-image-adapters.md) | DONE | Contratos `ImageProviderType` (`huggingface`, `pollinations`), `HuggingFaceFluxAdapter`, `PollinationsFluxAdapter`, resolução de credenciais e melhorias de Engenharia de Prompt por estilo (`src/lib/images/`) |
+| [279](tasks/279-ai-settings-image-provider-ui-and-test-endpoint.md) | DONE | Espaço de configuração da IA de Imagens na tela `/settings/ai`, atualização de `/settings/images`, `/api/images/config` e criação do endpoint `/api/images/test` |
+| [280](tasks/280-seed-huggingface-image-key-and-env.md) | DONE | Configuração da chave `HUGGINGFACE_API_KEY` em `.env`, `.env.example` e `prisma/seed.ts` (criptografada com AES-256-GCM em `imageSettings`) |
+| [281](tasks/281-phase36-e2e-tests-and-security-audit.md) | DONE | Testes E2E (`scripts/phase36/test-huggingface-image-e2e.ts`), Security Audit (`run-security-scanner`), `npx tsc --noEmit`, `npm run lint` e `npm run build` |
+
+### Evidências Verificáveis — Phase 36
+- Provedores `huggingface` (`HuggingFaceFluxAdapter` com ZeroGPU e Router API) e `pollinations` (`PollinationsFluxAdapter` gratuito sem chave) implementados e integrados ao `ImageGenerationService`.
+- Provedores existentes mantidos (`OpenAiDalleAdapter`, `GoogleImagenAdapter`, `OpenRouterFluxAdapter`).
+- Tela `/settings/ai` com nova aba dedicada "IA de Imagens (Hugging Face / DALL-E)", permitindo selecionar provedor, preencher API key, modelo, estratégias e testar a geração com preview.
+- Endpoint `POST /api/images/test` para testes rápidos da IA de imagens com autenticação de workspace.
+- `prisma/seed.ts` e `.env` atualizados com a chave `HUGGINGFACE_API_KEY`, deixando o workspace principal pré-configurado com Hugging Face FLUX.1.
+- `scripts/phase36/test-huggingface-image-e2e.ts`: PASS (100% de sucesso nas 6 suítes).
+- `npx tsc --noEmit`: PASS (0 erros).
+- `npm run lint`: PASS (0 erros).
+- `npm run build`: PASS (101/101 páginas compiladas com sucesso).
+
+
+## Phase 37 — Descrição de Produto com IA Focada em Vendas e Publicação no WordPress (WooCommerce) (DONE — 2026-11-04)
+
+- **Estado**: Concluída com sucesso em 2026-11-04 (Tasks 282 a 285).
+- **Plano**: `news-curator-harness/PLAN-phase37-woocommerce-and-sales-ai.md`
+- **Spec**: `news-curator-harness/SPEC.md` (Phase 37)
+
+| Task | Status | Entrega |
+|---|---|---|
+| [282](tasks/282-sales-copy-ai-and-product-schema.md) | DONE | Schema Prisma (`shortDescription` e campos `woocommerce*` em `Product`), melhoria de extração em `metadata-extractor.ts`, serviço `ProductSalesCopyService` (`src/lib/affiliate/sales-copy-service.ts`) e rota `POST /api/affiliate/import/sales-copy` |
+| [283](tasks/283-woocommerce-publisher-service-and-api.md) | DONE | Serviço `WooCommercePublisherService` (`src/lib/affiliate/woocommerce-publisher.ts`), publicação opcional em `/api/affiliate/import/confirm` e rota `POST /api/affiliate/products/[id]/publish-woocommerce` |
+| [284](tasks/284-importer-and-product-woocommerce-ui.md) | DONE | Interface em `AffiliateImporter` (`/affiliates/import`) e `ProductDetail` (`/affiliates/products/[id]`) para descrição vendedora com IA e publicação direta no WooCommerce |
+| [285](tasks/285-phase37-e2e-tests-and-security-audit.md) | DONE | Testes E2E (`scripts/phase37/test-woocommerce-and-sales-ai-e2e.ts`), Security Audit, `npx tsc --noEmit` PASS, `npm run lint` PASS e `npm run build` PASS (102/102 rotas) |
+
+### Resumo da Entrega da Phase 37
+- **Schema Prisma & Migração**: Modelo `Product` expandido com `shortDescription` (resumo magnético de topo para o WooCommerce), `wordpressSiteId`, `woocommerceProductId`, `woocommerceProductUrl`, `woocommerceProductType` e `woocommerceLastSyncedAt`.
+- **Serviço de Copywriting de Vendas AIDA**: `src/lib/affiliate/sales-copy-service.ts` com geração de copy comercial orientada à conversão usando o provedor de IA ativo e fallback determinístico de alta conversão sem alucinação de dados técnicos. Limpeza avançada de texto em `metadata-extractor.ts` removendo garantias, devoluções e ruídos de marketplaces.
+- **Serviço de Publicação WooCommerce**: `src/lib/affiliate/woocommerce-publisher.ts` integrando REST API do WooCommerce (`/wp-json/wc/v3/products`) para produtos externos (`type: "external"` com link de afiliado e texto do botão customizado) e simples, upload de imagens via REST API WordPress (`/wp-json/wp/v2/media`), sincronização idempotente (`PUT /wp-json/wc/v3/products/{id}`) e fallback automático transparente para Custom Post Type `/wp-json/wp/v2/product`.
+- **Interface de Importação (`/affiliates/import`)**: Toggle para geração de copy vendedora no preview, botão de reescrita com IA sob demanda, botão para restaurar texto original do marketplace, campo de descrição curta, visualização de prós/benefícios, opções completas de publicação no WooCommerce (site, tipo, texto do botão e status) e link direto para ver o produto na loja no alerta de sucesso.
+- **Interface de Detalhes do Produto (`/affiliates/products/[id]`)**: Campo de descrição curta de vendas na aba "Produto & Editorial", botão para gerar copy de vendas com IA e card lateral dedicado WordPress / WooCommerce com status de sincronização, link da loja e botão "Publicar/Atualizar no WooCommerce".
+- **Validação Automatizada E2E**:
+  - `npx tsx scripts/phase37/test-woocommerce-and-sales-ai-e2e.ts`: PASS (100% dos 6 cenários aprovados).
+  - `npx tsc --noEmit`: PASS (0 erros).
+  - `npm run lint`: PASS (0 erros, 5 warnings preexistentes).
+  - `npm run build`: PASS (102/102 rotas Next.js geradas com sucesso).
+
+
+## Phase 38 — Chaves da API do WooCommerce nos Destinos WordPress (Multi-Site) com Guardrail de Plano de Afiliados (IN_PROGRESS — 2026-11-04)
+
+- **Estado**: Autorizada pelo usuário em 2026-11-04. Em andamento (Task 286).
+- **Plano**: `news-curator-harness/PLAN-phase38-woocommerce-site-keys-and-plan-guard.md`
+- **Spec**: `news-curator-harness/SPEC.md` (Phase 38)
+
+| Task | Status | Entrega |
+|---|---|---|
+| [286](tasks/286-woocommerce-site-keys-schema-and-service.md) | DONE | Schema Prisma (`woocommerceConsumerKey` e `encryptedWooCommerceSecret` em `WordPressSite`), migração e serviço `src/lib/wordpress-sites.ts` |
+| [287](tasks/287-woocommerce-keys-plan-validation-and-test-api.md) | IN_PROGRESS | Validação de plano em `/api/wordpress/sites` e endpoint de teste `POST /api/wordpress/sites/[id]/test-woocommerce` |
+| [288](tasks/288-wordpress-sites-woocommerce-ui.md) | TODO | Seção WooCommerce na tela `/settings/wordpress` com habilitação condicional por plano |
+| [289](tasks/289-woocommerce-publisher-auth-and-e2e-tests.md) | TODO | Autenticação no publicador, testes E2E automatizados, security audit, lint e build |
+
+
+

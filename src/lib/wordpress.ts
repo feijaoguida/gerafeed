@@ -82,20 +82,28 @@ function getAuthHeaders(config: Awaited<ReturnType<typeof getWordPressConfig>>):
   };
 }
 
+export interface UploadedWpMedia {
+  id: number;
+  sourceUrl: string | null;
+}
+
 /**
- * Uploads an image (either local file or remote URL) to WordPress Media Library API (/wp-json/wp/v2/media).
- * Returns WordPress media ID on success or null on error.
+ * Uploads an image (Data URI, local file in public/, or remote URL) to WordPress Media Library API (/wp-json/wp/v2/media).
+ * Returns { id, sourceUrl } on success or null on error.
  */
-export async function uploadMediaToWordPress(
+export async function uploadMediaToWordPressWithUrl(
   config: Awaited<ReturnType<typeof getWordPressConfig>>,
   imageUrl: string,
-  articleId: string
-): Promise<number | null> {
+  articleId: string,
+  suffix = ""
+): Promise<UploadedWpMedia | null> {
   if (!imageUrl || typeof imageUrl !== "string") return null;
 
   try {
     let imageBuffer: Buffer;
-    let filename = `article-media-${articleId}.jpg`;
+    const safeArticleId = path.basename(articleId).replace(/[^a-zA-Z0-9_-]/g, "");
+    const safeSuffix = suffix ? `-${suffix.replace(/[^a-zA-Z0-9_-]/g, "")}` : "";
+    let filename = `article-media-${safeArticleId}${safeSuffix}.jpg`;
     let contentType = "image/jpeg";
 
     if (imageUrl.startsWith("data:")) {
@@ -105,20 +113,25 @@ export async function uploadMediaToWordPress(
         contentType = match[1];
         imageBuffer = Buffer.from(match[2], "base64");
         const ext = contentType.split("/")[1]?.replace("jpeg", "jpg") || "png";
-        filename = `article-media-${articleId}.${ext}`;
+        filename = `article-media-${safeArticleId}${safeSuffix}.${ext}`;
       } else {
         console.warn(`Invalid data URI format for article ${articleId}`);
         return null;
       }
     } else if (imageUrl.startsWith("/")) {
-      // Local file in public directory
-      const localPath = path.join(process.cwd(), "public", imageUrl);
-      if (!fs.existsSync(localPath)) {
-        console.warn(`Local media file not found at ${localPath}`);
+      // Local file in public directory (strictly bounded to public/)
+      const publicDir = path.resolve(process.cwd(), "public");
+      const resolvedLocalPath = path.resolve(publicDir, imageUrl.replace(/^\/+/, ""));
+      if (!resolvedLocalPath.startsWith(publicDir + path.sep)) {
+        console.warn(`Rejected local media path outside public directory for article ${articleId}`);
         return null;
       }
-      imageBuffer = await fs.promises.readFile(localPath);
-      filename = path.basename(localPath);
+      if (!fs.existsSync(resolvedLocalPath)) {
+        console.warn(`Local media file not found at ${resolvedLocalPath}`);
+        return null;
+      }
+      imageBuffer = await fs.promises.readFile(resolvedLocalPath);
+      filename = path.basename(resolvedLocalPath);
     } else {
       // Remote URL
       const res = await fetch(imageUrl, {
@@ -157,11 +170,76 @@ export async function uploadMediaToWordPress(
     }
 
     const mediaData = await wpMediaRes.json();
-    return typeof mediaData?.id === "number" ? mediaData.id : null;
+    if (typeof mediaData?.id !== "number") {
+      return null;
+    }
+
+    const sourceUrl =
+      typeof mediaData?.source_url === "string"
+        ? mediaData.source_url
+        : typeof mediaData?.guid?.rendered === "string"
+        ? mediaData.guid.rendered
+        : null;
+
+    return {
+      id: mediaData.id,
+      sourceUrl,
+    };
   } catch (error) {
     console.warn(`Error uploading media to WordPress for article ${articleId}:`, error);
     return null;
   }
+}
+
+/**
+ * Uploads an image (either local file or remote URL) to WordPress Media Library API (/wp-json/wp/v2/media).
+ * Returns WordPress media ID on success or null on error.
+ */
+export async function uploadMediaToWordPress(
+  config: Awaited<ReturnType<typeof getWordPressConfig>>,
+  imageUrl: string,
+  articleId: string
+): Promise<number | null> {
+  const uploaded = await uploadMediaToWordPressWithUrl(config, imageUrl, articleId);
+  return uploaded ? uploaded.id : null;
+}
+
+/**
+ * Finds inline <img src="data:image/..." /> occurrences inside article HTML content,
+ * uploads each to WordPress Media Library, and replaces the Data URI with the hosted WP source_url.
+ */
+export async function replaceInlineDataUriImagesWithWordPressMedia(
+  config: Awaited<ReturnType<typeof getWordPressConfig>>,
+  htmlContent: string,
+  articleId: string
+): Promise<string> {
+  if (!htmlContent || !htmlContent.includes("data:image/")) {
+    return htmlContent;
+  }
+
+  const dataUriRegex = /src=["'](data:image\/[a-zA-Z0-9.+-]+;base64,[^"']+)["']/gi;
+  const matches = Array.from(htmlContent.matchAll(dataUriRegex));
+  if (matches.length === 0) {
+    return htmlContent;
+  }
+
+  const uniqueDataUris = Array.from(new Set(matches.map((m) => m[1])));
+  let updatedHtml = htmlContent;
+
+  for (let i = 0; i < uniqueDataUris.length; i++) {
+    const dataUri = uniqueDataUris[i];
+    const uploaded = await uploadMediaToWordPressWithUrl(
+      config,
+      dataUri,
+      articleId,
+      `inline-${i + 1}`
+    );
+    if (uploaded?.sourceUrl) {
+      updatedHtml = updatedHtml.split(dataUri).join(uploaded.sourceUrl);
+    }
+  }
+
+  return updatedHtml;
 }
 
 /**
@@ -521,6 +599,13 @@ export async function publishArticleToWordPress(
       finalContent += `<br><br><p><em>Fonte: ${creditName}</em></p>`;
     }
   }
+
+  // 1b. Upload any inline Data URI images (<img src="data:image/..." />) to WordPress Media Library
+  finalContent = await replaceInlineDataUriImagesWithWordPressMedia(
+    config,
+    finalContent,
+    articleId
+  );
 
   // 2. Resolve selected featured media image
   let selectedImageUrl: string | null = null;

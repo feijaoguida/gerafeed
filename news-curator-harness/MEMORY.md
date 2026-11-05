@@ -453,3 +453,65 @@ A contratação de planos no Asaas deve ser feita gerando a assinatura (`POST /v
   esses dois formatos; demais ambientes via Backoffice SuperAdmin.
 - Referências visuais são exemplos de estrutura, não evidência de teste físico.
   Notas, selos e vencedores não devem ser atribuídos automaticamente.
+
+
+# Phase 35 — Criação Manual de Matérias (Pauta/Entrevista/Texto), 4 Níveis de Complemento, Upload de Fotos e Geração de Fotos pela Matéria
+
+- **4 Níveis de Complemento (`CompletionLevel` em `src/lib/ai/manual-prompts.ts`)**:
+  - `FORMAT_ONLY` (**Formatar**): Não altera o texto do usuário; apenas organiza parágrafos (`<p>`), listas e subtítulos existentes, preenchendo SEO/Resumo/Tags. Possui fallback determinístico (`formatRawTextToHtmlParagraphs`) caso nenhum provedor de IA esteja configurado.
+  - `LIGHT` (**Leve**): Formata, faz pequenas alterações dentro do estilo configurado (`PromptSettings`) e insere pequenos trechos de transição.
+  - `MEDIUM` (**Média**): Formata, faz alterações pontuais dentro do estilo configurado e insere trechos criados pela IA.
+  - `LARGE` (**Grande**): Formata, faz alterações e complementação ampla da matéria dentro do estilo configurado, inserindo grandes partes de trechos criados pela IA.
+- **Upload de Fotos e Imagens (`POST /api/images/upload` e `src/lib/imageProcessor.ts`)**:
+  - Suporta envio de Foto de Capa (com geração automática da versão invertida Sharp) e Fotos do Corpo da Matéria (distribuídas entre os parágrafos via `distributeImagesInHtmlContent` ou inseridas sob demanda na tela de revisão `/articles/[id]`).
+  - Na publicação para o WordPress (`publishArticleToWordPress`), imagens inline em formato Data URI no corpo do HTML são enviadas automaticamente para a Biblioteca de Mídia do WordPress (`/wp-json/wp/v2/media`) via `replaceInlineDataUriImagesWithWordPressMedia` e substituídas pela URL pública (`source_url`).
+- **Criar Fotos através da Matéria (IA)**:
+  - Disponível tanto na tela de criação (`/publishing/manual`) quanto na tela de Revisão Editorial (`/articles/[id]`), permitindo escolher o estilo visual (`REALISTIC`, `CARTOON`, `DRAWING`, `SATIRICAL_CARTOON`, `CUSTOM`), definir como capa (`AI_GENERATED`) e/ou inserir no corpo do texto.
+
+
+# Phase 36 — Geração de Imagens com IA Gratuita (Hugging Face & Pollinations.ai)
+
+- **Diagnóstico Técnico do Hugging Face (2026-11-04)**:
+  - O domínio legado `api-inference.huggingface.co` foi substituído por `router.huggingface.co`.
+  - O repositório `Freepik/flux.1-lite-8B` possui `inferenceProviderMapping: {}` (apenas pesos para download local; retorna HTTP 400 na API serverless), e o Space `Freepik/F-Lite` está `PAUSED`.
+  - Para contas gratuitas no Hugging Face com token `hf_...` (`inference.serverless.write`), a geração gratuita de imagens funciona via API ZeroGPU/Gradio oficial (`https://black-forest-labs-flux-1-schnell.hf.space/gradio_api/call/infer`) autenticada com `Authorization: Bearer hf_...` (~6s para 1024x1024), além de suportar `https://router.huggingface.co/hf-inference/models/...` quando houver créditos/suporte.
+- **Pollinations.ai**:
+  - Endpoint `https://image.pollinations.ai/prompt/{prompt}?model=flux&width=1024&height=1024&nologo=true` gera imagens FLUX gratuitamente sem necessidade de chave de API.
+- **Preservação de Provedores**:
+  - Os provedores `openai` (DALL-E 3), `gemini` (Imagen 3) e `openrouter` (FLUX) permanecem ativos ao lado de `huggingface` e `pollinations`.
+
+
+# Phase 37 — Descrição de Produto com IA Focada em Vendas e Publicação no WordPress (WooCommerce)
+
+- **Copywriting Persuasivo AIDA para Produtos (`ProductSalesCopyService`)**:
+  - O framework AIDA (Atenção, Interesse, Desejo, Ação) é aplicado na importação de produtos de afiliados e na tela de detalhes do produto.
+  - A IA gera simultaneamente:
+    1. `shortDescription`: Resumo de impacto magnético (2-3 frases) com foco no gancho de atenção e benefício principal, posicionado no topo da página do WooCommerce ao lado do botão de compra.
+    2. `description`: Descrição completa estruturada em HTML semântico (`<p>`, `<h3>`, `<ul>`, `<li>`, `<strong>`), convertendo especificações frias em benefícios práticos.
+    3. `pros`: Destaques e pontos fortes reais do produto para rápida assimilação visual.
+  - O fallback determinístico (`generateDeterministicSalesCopy`) produz copy rica sem alucinar especificações técnicas ou inventar dados falsos.
+  - Limpeza de texto (`cleanDescriptionText`) remove automaticamente ruídos e boilerplates de marketplaces (garantias de vendedor, devoluções, menções a frete grátis, etc.).
+- **Publicação no WordPress / WooCommerce (`WooCommercePublisherService`)**:
+  - Utiliza os Application Passwords do WordPress via Basic Auth segura para acessar a REST API oficial do WooCommerce (`/wp-json/wc/v3/products`).
+  - Suporta produtos do tipo `external` (perfeito para afiliados: botão customizado redireciona diretamente para o link de afiliado `external_url`) e do tipo `simple`.
+  - Envia preços formatados com duas casas decimais (`regular_price`, `sale_price`), imagens de produto via upload no WordPress Media (`/wp-json/wp/v2/media`) e especificações técnicas mapeadas como atributos visíveis (`attributes`).
+  - Idempotência: caso o produto já possua `woocommerceProductId`, o serviço envia `PUT /wp-json/wc/v3/products/{id}` atualizando o registro existente sem duplicar.
+  - Fallback transparente: quando `/wc/v3/products` não está habilitado (HTTP 404), o serviço faz fallback automático para o Custom Post Type `/wp-json/wp/v2/product` gravando meta-fields do WooCommerce (`_regular_price`, `_sale_price`, `_product_url`, `_button_text`).
+  - Campos persistidos no model `Product`: `shortDescription`, `wordpressSiteId`, `woocommerceProductId`, `woocommerceProductUrl`, `woocommerceProductType` e `woocommerceLastSyncedAt`.
+
+
+# Phase 38 — Chaves da API do WooCommerce nos Destinos WordPress (Multi-Site) com Guardrail de Plano de Afiliados
+
+- **Chaves de API do WooCommerce por Destino WordPress (`WordPressSite`)**:
+  - As chaves de API da WooCommerce REST API (`Consumer Key` no formato `ck_...` e `Consumer Secret` no formato `cs_...`) são configuradas individualmente por site WordPress na tela `/settings/wordpress`.
+  - O segredo (`Consumer Secret`) é criptografado em repouso no PostgreSQL via AES-256-GCM (`v1:...`) através de `encryptedWooCommerceSecret`, e nunca trafega para o navegador do cliente. O helper `sanitizeWordPressSite` expõe apenas `woocommerceConsumerKey: string | null` e o indicador booleano `hasWooCommerceSecret: boolean`.
+- **Guardrail de Plano de Afiliados (`BillingService`)**:
+  - Tanto o backend (`POST /api/wordpress/sites` e `PATCH /api/wordpress/sites/[id]`) quanto o frontend (`src/app/(app)/settings/wordpress/page.tsx`) verificam se o Workspace possui o módulo de Afiliados ativo via `BillingService.hasFeature(workspaceId, AFFILIATE_FEATURES.MODULE)`.
+  - Se um Workspace sem o módulo de afiliados tentar salvar ou atualizar credenciais do WooCommerce, a requisição é rejeitada com HTTP 403 Forbidden. Na interface, exibe-se um card com badge explicativo orientando o upgrade de plano.
+- **Endpoint de Teste e Diagnóstico WooCommerce**:
+  - Endpoint dedicado `POST /api/wordpress/sites/[id]/test-woocommerce` testa a conectividade chamando `/wp-json/wc/v3/system_status` (com fallback para `/wp-json/wc/v3/products?per_page=1` para roles com permissão restrita).
+  - Retorna diagnósticos em linguagem clara para 401 (chaves inválidas/permissões), 404 (WooCommerce inativo ou permalinks não configurados) e 403 (permissões de usuário).
+- **Publicação com Autenticação Híbrida Inteligente (`WooCommercePublisherService`)**:
+  - Ao publicar produtos do catálogo de afiliados para o WooCommerce, o serviço utiliza `Basic base64(ck:cs)` como autenticação primária para a REST API `/wp-json/wc/v3/products`.
+  - Para uploads de arquivos de imagem na biblioteca de mídia do WordPress (`/wp-json/wp/v2/media`), continua utilizando as credenciais de usuário WordPress (`username:applicationPassword`), pois a REST API de mídia do core do WordPress não aceita credenciais do WooCommerce.
+

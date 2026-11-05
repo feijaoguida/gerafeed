@@ -14,6 +14,8 @@ import {
   Globe,
   Tag,
   Image as ImageIcon,
+  Upload,
+  Plus,
 } from "lucide-react";
 
 import {
@@ -33,6 +35,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { trackEvent } from "@/lib/analytics";
+import { CompletionLevel } from "@/lib/ai/manual-prompts";
+import { ImageStyle } from "@/lib/images/types";
 
 interface Category {
   id: string;
@@ -106,10 +110,17 @@ export default function ReviewArticlePage({ params }: { params: Promise<{ id: st
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isProcessingAi, setIsProcessingAi] = useState(false);
+  const [completionLevel, setCompletionLevel] = useState<"" | CompletionLevel>("");
+  const [aiImageStyle, setAiImageStyle] = useState<ImageStyle>("REALISTIC");
   const [isGeneratingImage, setIsGeneratingImage] = useState(false);
+  const [isUploadingCover, setIsUploadingCover] = useState(false);
+  const [isUploadingBodyImage, setIsUploadingBodyImage] = useState(false);
+  const coverFileInputRef = useRef<HTMLInputElement>(null);
+  const bodyFileInputRef = useRef<HTMLInputElement>(null);
   const [showPromptModal, setShowPromptModal] = useState(false);
   const [isApproving, setIsApproving] = useState(false);
   const [isRejecting, setIsRejecting] = useState(false);
+  const [confirmReject, setConfirmReject] = useState(false);
 
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
@@ -251,7 +262,14 @@ export default function ReviewArticlePage({ params }: { params: Promise<{ id: st
     }
 
     try {
-      const payload: { force?: boolean; aiResult?: unknown } = {};
+      const payload: {
+        force?: boolean;
+        aiResult?: unknown;
+        completionLevel?: CompletionLevel;
+      } = {};
+      if (completionLevel) {
+        payload.completionLevel = completionLevel;
+      }
       if (force) {
         payload.force = true;
         if (relevanceWarning?.aiResult) {
@@ -308,8 +326,121 @@ export default function ReviewArticlePage({ params }: { params: Promise<{ id: st
     }
   };
 
+  const insertHtmlAtCursor = (htmlSnippet: string) => {
+    const textarea = contentRef.current;
+    if (!textarea) {
+      setContent((prev) => `${prev.trim()}\n\n${htmlSnippet}`);
+      return;
+    }
+
+    const start = textarea.selectionStart ?? content.length;
+    const before = content.slice(0, start);
+    const after = content.slice(start);
+    const nextContent = `${before}${before && !before.endsWith("\n") ? "\n\n" : ""}${htmlSnippet}${after && !after.startsWith("\n") ? "\n\n" : ""}${after}`;
+    setContent(nextContent);
+  };
+
+  // Action: Upload Cover Image
+  const handleUploadCoverImage = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsUploadingCover(true);
+    setErrorMessage(null);
+    setSuccessMessage(null);
+
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("generateModified", "true");
+
+      const uploadRes = await fetch("/api/images/upload", {
+        method: "POST",
+        body: formData,
+      });
+      const uploadData = await uploadRes.json();
+      if (!uploadRes.ok) {
+        throw new Error(uploadData.error || "Erro ao enviar foto de capa.");
+      }
+
+      const patchRes = await fetch(`/api/articles/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          originalImageUrl: uploadData.imageUrl,
+          modifiedImageUrl: uploadData.modifiedImageUrl || null,
+          selectedImage: "ORIGINAL",
+        }),
+      });
+      const patchData = await patchRes.json();
+      if (!patchRes.ok) {
+        throw new Error(patchData.error || "Erro ao salvar foto de capa na matéria.");
+      }
+
+      setSelectedImage("ORIGINAL");
+      setArticle((prev) =>
+        prev
+          ? {
+              ...prev,
+              originalImageUrl: uploadData.imageUrl,
+              modifiedImageUrl: uploadData.modifiedImageUrl || prev.modifiedImageUrl,
+              selectedImage: "ORIGINAL",
+            }
+          : null
+      );
+      setSuccessMessage("Foto de capa enviada e aplicada com sucesso!");
+    } catch (err) {
+      setErrorMessage(err instanceof Error ? err.message : "Erro ao enviar foto de capa.");
+    } finally {
+      setIsUploadingCover(false);
+      if (coverFileInputRef.current) {
+        coverFileInputRef.current.value = "";
+      }
+    }
+  };
+
+  // Action: Upload & Insert Photo in Article Body
+  const handleUploadBodyImage = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsUploadingBodyImage(true);
+    setErrorMessage(null);
+    setSuccessMessage(null);
+
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("generateModified", "false");
+
+      const uploadRes = await fetch("/api/images/upload", {
+        method: "POST",
+        body: formData,
+      });
+      const uploadData = await uploadRes.json();
+      if (!uploadRes.ok) {
+        throw new Error(uploadData.error || "Erro ao enviar foto para o corpo da matéria.");
+      }
+
+      const safeAlt = (title || article?.originalTitle || "Foto da matéria")
+        .replace(/"/g, "&quot;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;");
+      const figureHtml = `<figure class="wp-block-image"><img src="${uploadData.imageUrl}" alt="${safeAlt}" /></figure>`;
+      insertHtmlAtCursor(figureHtml);
+      setSuccessMessage("Foto enviada e inserida no corpo da matéria! Clique em Salvar Rascunho para gravar.");
+    } catch (err) {
+      setErrorMessage(err instanceof Error ? err.message : "Erro ao enviar foto para a matéria.");
+    } finally {
+      setIsUploadingBodyImage(false);
+      if (bodyFileInputRef.current) {
+        bodyFileInputRef.current.value = "";
+      }
+    }
+  };
+
   // Action: Generate or Regenerate Image with AI on-demand
-  const handleGenerateImage = async () => {
+  const handleGenerateImage = async (alsoInsertInBody = false) => {
     setIsGeneratingImage(true);
     setErrorMessage(null);
     setSuccessMessage(null);
@@ -318,13 +449,15 @@ export default function ReviewArticlePage({ params }: { params: Promise<{ id: st
       const res = await fetch(`/api/articles/${id}/generate-image`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({}),
+        body: JSON.stringify({ style: aiImageStyle }),
       });
 
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Erro ao gerar imagem com IA.");
 
       setSelectedImage("AI_GENERATED");
+      const generatedUrl = data.imageUrl || data.article?.generatedImageUrl;
+
       if (data.article) {
         setArticle((prev) => (prev ? { ...prev, ...data.article } : null));
       } else if (data.imageUrl) {
@@ -340,7 +473,18 @@ export default function ReviewArticlePage({ params }: { params: Promise<{ id: st
         );
       }
 
-      setSuccessMessage("Nova imagem gerada com sucesso pela IA!");
+      if (alsoInsertInBody && generatedUrl) {
+        const safeAlt = (title || article?.originalTitle || "Ilustração da matéria")
+          .replace(/"/g, "&quot;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;");
+        insertHtmlAtCursor(
+          `<figure class="wp-block-image"><img src="${generatedUrl}" alt="${safeAlt}" /></figure>`
+        );
+        setSuccessMessage("Foto criada através da matéria com IA e inserida no texto!");
+      } else {
+        setSuccessMessage("Nova foto criada através da matéria com sucesso pela IA!");
+      }
     } catch (err) {
       setErrorMessage(err instanceof Error ? err.message : "Erro ao gerar imagem com IA.");
     } finally {
@@ -350,7 +494,10 @@ export default function ReviewArticlePage({ params }: { params: Promise<{ id: st
 
   // Action: Reject Article
   const handleReject = async () => {
-    if (!confirm("Tem certeza que deseja rejeitar esta notícia?")) return;
+    if (!confirmReject) {
+      setConfirmReject(true);
+      return;
+    }
 
     setIsRejecting(true);
     setErrorMessage(null);
@@ -365,6 +512,7 @@ export default function ReviewArticlePage({ params }: { params: Promise<{ id: st
     } catch (err) {
       setErrorMessage(err instanceof Error ? err.message : "Erro ao rejeitar notícia.");
       setIsRejecting(false);
+      setConfirmReject(false);
     }
   };
 
@@ -529,7 +677,7 @@ export default function ReviewArticlePage({ params }: { params: Promise<{ id: st
                 )}
               </div>
               <p className="text-xs text-muted-foreground flex items-center gap-2 mt-0.5">
-                <span>Fonte: {article.source?.name || "Fonte RSS"}</span>
+                <span>Fonte: {article.source?.name || (article.originalUrl ? "Fonte RSS" : "Pauta / Texto Manual")}</span>
                 <span>•</span>
                 <span>
                   Publicação:{" "}
@@ -550,15 +698,30 @@ export default function ReviewArticlePage({ params }: { params: Promise<{ id: st
 
           {/* Action Bar */}
           <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => handleProcessAi(false)}
-              isLoading={isProcessingAi}
-              leadingIcon={<Sparkles className="w-3.5 h-3.5 text-primary" />}
-            >
-              Reescrever com IA
-            </Button>
+            <div className="flex items-center gap-1.5">
+              <select
+                value={completionLevel}
+                onChange={(e) => setCompletionLevel(e.target.value as "" | CompletionLevel)}
+                className="h-8 px-2.5 text-xs rounded-lg border border-border bg-surface text-foreground focus:outline-hidden focus:ring-2 focus:ring-primary"
+                title="Escolha o nível de complemento da IA"
+              >
+                <option value="">IA: Reescrita Padrão RSS</option>
+                <option value="FORMAT_ONLY">Nível: Formatar (Sem alterar texto)</option>
+                <option value="LIGHT">Nível: Leve (Pequenos ajustes)</option>
+                <option value="MEDIUM">Nível: Média (Trechos de apoio IA)</option>
+                <option value="LARGE">Nível: Grande (Complementação ampla IA)</option>
+              </select>
+
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handleProcessAi(false)}
+                isLoading={isProcessingAi}
+                leadingIcon={<Sparkles className="w-3.5 h-3.5 text-primary" />}
+              >
+                {completionLevel ? "Completar com IA" : "Reescrever com IA"}
+              </Button>
+            </div>
 
             <Button
               variant="secondary"
@@ -578,7 +741,7 @@ export default function ReviewArticlePage({ params }: { params: Promise<{ id: st
               className="text-rose-600 dark:text-rose-400 hover:bg-rose-500/10"
               leadingIcon={<XCircle className="w-3.5 h-3.5" />}
             >
-              Rejeitar
+              {confirmReject ? "Confirmar Rejeição?" : "Rejeitar"}
             </Button>
 
             <Button
@@ -712,12 +875,60 @@ export default function ReviewArticlePage({ params }: { params: Promise<{ id: st
 
               {/* Content Input */}
               <FormField label="Corpo do Artigo (HTML)" required>
-                <AffiliateBlockManager
-                  content={content}
-                  onChangeContent={setContent}
-                  textareaRef={contentRef}
-                  articleProducts={article.articleProducts}
-                />
+                <div className="flex flex-wrap items-center justify-between gap-2 pb-2">
+                  <AffiliateBlockManager
+                    content={content}
+                    onChangeContent={setContent}
+                    textareaRef={contentRef}
+                    articleProducts={article.articleProducts}
+                  />
+
+                  <div className="flex flex-wrap items-center gap-2">
+                    <input
+                      ref={bodyFileInputRef}
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp"
+                      onChange={handleUploadBodyImage}
+                      className="hidden"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => bodyFileInputRef.current?.click()}
+                      isLoading={isUploadingBodyImage}
+                      leadingIcon={<Upload className="w-3.5 h-3.5 text-primary" />}
+                    >
+                      Enviar Foto no Texto
+                    </Button>
+
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        if (article.generatedImageUrl) {
+                          const safeAlt = (title || article.originalTitle || "Ilustração da matéria")
+                            .replace(/"/g, "&quot;")
+                            .replace(/</g, "&lt;")
+                            .replace(/>/g, "&gt;");
+                          insertHtmlAtCursor(
+                            `<figure class="wp-block-image"><img src="${article.generatedImageUrl}" alt="${safeAlt}" /></figure>`
+                          );
+                          setSuccessMessage("Foto criada por IA inserida no corpo do texto!");
+                        } else {
+                          handleGenerateImage(true);
+                        }
+                      }}
+                      isLoading={isGeneratingImage}
+                      leadingIcon={<Sparkles className="w-3.5 h-3.5 text-purple-500" />}
+                    >
+                      {article.generatedImageUrl
+                        ? "Inserir Foto IA no Texto"
+                        : "Criar Foto IA no Texto"}
+                    </Button>
+                  </div>
+                </div>
                 <Textarea
                   ref={contentRef}
                   rows={12}
@@ -746,29 +957,61 @@ export default function ReviewArticlePage({ params }: { params: Promise<{ id: st
                 <div className="flex items-center gap-2 flex-wrap">
                   <CardTitle className="text-sm font-semibold text-foreground flex items-center gap-2">
                     <ImageIcon className="w-4 h-4 text-primary" />
-                    Mídia Destacada
+                    Mídia Destacada (Capa)
                   </CardTitle>
                   <Badge variant="outline" size="sm">
                     Ativa: <strong className="uppercase ml-1 text-primary">{selectedImage}</strong>
                   </Badge>
                 </div>
-                {/* Botão de gerar com IA (Oculto temporariamente para produção) */}
-                <div style={{ display: "none" }} className="hidden">
+                <div className="flex flex-wrap items-center gap-2">
+                  <input
+                    ref={coverFileInputRef}
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    onChange={handleUploadCoverImage}
+                    className="hidden"
+                  />
                   <Button
                     type="button"
                     variant="outline"
                     size="sm"
-                    onClick={handleGenerateImage}
+                    onClick={() => coverFileInputRef.current?.click()}
+                    isLoading={isUploadingCover}
+                    leadingIcon={<Upload className="w-3.5 h-3.5 text-primary" />}
+                  >
+                    Enviar Foto de Capa
+                  </Button>
+
+                  <select
+                    value={aiImageStyle}
+                    onChange={(e) => setAiImageStyle(e.target.value as ImageStyle)}
+                    className="h-8 px-2 text-xs rounded-lg border border-border bg-surface text-foreground focus:outline-hidden focus:ring-2 focus:ring-primary"
+                    title="Estilo visual para criar foto pela matéria"
+                  >
+                    <option value="REALISTIC">Estilo: Realista</option>
+                    <option value="DRAWING">Estilo: Ilustração / Desenho</option>
+                    <option value="CARTOON">Estilo: Cartoon 3D</option>
+                    <option value="SATIRICAL_CARTOON">Estilo: Sátira / Charge</option>
+                    <option value="CUSTOM">Estilo: Personalizado</option>
+                  </select>
+
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleGenerateImage(false)}
                     isLoading={isGeneratingImage}
                     leadingIcon={<Sparkles className="w-3.5 h-3.5 text-purple-500" />}
                   >
-                    {article.generatedImageUrl ? "Regenerar com IA" : "Gerar com IA"}
+                    {article.generatedImageUrl
+                      ? "Regenerar Foto pela Matéria"
+                      : "Criar Foto pela Matéria"}
                   </Button>
                 </div>
               </CardHeader>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* Option 1: Original Image */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {/* Option 1: Original / Uploaded Image */}
                 {article.originalImageUrl ? (
                   <div
                     onClick={() => setSelectedImage("ORIGINAL")}
@@ -787,7 +1030,7 @@ export default function ReviewArticlePage({ params }: { params: Promise<{ id: st
                           onChange={() => setSelectedImage("ORIGINAL")}
                           className="accent-primary"
                         />
-                        Original (RSS)
+                        Original / Enviada
                       </span>
                       {selectedImage === "ORIGINAL" && (
                         <Badge variant="outline" size="sm" className="shrink-0">
@@ -805,8 +1048,21 @@ export default function ReviewArticlePage({ params }: { params: Promise<{ id: st
                     </div>
                   </div>
                 ) : (
-                  <div className="p-3 rounded-xl bg-surface-muted/30 border border-border flex items-center justify-center text-center">
-                    <p className="text-[11px] text-muted-foreground italic">Sem imagem original no RSS.</p>
+                  <div className="p-3 rounded-xl bg-surface-muted/30 border border-dashed border-border flex flex-col items-center justify-center text-center space-y-2">
+                    <p className="text-[11px] text-muted-foreground italic">
+                      Sem foto de capa enviada ou do RSS.
+                    </p>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => coverFileInputRef.current?.click()}
+                      isLoading={isUploadingCover}
+                      leadingIcon={<Plus className="w-3.5 h-3.5" />}
+                      className="text-xs"
+                    >
+                      Enviar Foto
+                    </Button>
                   </div>
                 )}
 
@@ -854,12 +1110,12 @@ export default function ReviewArticlePage({ params }: { params: Promise<{ id: st
                   </div>
                 )}
 
-                {/* Option 3: AI Generated Image (Oculto temporariamente para produção) */}
-                <div style={{ display: "none" }} className="hidden">
+                {/* Option 3: AI Generated Image ("Criar Foto através da Matéria") */}
+                <div>
                   {article.generatedImageUrl ? (
                     <div
                       onClick={() => setSelectedImage("AI_GENERATED")}
-                      className={`p-3 rounded-xl border cursor-pointer transition-all flex flex-col justify-between space-y-2 ${
+                      className={`p-3 rounded-xl border cursor-pointer transition-all flex flex-col justify-between space-y-2 h-full ${
                         selectedImage === "AI_GENERATED"
                           ? "bg-purple-500/10 border-purple-500 shadow-xs ring-1 ring-purple-500/30"
                           : "bg-surface border-border hover:border-muted-foreground/40"
@@ -874,7 +1130,7 @@ export default function ReviewArticlePage({ params }: { params: Promise<{ id: st
                             onChange={() => setSelectedImage("AI_GENERATED")}
                             className="accent-purple-500"
                           />
-                          Gerada por IA
+                          Criada pela Matéria (IA)
                         </span>
                         {selectedImage === "AI_GENERATED" ? (
                           <Badge variant="purple" size="sm" className="shrink-0">
@@ -910,20 +1166,20 @@ export default function ReviewArticlePage({ params }: { params: Promise<{ id: st
                       )}
                     </div>
                   ) : (
-                    <div className="p-3 rounded-xl bg-purple-500/5 border border-dashed border-purple-500/30 flex flex-col items-center justify-center text-center space-y-2">
+                    <div className="p-3 rounded-xl bg-purple-500/5 border border-dashed border-purple-500/30 flex flex-col items-center justify-center text-center space-y-2 h-full">
                       <Sparkles className="w-5 h-5 text-purple-500" />
                       <p className="text-[11px] text-muted-foreground">
-                        Nenhuma imagem IA gerada ainda.
+                        Crie uma foto exclusiva com base no conteúdo desta matéria.
                       </p>
                       <Button
                         type="button"
                         variant="outline"
                         size="sm"
-                        onClick={handleGenerateImage}
+                        onClick={() => handleGenerateImage(false)}
                         isLoading={isGeneratingImage}
                         className="text-xs"
                       >
-                        Gerar com IA
+                        Criar Foto pela Matéria
                       </Button>
                     </div>
                   )}
@@ -981,19 +1237,19 @@ export default function ReviewArticlePage({ params }: { params: Promise<{ id: st
               </FormField>
             </Card>
 
-            {/* Original RSS Reference Panel */}
+            {/* Original RSS / Manual Pauta Reference Panel */}
             <Card className="p-6 space-y-3 shadow-xs">
               <CardHeader className="p-0 border-b border-border pb-3">
                 <CardTitle className="text-sm font-semibold text-foreground flex items-center gap-1.5">
                   <Globe className="w-4 h-4 text-primary" />
-                  Matéria Original (RSS)
+                  {article.originalUrl ? "Matéria Original (RSS)" : "Texto Base / Pauta Original"}
                 </CardTitle>
               </CardHeader>
 
               <div className="space-y-1">
                 <p className="text-xs font-semibold text-foreground">{article.originalTitle}</p>
                 <p className="text-[11px] text-muted-foreground flex items-center gap-2">
-                  <span>Fonte: {article.source?.name || "Fonte RSS"}</span>
+                  <span>Fonte: {article.source?.name || (article.originalUrl ? "Fonte RSS" : "Criação Manual / Pauta")}</span>
                   <span>•</span>
                   <span>
                     Publicação:{" "}
@@ -1017,14 +1273,16 @@ export default function ReviewArticlePage({ params }: { params: Promise<{ id: st
                 </p>
               )}
 
-              <a
-                href={article.originalUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-1.5 text-xs text-primary hover:underline pt-1 font-medium"
-              >
-                Ver notícia original na íntegra <ExternalLink className="w-3.5 h-3.5" />
-              </a>
+              {article.originalUrl && (
+                <a
+                  href={article.originalUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 text-xs text-primary hover:underline pt-1 font-medium"
+                >
+                  Ver notícia original na íntegra <ExternalLink className="w-3.5 h-3.5" />
+                </a>
+              )}
             </Card>
           </div>
         </div>

@@ -17,6 +17,7 @@ import {
   PenTool,
   Smile,
   Sliders,
+  RefreshCw,
 } from "lucide-react";
 
 import { PageHeader } from "@/components/design-system/page-header";
@@ -62,6 +63,8 @@ export default function SettingsImagesPage() {
   // Estados de tela
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [isTesting, setIsTesting] = useState(false);
+  const [testResult, setTestResult] = useState<{ imageUrl?: string; message?: string } | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
@@ -120,11 +123,12 @@ export default function SettingsImagesPage() {
     if (
       defaultStrategy === "AI_GENERATED" &&
       textAiContext?.provider === "anthropic" &&
+      imageProvider !== "pollinations" &&
       !customApiKey &&
       !hasDedicatedKey
     ) {
       setErrorMessage(
-        "A Anthropic não gera imagens. Por favor, forneça uma chave de API para OpenAI, Gemini ou OpenRouter."
+        "A Anthropic não gera imagens. Por favor, selecione Pollinations (gratuito) ou forneça uma chave de API para Hugging Face, OpenAI, Gemini ou OpenRouter."
       );
       setIsSaving(false);
       return;
@@ -163,6 +167,28 @@ export default function SettingsImagesPage() {
       setErrorMessage(err instanceof Error ? err.message : "Erro ao salvar configurações de imagem.");
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleTest = async () => {
+    setIsTesting(true);
+    setErrorMessage(null);
+    setSuccessMessage(null);
+    setTestResult(null);
+
+    try {
+      const res = await fetch("/api/images/test", { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Falha no teste de geração de imagem.");
+
+      setSuccessMessage(data.message || "Imagem gerada com sucesso no teste!");
+      if (data.imageUrl) {
+        setTestResult({ imageUrl: data.imageUrl, message: data.message });
+      }
+    } catch (err) {
+      setErrorMessage(err instanceof Error ? err.message : "Erro ao testar imagem.");
+    } finally {
+      setIsTesting(false);
     }
   };
 
@@ -262,7 +288,7 @@ export default function SettingsImagesPage() {
           </CardHeader>
 
           <CardContent className="p-0">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               {/* Opção 1: ORIGINAL */}
               <label
                 className={`p-4 rounded-xl border cursor-pointer transition-all flex flex-col justify-between space-y-3 ${
@@ -325,10 +351,9 @@ export default function SettingsImagesPage() {
                 </p>
               </label>
 
-              {/* Opção 3: AI_GENERATED (Oculto temporariamente para produção) */}
+              {/* Opção 3: AI_GENERATED */}
               <label
-                style={{ display: "none" }}
-                className={`hidden p-4 rounded-xl border cursor-pointer transition-all flex flex-col justify-between space-y-3 ${
+                className={`p-4 rounded-xl border cursor-pointer transition-all flex flex-col justify-between space-y-3 ${
                   defaultStrategy === "AI_GENERATED"
                     ? "bg-purple-500/10 border-purple-500 shadow-xs ring-1 ring-purple-500/30 text-foreground"
                     : "bg-surface border-border hover:border-muted-foreground/30 text-muted-foreground hover:text-foreground"
@@ -385,15 +410,13 @@ export default function SettingsImagesPage() {
               ).map((styleKey) => {
                 const def = IMAGE_STYLE_DEFINITIONS[styleKey];
                 const isSelected = imageStyle === styleKey;
-                const isCartoonOption = styleKey === "CARTOON" || styleKey === "SATIRICAL_CARTOON";
 
                 return (
                   <button
                     key={styleKey}
                     type="button"
                     onClick={() => setImageStyle(styleKey)}
-                    style={isCartoonOption ? { display: "none" } : undefined}
-                    className={`${isCartoonOption ? "hidden " : ""}p-3.5 rounded-xl border text-left transition-all flex flex-col justify-between space-y-2 ${
+                    className={`p-3.5 rounded-xl border text-left transition-all flex flex-col justify-between space-y-2 ${
                       isSelected
                         ? "bg-primary/5 border-primary shadow-xs ring-1 ring-primary/20"
                         : "bg-surface border-border hover:border-muted-foreground/30"
@@ -523,6 +546,8 @@ export default function SettingsImagesPage() {
                       onChange={(e) => setImageProvider(e.target.value as ImageProviderType)}
                       className="w-full px-3 py-2 text-xs rounded-lg border border-border bg-surface text-foreground focus:ring-2 focus:ring-primary"
                     >
+                      <option value="huggingface">Hugging Face (FLUX.1 Schnell — Gratuito com Token HF)</option>
+                      <option value="pollinations">Pollinations.ai (FLUX — Gratuito Sem Chave)</option>
                       <option value="openai">OpenAI (DALL-E 3)</option>
                       <option value="gemini">Google Gemini (Imagen 3)</option>
                       <option value="openrouter">OpenRouter (FLUX.1 / FLUX.2)</option>
@@ -539,7 +564,11 @@ export default function SettingsImagesPage() {
                       value={customModel}
                       onChange={(e) => setCustomModel(e.target.value)}
                       placeholder={
-                        imageProvider === "openai"
+                        imageProvider === "huggingface"
+                          ? "black-forest-labs/FLUX.1-schnell"
+                          : imageProvider === "pollinations"
+                          ? "flux"
+                          : imageProvider === "openai"
                           ? "dall-e-3"
                           : imageProvider === "gemini"
                           ? "imagen-3.0-generate-002"
@@ -551,29 +580,36 @@ export default function SettingsImagesPage() {
                 </div>
 
                 {/* Campo de API Key */}
-                <div className="space-y-1.5">
-                  <div className="flex items-center justify-between">
-                    <label className="font-heading text-xs font-semibold text-foreground">
-                      Chave de API ({imageProvider.toUpperCase()})
-                    </label>
-                    {hasDedicatedKey && (
-                      <span className="text-[11px] text-emerald-600 dark:text-emerald-400 font-medium">
-                        ✓ Chave cadastrada anteriormente (preencha apenas para alterar)
-                      </span>
-                    )}
+                {imageProvider !== "pollinations" && (
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <label className="font-heading text-xs font-semibold text-foreground">
+                        Chave de API ({imageProvider === "huggingface" ? "Hugging Face (hf_...)" : imageProvider.toUpperCase()})
+                      </label>
+                      {hasDedicatedKey && (
+                        <span className="text-[11px] text-emerald-600 dark:text-emerald-400 font-medium">
+                          ✓ Chave cadastrada anteriormente (preencha apenas para alterar)
+                        </span>
+                      )}
+                    </div>
+                    <input
+                      type="password"
+                      value={customApiKey}
+                      onChange={(e) => setCustomApiKey(e.target.value)}
+                      placeholder={hasDedicatedKey ? "••••••••••••••••••••••••" : "Cole sua chave de API aqui..."}
+                      className="w-full px-3 py-2 text-xs rounded-lg border border-border bg-surface text-foreground focus:ring-2 focus:ring-primary"
+                    />
+                    <p className="font-sans text-[11px] text-muted-foreground flex items-center gap-1">
+                      <Info className="w-3.5 h-3.5 shrink-0" />
+                      Sua chave é criptografada no banco de dados e nunca exposta no navegador.
+                    </p>
                   </div>
-                  <input
-                    type="password"
-                    value={customApiKey}
-                    onChange={(e) => setCustomApiKey(e.target.value)}
-                    placeholder={hasDedicatedKey ? "••••••••••••••••••••••••" : "Cole sua chave de API aqui..."}
-                    className="w-full px-3 py-2 text-xs rounded-lg border border-border bg-surface text-foreground focus:ring-2 focus:ring-primary"
-                  />
-                  <p className="font-sans text-[11px] text-muted-foreground flex items-center gap-1">
-                    <Info className="w-3.5 h-3.5 shrink-0" />
-                    Sua chave é criptografada no banco de dados e nunca exposta no navegador.
-                  </p>
-                </div>
+                )}
+                {imageProvider === "pollinations" && (
+                  <div className="p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-[11px] text-emerald-700 dark:text-emerald-300">
+                    ✓ A Pollinations.ai é 100% gratuita e de código aberto. Não exige cadastro nem chave de API.
+                  </div>
+                )}
               </div>
             )}
           </CardContent>
@@ -619,20 +655,58 @@ export default function SettingsImagesPage() {
             </div>
           </CardContent>
 
-          <CardFooter className="p-0 pt-3 border-t border-border flex items-center justify-between">
+          <CardFooter className="p-0 pt-3 border-t border-border flex flex-col sm:flex-row items-center justify-between gap-3">
             <p className="text-[11px] text-muted-foreground">
               A imagem de IA só é gerada se a estratégia estiver definida como <strong>Gerar Nova Imagem IA</strong>.
             </p>
-            <Button
-              type="submit"
-              variant="gradient"
-              isLoading={isSaving}
-              leadingIcon={<Save className="w-4 h-4" />}
-            >
-              Salvar Configurações de Imagem
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleTest}
+                isLoading={isTesting}
+                leadingIcon={<RefreshCw className="w-3.5 h-3.5" />}
+              >
+                Testar IA de Imagens
+              </Button>
+              <Button
+                type="submit"
+                variant="gradient"
+                isLoading={isSaving}
+                leadingIcon={<Save className="w-4 h-4" />}
+              >
+                Salvar Configurações de Imagem
+              </Button>
+            </div>
           </CardFooter>
         </Card>
+
+        {/* Modal/Preview do Teste de Imagem */}
+        {testResult?.imageUrl && (
+          <Card className="p-4 bg-surface-muted/40 border border-emerald-500/30 space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold text-emerald-700 dark:text-emerald-300">
+                Resultado do Teste de Imagem
+              </span>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => setTestResult(null)}
+              >
+                Fechar
+              </Button>
+            </div>
+            <div className="max-w-xs mx-auto rounded-lg overflow-hidden border border-border">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={testResult.imageUrl}
+                alt="Preview do Teste de Imagem"
+                className="w-full h-auto object-cover"
+              />
+            </div>
+          </Card>
+        )}
       </form>
     </div>
   );
