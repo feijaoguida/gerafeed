@@ -29,6 +29,7 @@ import {
   updateBlockOccurrence,
   ParsedBlockOccurrence,
 } from "@/lib/affiliate/editor-document";
+import { sanitizeHtml } from "@/lib/security/sanitize-html";
 import { splitHtmlAtCursor } from "@/lib/affiliate/html-position";
 import { renderProductGroup, RenderProduct } from "@/lib/affiliate/render-document";
 import { Button } from "@/components/ui/button";
@@ -622,7 +623,7 @@ export function AffiliateBlockManager({
                     <div className="p-3 bg-muted/20 border border-border/40 rounded-xl overflow-hidden text-xs">
                       <div
                         className="preview-wrapper"
-                        dangerouslySetInnerHTML={{ __html: occurrencePreview }}
+                        dangerouslySetInnerHTML={{ __html: sanitizeHtml(occurrencePreview) }}
                       />
                     </div>
                   ) : (
@@ -880,7 +881,7 @@ export function AffiliateBlockManager({
                   <div className="p-4 bg-muted/20 border border-border/50 rounded-xl overflow-hidden text-xs">
                     <div
                       className="preview-wrapper"
-                      dangerouslySetInnerHTML={{ __html: previewHtml }}
+                      dangerouslySetInnerHTML={{ __html: sanitizeHtml(previewHtml) }}
                     />
                   </div>
                 </div>

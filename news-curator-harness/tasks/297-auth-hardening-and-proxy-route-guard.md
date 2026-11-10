@@ -1,7 +1,23 @@
 # Task 297: Endurecimento de Autenticação (`src/auth.ts`), Proxy Guard (`src/proxy.ts`) e Proteção do Layout Autenticado
 
 ## Status
-TODO
+DONE
+
+## Evidências de Conclusão
+- `src/auth.ts`:
+  - Implementada função `constantTimeCompare` utilizando digest SHA-256 e `crypto.timingSafeEqual` para comparação resistente a timing attacks.
+  - No provider `Credentials`, implementada verificação estrita `if (!regularUser.passwordHash) return null;`, eliminando o bypass de autenticação por senha para usuários sem hash.
+  - Credenciais administrativas de ambiente comparadas via `constantTimeCompare` e `ADMIN_EMAIL`/`ADMIN_PASSWORD` legados restringidos exclusivamente a ambientes fora de produção (`NODE_ENV !== "production"`).
+- `src/proxy.ts`:
+  - Implementado handler ativo com `isPublicRoute(pathname)`.
+  - Rotas públicas (landing pages, blog, `/api/auth/*`, `/api/billing/coupons/validate`, `/api/webhooks/*`, assets estáticos) preservadas.
+  - Rotas privadas protegidas: retorna `HTTP 401` JSON para `/api/*` não autenticadas e redireciona para `/login?callbackUrl=...` em páginas.
+- `src/app/(app)/layout.tsx`:
+  - Implementado `if (!session?.user?.id) { redirect("/login"); }` garantindo defesa em profundidade em Server Components.
+- Validação:
+  - `npx tsx scripts/phase40/test-task297-auth-and-proxy.ts`: PASS (100% de sucesso).
+  - `npx tsc --noEmit`: PASS (0 erros).
+  - `npm run lint`: PASS (0 erros).
 
 ## Contexto
 A auditoria de segurança pré-produção identificou duas falhas críticas nos itens **4 (Autenticação robusta)** e **5 (Autorização no servidor)**:
@@ -31,11 +47,11 @@ A auditoria de segurança pré-produção identificou duas falhas críticas nos 
 1. Em `src/app/(app)/layout.tsx`, verificar `if (!session?.user?.id) { redirect("/login"); }` imediatamente após `const session = await auth();`, garantindo defesa em profundidade caso o layout seja renderizado sem sessão.
 
 ## Critérios de Aceitação (Definition of Done)
-- [ ] `src/auth.ts` nega login (`return null`) para qualquer usuário com `passwordHash` nulo ou vazio.
-- [ ] `src/auth.ts` utiliza `crypto.timingSafeEqual` para comparação de credenciais administrativas de ambiente.
-- [ ] `src/proxy.ts` retorna `HTTP 401` para chamadas não autenticadas em rotas `/api/*` protegidas e redireciona para `/login` em páginas privadas, preservando intactas todas as landing pages públicas, blog, sitemap, robots, `/api/auth/*`, `/api/billing/coupons/validate` e `/api/webhooks/*`.
-- [ ] `src/app/(app)/layout.tsx` redireciona para `/login` caso `session?.user?.id` não esteja presente.
-- [ ] Teste automatizado `scripts/phase40/test-task297-auth-and-proxy.ts` validando todos os cenários.
-- [ ] `npx tsc --noEmit`: PASS (0 erros).
-- [ ] `npm run lint`: PASS (0 erros).
+- [x] `src/auth.ts` nega login (`return null`) para qualquer usuário com `passwordHash` nulo ou vazio.
+- [x] `src/auth.ts` utiliza `crypto.timingSafeEqual` para comparação de credenciais administrativas de ambiente.
+- [x] `src/proxy.ts` retorna `HTTP 401` para chamadas não autenticadas em rotas `/api/*` protegidas e redireciona para `/login` em páginas privadas, preservando intactas todas as landing pages públicas, blog, sitemap, robots, `/api/auth/*`, `/api/billing/coupons/validate` e `/api/webhooks/*`.
+- [x] `src/app/(app)/layout.tsx` redireciona para `/login` caso `session?.user?.id` não esteja presente.
+- [x] Teste automatizado `scripts/phase40/test-task297-auth-and-proxy.ts` validando todos os cenários.
+- [x] `npx tsc --noEmit`: PASS (0 erros).
+- [x] `npm run lint`: PASS (0 erros).
 

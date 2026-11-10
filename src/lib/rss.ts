@@ -1,6 +1,7 @@
 import Parser from "rss-parser";
 import { prisma } from "@/lib/prisma";
 import { scrapeArticleContent } from "@/lib/scraper";
+import { validateSafeRemoteUrl } from "@/lib/affiliate/ssrf";
 
 
 export interface ExtractedRssItem {
@@ -78,6 +79,7 @@ function extractImageUrl(item: Parser.Item & CustomItem): string | null {
  */
 export async function parseFeedUrl(url: string, sourceId: string): Promise<ExtractedRssItem[]> {
   try {
+    await validateSafeRemoteUrl(url);
     const feed = await parser.parseURL(url);
     const items: ExtractedRssItem[] = [];
 

@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { generateOtpCode } from "@/lib/security/otp";
 import { renderPasswordResetEmail } from "@/lib/mail/templates/password-reset";
 import { sendEmail } from "@/lib/mail";
+import { getSafeClientErrorMessage } from "@/lib/errors/service";
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const TOKEN_LIFETIME_MS = 15 * 60 * 1000; // 15 minutos
@@ -91,7 +92,7 @@ export async function POST(request: Request) {
     });
   } catch (error) {
     console.error("POST /api/auth/forgot-password/send-code error:", error);
-    const message = error instanceof Error ? error.message : "Erro ao processar solicitação de recuperação de senha.";
+    const message = getSafeClientErrorMessage(error, "Erro ao processar solicitação de recuperação de senha.");
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

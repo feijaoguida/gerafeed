@@ -1,3 +1,4 @@
+import crypto from "crypto";
 import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import { PrismaAdapter } from "@auth/prisma-adapter";
@@ -5,6 +6,19 @@ import { prisma } from "@/lib/prisma";
 import { verifyPassword } from "@/lib/security/password";
 
 export const DEFAULT_WORKSPACE_ID = "default-workspace";
+
+/**
+ * Constant-time string comparison to prevent timing attacks on administrative credentials.
+ * Hashes inputs with SHA-256 to ensure identical buffer lengths before timingSafeEqual.
+ */
+export function constantTimeCompare(a: string | undefined | null, b: string | undefined | null): boolean {
+  if (typeof a !== "string" || typeof b !== "string") {
+    return false;
+  }
+  const hashA = crypto.createHash("sha256").update(a).digest();
+  const hashB = crypto.createHash("sha256").update(b).digest();
+  return crypto.timingSafeEqual(hashA, hashB);
+}
 
 /**
  * Ensures the user has a Workspace assigned in DB and returns the workspaceId.
@@ -65,16 +79,22 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         password: { label: "Senha", type: "password" },
       },
       async authorize(credentials) {
-        const email = credentials?.email as string | undefined;
+        const rawEmail = credentials?.email as string | undefined;
         const password = credentials?.password as string | undefined;
 
-        if (!email || !password) return null;
+        if (!rawEmail || !password) return null;
+        const email = rawEmail.trim().toLowerCase();
 
-        // 1. SuperAdmin Credentials Check
+        // 1. SuperAdmin Credentials Check (constant-time comparison)
         const superAdminEmail = process.env.SUPERADMIN_EMAIL?.trim().toLowerCase();
         const superAdminPassword = process.env.SUPERADMIN_PASSWORD;
 
-        if (superAdminEmail && superAdminPassword && email.toLowerCase() === superAdminEmail && password === superAdminPassword) {
+        if (
+          superAdminEmail &&
+          superAdminPassword &&
+          constantTimeCompare(email, superAdminEmail) &&
+          constantTimeCompare(password, superAdminPassword)
+        ) {
           const superUser = await prisma.user.upsert({
             where: { email: superAdminEmail },
             update: {
@@ -99,11 +119,17 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           };
         }
 
-        // 2. Standard Admin Credentials Check (Legacy MVP admin)
-        const adminEmail = process.env.ADMIN_EMAIL;
-        const adminPassword = process.env.ADMIN_PASSWORD;
+        // 2. Standard Admin Credentials Check (Legacy MVP admin - only allowed outside production)
+        const isProduction = process.env.NODE_ENV === "production";
+        const adminEmail = !isProduction ? process.env.ADMIN_EMAIL?.trim().toLowerCase() : undefined;
+        const adminPassword = !isProduction ? process.env.ADMIN_PASSWORD : undefined;
 
-        if (adminEmail && adminPassword && email === adminEmail && password === adminPassword) {
+        if (
+          adminEmail &&
+          adminPassword &&
+          constantTimeCompare(email, adminEmail) &&
+          constantTimeCompare(password, adminPassword)
+        ) {
           // Find or create user in DB
           const dbUser = await prisma.user.upsert({
             where: { email: adminEmail },
@@ -127,16 +153,21 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 
         // 3. Check if standard registered user exists in DB
         const regularUser = await prisma.user.findUnique({
-          where: { email: email.trim().toLowerCase() },
+          where: { email },
         });
 
         if (regularUser) {
-          if (regularUser.passwordHash) {
-            const isValid = await verifyPassword(password, regularUser.passwordHash);
-            if (!isValid) {
-              return null;
-            }
+          // Bloqueio obrigatório: Se o usuário não possui hash de senha, negar login por credenciais
+          if (!regularUser.passwordHash) {
+            console.warn(`[Auth Security] Tentativa de login por senha em conta sem passwordHash: ${email}`);
+            return null;
           }
+
+          const isValid = await verifyPassword(password, regularUser.passwordHash);
+          if (!isValid) {
+            return null;
+          }
+
           const workspaceId = await ensureUserWorkspace(regularUser.id);
           return {
             id: regularUser.id,

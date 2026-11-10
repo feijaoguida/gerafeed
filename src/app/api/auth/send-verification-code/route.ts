@@ -4,7 +4,7 @@ import { generateOtpCode } from "@/lib/security/otp";
 import { renderVerificationCodeEmail } from "@/lib/mail/templates/verification-code";
 import { sendEmail } from "@/lib/mail";
 import { SiteAntifraudService } from "@/lib/site-antifraud";
-import { logSystemError } from "@/lib/errors/service";
+import { logSystemError, getSafeClientErrorMessage } from "@/lib/errors/service";
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const TOKEN_LIFETIME_MS = 15 * 60 * 1000; // 15 minutos
@@ -119,7 +119,7 @@ export async function POST(request: Request) {
     });
   } catch (error) {
     console.error("POST /api/auth/send-verification-code error:", error);
-    const message = error instanceof Error ? error.message : "Erro ao enviar código de confirmação.";
+    const message = getSafeClientErrorMessage(error, "Erro ao enviar código de confirmação.");
 
     await logSystemError({
       path: "/api/auth/send-verification-code",

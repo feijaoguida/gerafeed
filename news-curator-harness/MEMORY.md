@@ -535,3 +535,35 @@ A contratação de planos no Asaas deve ser feita gerando a assinatura (`POST /v
   - Qualquer erro ou rejeição nos fluxos de cupom, checkout/atualização Asaas ou bloqueio anti-fraude de site gera obrigatoriamente registro detalhado em `SystemErrorLog` via `logSystemError` / `handleApiError`.
 
 
+# Phase 40 — Hardening de Segurança Pré-Produção (Auditoria de 20 Pontos)
+
+- **Autenticação Robusta (`src/auth.ts`)**:
+  - Usuários criados via provedores externos ou sem senha definida (`passwordHash: null`) são bloqueados no login por credenciais (`if (!user.passwordHash) return null;`).
+  - Comparação de senhas e tokens utiliza `constantTimeCompare` baseado em `crypto.createHash("sha256")` e `crypto.timingSafeEqual` para imunidade contra timing attacks.
+  - O fallback legado para `ADMIN_PASSWORD` foi desativado em produção (`process.env.NODE_ENV !== "production"`).
+- **Autorização e Proxy Guard (`src/proxy.ts`, `src/app/(app)/layout.tsx`)**:
+  - O Proxy do Next.js intercepta todas as requisições em runtime Node.js, bloqueando rotas privadas com HTTP 401 para `/api/*` e redirecionando para `/login?callbackUrl=...` para páginas navegáveis. Rotas públicas explícitas (`/`, `/login`, `/register`, `/como-funciona`, `/blog`, `/sitemap.xml`, etc.) são liberadas em `isPublicRoute`.
+  - O layout do painel autenticado valida a sessão no servidor como defesa em profundidade com `redirect("/login")`.
+- **Isolamento Multi-Tenant e Prevenção a IDOR (`src/lib/workspace.ts`)**:
+  - `getSessionWorkspaceId` lança `UnauthorizedWorkspaceError` (`status: 401`) em produção caso não haja usuário autenticado, extinguindo o fallback silencioso para `DEFAULT_WORKSPACE_ID`.
+  - `getAuthenticatedWorkspace` retorna `null` de forma segura na ausência de sessão.
+  - Todas as consultas ao Prisma filtram obrigatoriamente por `where: { id, workspaceId }`.
+- **Rate Limiting e Anti-Brute Force (`src/lib/security/rate-limit.ts`)**:
+  - Limitação sliding-window em memória sem dependência de Redis ou infraestrutura externa.
+  - Endpoints de OTP (`/api/auth/verify-code`, `/api/auth/forgot-password/reset`, `/api/auth/register`) bloqueiam na 5ª tentativa incorreta por 15 minutos (HTTP 429), deletam o `VerificationToken` no banco de dados e gravam o evento no `SystemErrorLog` (`module: "AUTH"`).
+- **Webhooks com Política Fail-Closed (`src/lib/payments/asaas.ts`, `/api/webhooks/asaas`)**:
+  - A validação do cabeçalho `asaas-access-token` exige que `ASAAS_WEBHOOK_TOKEN` esteja configurado no servidor. Se a variável estiver ausente ou o token diferir, a requisição é rejeitada com HTTP 401 (*Fail-Closed*) e registrada em `SystemErrorLog`.
+- **Sanitização contra Stored XSS (`src/lib/security/sanitize-html.ts`)**:
+  - Função `sanitizeHtml` remove tags `<script>`, `<iframe>`, `<object>`, `<embed>`, handlers inline de JavaScript (`onerror`, `onload`, `onclick`, etc.), e esquemas maliciosos `javascript:` / `data:text/html`.
+  - Preserva tags semânticas editoriais e data URIs seguros de imagem (`data:image/...;base64`).
+  - Aplicada no editor de artigos, no gerenciador de blocos e na persistência de artigos.
+- **Proteção Anti-SSRF em RSS e Scraper (`src/lib/affiliate/ssrf.ts`, `src/lib/rss.ts`, `src/lib/scraper.ts`, `/api/sources`)**:
+  - Função `validateSafeRemoteUrl` valida protocolo (apenas HTTP/HTTPS), proíbe credenciais na URL (`user:pass`), resolve o DNS e bloqueia loopback (`127.0.0.1`, `::1`), `localhost`, link-local (`169.254.169.254`), e faixas privadas RFC 1918 antes de qualquer requisição externa.
+- **Security Headers (`next.config.ts`)**:
+  - Cabeçalhos `Content-Security-Policy`, `Strict-Transport-Security` (com preload), `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin` e `Permissions-Policy` configurados globalmente.
+- **Mascaramento Seguro de Erros e Higienização de Logs (`src/lib/errors/service.ts`)**:
+  - `isInternalInfrastructureError` e `getSafeClientErrorMessage` asseguram que nomes de tabelas, constraints e queries do Prisma/PostgreSQL nunca vazem para o cliente.
+  - Logs de console com PII de clientes (nomes, e-mails) e códigos OTP são suprimidos em ambiente de produção.
+
+
+

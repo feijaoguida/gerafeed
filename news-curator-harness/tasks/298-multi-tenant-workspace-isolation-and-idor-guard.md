@@ -1,7 +1,20 @@
 # Task 298: Blindagem de Isolamento Multi-Tenant (`src/lib/workspace.ts`) e Prevenção a IDOR
 
 ## Status
-TODO
+DONE
+
+## Evidências de Conclusão
+- `src/lib/workspace.ts`:
+  - Implementada a classe de erro `UnauthorizedWorkspaceError` com `status = 401`.
+  - `getAuthenticatedWorkspace` atualizado para retornar `null` em caso de ausência de sessão ou exceção, nunca mais retornando `DEFAULT_WORKSPACE_ID` silenciosamente.
+  - `getSessionWorkspaceId` atualizado para lançar `UnauthorizedWorkspaceError` em produção ou quando não autenticado, eliminando o fallback anônimo para `DEFAULT_WORKSPACE_ID` em requisições de API.
+- `src/lib/errors/service.ts`:
+  - `handleApiError` atualizado para detectar `UnauthorizedWorkspaceError` e erros com status 401, retornando `HTTP 401` com mensagem amigável mascarada para o cliente (`"Não autorizado. Faça login para continuar."`).
+- Validação e Prevenção a IDOR:
+  - `scripts/phase40/test-task298-tenant-isolation-and-idor.ts`: validou bloqueio 401 sem sessão em produção, retorno nulo seguro em `getAuthenticatedWorkspace`, resposta 401 do `handleApiError`, e isolamento estrito onde o Workspace B não tem acesso a Article, WordPressSite ou Source do Workspace A.
+  - `npx tsx scripts/phase40/test-task298-tenant-isolation-and-idor.ts`: PASS (100% de sucesso).
+  - `npx tsc --noEmit`: PASS (0 erros).
+  - `npm run lint`: PASS (0 erros).
 
 ## Contexto
 A auditoria de segurança pré-produção identificou nos itens **6 (Prevenção a IDOR)** e **7 (Isolamento de dados / Multi-tenancy)** que a função central `getSessionWorkspaceId()` em `src/lib/workspace.ts` faz fallback silencioso para `DEFAULT_WORKSPACE_ID` (`"default-workspace"`) sempre que `auth()` retorna `null` ou lança exceção, e `getAuthenticatedWorkspace()` também retorna `{ workspaceId: DEFAULT_WORKSPACE_ID }` no bloco `catch`.
@@ -35,10 +48,10 @@ Em produção, uma requisição HTTP sem sessão válida jamais pode operar sobr
 1. Verificar e assegurar que as operações de leitura, atualização e exclusão por `[id]` em `/api/articles/[id]/*`, `/api/sources/[id]`, `/api/wordpress/sites/[id]/*`, `/api/affiliate/products/[id]/*`, `/api/affiliate/offers/[id]/*` e `/api/affiliate/categories/[id]` validem sempre o par `{ id, workspaceId }` pertencente ao usuário autenticado antes de modificar qualquer registro.
 
 ## Critérios de Aceitação (Definition of Done)
-- [ ] `getAuthenticatedWorkspace()` retorna `null` em caso de ausência de sessão ou exceção, nunca caindo em `DEFAULT_WORKSPACE_ID`.
-- [ ] `getSessionWorkspaceId()` lança `UnauthorizedWorkspaceError` (`status: 401`) quando chamado sem sessão autenticada em produção, mantendo compatibilidade controlada apenas para scripts CLI de teste em desenvolvimento.
-- [ ] `handleApiError` responde `HTTP 401` para `UnauthorizedWorkspaceError`.
-- [ ] Teste automatizado `scripts/phase40/test-task298-tenant-isolation-and-idor.ts` validando bloqueio de acesso sem sessão e isolamento estrito entre Workspaces A e B (prevenção a IDOR).
-- [ ] `npx tsc --noEmit`: PASS (0 erros).
-- [ ] `npm run lint`: PASS (0 erros).
+- [x] `getAuthenticatedWorkspace()` retorna `null` em caso de ausência de sessão ou exceção, nunca caindo em `DEFAULT_WORKSPACE_ID`.
+- [x] `getSessionWorkspaceId()` lança `UnauthorizedWorkspaceError` (`status: 401`) quando chamado sem sessão autenticada em produção, mantendo compatibilidade controlada apenas para scripts CLI de teste em desenvolvimento.
+- [x] `handleApiError` responde `HTTP 401` para `UnauthorizedWorkspaceError`.
+- [x] Teste automatizado `scripts/phase40/test-task298-tenant-isolation-and-idor.ts` validando bloqueio de acesso sem sessão e isolamento estrito entre Workspaces A e B (prevenção a IDOR).
+- [x] `npx tsc --noEmit`: PASS (0 erros).
+- [x] `npm run lint`: PASS (0 erros).
 

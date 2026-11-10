@@ -1,5 +1,6 @@
 import { Suspense } from "react";
 import type { Metadata } from "next";
+import { redirect } from "next/navigation";
 import { Sidebar } from "@/components/sidebar";
 import { auth, DEFAULT_WORKSPACE_ID } from "@/auth";
 import { BillingService, AFFILIATE_FEATURES } from "@/lib/billing";
@@ -21,9 +22,15 @@ export default async function AppLayout({
   children: React.ReactNode;
 }) {
   const session = await auth();
-  const isSuperAdmin = Boolean(session?.user?.isSuperAdmin);
+
+  // Guarda server-side estrita de autenticação
+  if (!session?.user?.id) {
+    redirect("/login");
+  }
+
+  const isSuperAdmin = Boolean(session.user.isSuperAdmin);
   const workspaceId =
-    session?.user?.workspaceId || session?.workspaceId || DEFAULT_WORKSPACE_ID;
+    session.user.workspaceId || session.workspaceId || DEFAULT_WORKSPACE_ID;
 
   let hasAffiliateModule = false;
   try {

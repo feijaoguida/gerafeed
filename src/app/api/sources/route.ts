@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { getSessionWorkspaceId } from "@/lib/workspace";
 import { BillingService } from "@/lib/billing";
 import { handleApiError } from "@/lib/errors/service";
+import { validateSafeRemoteUrl } from "@/lib/affiliate/ssrf";
 
 export async function GET(request: Request) {
   try {
@@ -33,6 +34,15 @@ export async function POST(request: Request) {
 
     if (!rssUrl || typeof rssUrl !== "string" || !rssUrl.trim()) {
       return NextResponse.json({ error: "URL do RSS é obrigatória" }, { status: 400 });
+    }
+
+    try {
+      await validateSafeRemoteUrl(rssUrl.trim());
+    } catch (urlErr) {
+      return NextResponse.json(
+        { error: urlErr instanceof Error ? urlErr.message : "URL de RSS inválida ou não permitida." },
+        { status: 400 }
+      );
     }
 
     // Check billing limit for active sources

@@ -162,3 +162,35 @@ export async function validateHostForSSRF(hostname: string, allowedHosts?: strin
     throw new InvalidHostError(`Falha na resolução de DNS para '${cleanHost}': ${(error as Error).message}`);
   }
 }
+
+/**
+ * Parses and strictly validates a remote URL against SSRF:
+ * - Requires http: or https:
+ * - Forbids embedded credentials (username/password)
+ * - Validates host and all resolved DNS records against private/loopback/metadata IPs.
+ */
+export async function validateSafeRemoteUrl(rawUrl: string, allowedHosts?: string[]): Promise<URL> {
+  if (!rawUrl || typeof rawUrl !== "string" || !rawUrl.trim()) {
+    throw new ResolverError("URL remota vazia ou inválida.", "INVALID_URL");
+  }
+
+  let parsed: URL;
+  try {
+    parsed = new URL(rawUrl.trim());
+  } catch {
+    throw new ResolverError(`Formato de URL inválido: ${rawUrl}`, "INVALID_URL");
+  }
+
+  if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+    throw new SSRFSecurityError(`Protocolo não permitido: ${parsed.protocol}. Utilize apenas http ou https.`);
+  }
+
+  if (parsed.username || parsed.password) {
+    throw new SSRFSecurityError("URLs com credenciais embutidas não são permitidas por segurança.");
+  }
+
+  await validateHostForSSRF(parsed.hostname, allowedHosts);
+
+  return parsed;
+}
+

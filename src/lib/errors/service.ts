@@ -44,6 +44,82 @@ export interface ApiErrorContext {
 }
 
 /**
+ * Detecta se o erro decorre de infraestrutura interna, banco de dados (Prisma/PostgreSQL),
+ * problemas de conexão de rede ou vazamentos de código fonte.
+ */
+export function isInternalInfrastructureError(error: unknown): boolean {
+  if (!error) return false;
+
+  const errorObj = typeof error === "object" ? (error as Record<string, unknown>) : null;
+  const errorName = String(errorObj?.name || "");
+
+  if (errorName.startsWith("PrismaClient")) {
+    return true;
+  }
+
+  const message = extractErrorMessage(error);
+  const lowerMsg = message.toLowerCase();
+
+  const infrastructurePatterns = [
+    "prisma",
+    "unique constraint",
+    "foreign key constraint",
+    "relation does not exist",
+    "table does not exist",
+    "column does not exist",
+    "econnrefused",
+    "etimedout",
+    "enotfound",
+    "select ",
+    "insert into ",
+    "update ",
+    "delete from ",
+    "node_modules",
+    "/home/",
+    "stack trace",
+  ];
+
+  if (
+    lowerMsg.includes("does not exist") &&
+    (lowerMsg.includes("relation") || lowerMsg.includes("table") || lowerMsg.includes("column"))
+  ) {
+    return true;
+  }
+
+  for (const pattern of infrastructurePatterns) {
+    if (lowerMsg.includes(pattern)) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+/**
+ * Retorna uma mensagem de erro segura para o cliente frontend,
+ * garantindo que detalhes internos de banco de dados ou stack traces nunca vazem.
+ */
+export function getSafeClientErrorMessage(
+  error: unknown,
+  fallbackMessage: string = "Ocorreu um erro interno ao processar sua solicitação. Tente novamente mais tarde."
+): string {
+  if (!error) return fallbackMessage;
+
+  if (isInternalInfrastructureError(error)) {
+    return fallbackMessage;
+  }
+
+  if (error instanceof Error && error.message) {
+    const trimmed = error.message.trim();
+    if (trimmed.length > 0 && trimmed.length <= 300) {
+      return trimmed;
+    }
+  }
+
+  return fallbackMessage;
+}
+
+/**
  * Palavras-chave de campos sensíveis para higienização em logs.
  */
 const SENSITIVE_KEYS = new Set([
@@ -250,7 +326,15 @@ export async function handleApiError(
     }
   }
 
-  const statusCode = context?.statusCode || 500;
+  const isUnauthorized =
+    error instanceof Error &&
+    (error.name === "UnauthorizedWorkspaceError" ||
+      (error as { status?: number }).status === 401 ||
+      error.message === "UNAUTHORIZED_WORKSPACE_ACCESS" ||
+      error.message.includes("Não autenticado") ||
+      error.message.includes("Não autorizado"));
+
+  const statusCode = isUnauthorized ? 401 : (context?.statusCode || (error as { status?: number })?.status || 500);
   const rawMessage = extractErrorMessage(error);
   const stack = extractErrorStack(error);
 
@@ -264,7 +348,7 @@ export async function handleApiError(
     path,
     method,
     query: queryParams,
-    module: context?.module || "GENERAL",
+    module: context?.module || (isUnauthorized ? "AUTH" : "GENERAL"),
     error,
     errorMessage: rawMessage,
     errorStack: stack,
@@ -276,7 +360,9 @@ export async function handleApiError(
   // Mensagem amigável mascarada para o cliente
   const userFacingMessage =
     context?.userFacingMessage ||
-    "Ocorreu um erro interno ao processar sua solicitação. Tente novamente mais tarde.";
+    (isUnauthorized
+      ? "Não autorizado. Faça login para continuar."
+      : "Ocorreu um erro interno ao processar sua solicitação. Tente novamente mais tarde.");
 
   return NextResponse.json(
     {

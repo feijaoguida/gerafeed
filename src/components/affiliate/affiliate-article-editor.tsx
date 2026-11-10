@@ -16,6 +16,7 @@ import {
 import { CanonicalDocument } from "@/lib/affiliate/canonical-document";
 import { AffiliateBlockManager } from "@/components/affiliate/affiliate-block-manager";
 import { documentToEditorHtml, editorHtmlToDocument } from "@/lib/affiliate/editor-document";
+import { sanitizeHtml } from "@/lib/security/sanitize-html";
 
 export interface ArticleProductItem {
   id?: string;
@@ -737,7 +738,7 @@ export function AffiliateArticleEditor({
                   <div
                     key={idx}
                     className="prose dark:prose-invert max-w-none text-sm"
-                    dangerouslySetInnerHTML={{ __html: block.data.html || block.data.markdown || "" }}
+                    dangerouslySetInnerHTML={{ __html: sanitizeHtml(block.data.html || block.data.markdown || "") }}
                   />
                 );
               case "PRODUCT_CARD":

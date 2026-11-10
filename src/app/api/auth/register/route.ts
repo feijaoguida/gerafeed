@@ -4,7 +4,15 @@ import { BillingService } from "@/lib/billing";
 import { PlanHistoryService } from "@/lib/plan-history";
 import { hashPassword } from "@/lib/security/password";
 import { SiteAntifraudService, type SiteAntifraudValidationResult } from "@/lib/site-antifraud";
-import { logSystemError } from "@/lib/errors/service";
+import { logSystemError, getSafeClientErrorMessage } from "@/lib/errors/service";
+import {
+  getLockStatus,
+  recordFailedAttempt,
+  clearFailedAttempts,
+} from "@/lib/security/rate-limit";
+
+const MAX_OTP_ATTEMPTS = 5;
+const LOCK_DURATION_MS = 15 * 60 * 1000;
 
 export async function POST(request: Request) {
   try {
@@ -32,8 +40,20 @@ export async function POST(request: Request) {
     }
     const cleanPhone = typeof phone === "string" && phone.trim() ? phone.trim() : "";
     const cleanCode = code.trim();
+    const rateLimitKey = `otp-verify:${cleanEmail}`;
 
-    // 1. Validar Token de Verificação
+    // 1. Verificar bloqueio temporário anti-força bruta
+    const lock = getLockStatus(rateLimitKey);
+    if (lock.locked) {
+      return NextResponse.json(
+        {
+          error: `Muitas tentativas incorretas. Por segurança, aguarde ${lock.retryAfterSeconds} segundos ou solicite um novo código.`,
+        },
+        { status: 429 }
+      );
+    }
+
+    // 2. Validar Token de Verificação
     const tokenRecord = await prisma.verificationToken.findUnique({
       where: {
         identifier_token: {
@@ -44,11 +64,43 @@ export async function POST(request: Request) {
     });
 
     if (!tokenRecord || tokenRecord.expires < new Date()) {
+      const attempt = recordFailedAttempt(rateLimitKey, {
+        maxAttempts: MAX_OTP_ATTEMPTS,
+        windowMs: LOCK_DURATION_MS,
+        lockDurationMs: LOCK_DURATION_MS,
+      });
+
+      if (attempt.locked) {
+        await prisma.verificationToken.deleteMany({
+          where: { identifier: cleanEmail },
+        });
+
+        await logSystemError({
+          path: "/api/auth/register",
+          module: "AUTH",
+          statusCode: 429,
+          errorMessage: `[Security] Força bruta detectada no cadastro para o email ${cleanEmail}. Código invalidado e bloqueado por 15m.`,
+        });
+
+        return NextResponse.json(
+          {
+            error:
+              "Limite de 5 tentativas excedido. O código de confirmação foi cancelado por segurança. Solicite um novo código.",
+          },
+          { status: 429 }
+        );
+      }
+
       return NextResponse.json(
-        { error: "Código de confirmação inválido ou expirado. Por favor, solicite um novo código." },
+        {
+          error: `Código de confirmação inválido ou expirado. Você tem mais ${attempt.remainingAttempts} tentativa(s).`,
+        },
         { status: 400 }
       );
     }
+
+    // Código válido: limpar contador de tentativas
+    clearFailedAttempts(rateLimitKey);
 
     // 2. Check if user already exists
     const existingUser = await prisma.user.findUnique({
@@ -172,7 +224,7 @@ export async function POST(request: Request) {
     });
   } catch (error) {
     console.error("POST /api/auth/register error:", error);
-    const message = error instanceof Error ? error.message : "Erro ao criar conta de usuário.";
+    const message = getSafeClientErrorMessage(error, "Erro ao criar conta de usuário.");
 
     await logSystemError({
       path: "/api/auth/register",

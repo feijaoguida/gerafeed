@@ -19,9 +19,18 @@ export async function POST(request: Request) {
     try {
       eventResult = await gateway.handleWebhook(body, headersObj);
     } catch (authError) {
-      console.warn("Asaas webhook unauthorized:", authError);
+      const errorMsg = authError instanceof Error ? authError.message : "Não autorizado";
+      console.warn("Asaas webhook unauthorized:", errorMsg);
+
+      await logSystemError({
+        path: "/api/webhooks/asaas",
+        module: "BILLING",
+        statusCode: 401,
+        errorMessage: `[Security] Tentativa de acesso não autorizado ao Webhook Asaas: ${errorMsg}`,
+      });
+
       return NextResponse.json(
-        { error: authError instanceof Error ? authError.message : "Não autorizado" },
+        { error: errorMsg },
         { status: 401 }
       );
     }

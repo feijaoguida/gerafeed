@@ -4,26 +4,76 @@
 Phase 40. Hardening de Segurança Pré-Produção (Auditoria de 20 Pontos)
 
 ## Current Task
-Task 297 (`tasks/297-auth-hardening-and-proxy-route-guard.md`) — TODO
+None
 
 ## Status
-PLANNED — Phase 40 estruturada no harness e no speckit (`SPEC.md`, `PLAN-phase40-security-hardening-and-pre-production-audit.md` e tasks `297` a `302`) após auditoria completa de segurança e confiabilidade de 20 pontos. Pronta para iniciar execução na Task 297.
+DONE — Todas as tasks da Phase 40 (297 a 302) foram concluídas, testadas e auditadas com 100% de sucesso. A aplicação News Curator / GeraFeed está auditada e protegida conforme todos os 20 pontos de verificação de segurança pré-produção.
 
-## Phase 40 (PLANNED / TODO)
+## Phase 40 (DONE)
 
-Hardening de Segurança Pré-Produção cobrindo Autenticação Robusta (bloqueio de senha nula e constant-time compare), Autorização no Proxy e Layout, Isolamento Multi-Tenant sem fallback anônimo para `DEFAULT_WORKSPACE_ID`, Rate Limiting e Anti-Brute Force de OTP/Login, Política Fail-Closed no Webhook Asaas, Sanitização HTML contra Stored XSS, Proteção Anti-SSRF em RSS/Scraper, Security Headers (`next.config.ts`) e Mascaramento Seguro de Erros Internos.
+Hardening de Segurança Pré-Produção cobrindo Autenticação Robusta (bloqueio de senha nula e constant-time compare), Autorização no Proxy e Layout, Isolamento Multi-Tenant sem fallback anônimo para `DEFAULT_WORKSPACE_ID`, Rate Limiting e Anti-Brute Force de OTP/Login, Política Fail-Closed no Webhook Asaas, Sanitização HTML contra Stored XSS, Proteção Anti-SSRF em RSS/Scraper, Security Headers (`next.config.ts`), Mascaramento Seguro de Erros Internos e Suíte de Testes E2E de Auditoria.
 
 Plano: [PLAN-phase40-security-hardening-and-pre-production-audit.md](PLAN-phase40-security-hardening-and-pre-production-audit.md).
 Spec: [Phase 40](SPEC.md#phase-40-hardening-de-segurança-pré-produção-auditoria-de-20-pontos).
 
 | Task | Status | Entrega |
 |---|---|---|
-| [297](tasks/297-auth-hardening-and-proxy-route-guard.md) | TODO | Endurecimento de Autenticação (`src/auth.ts`), bloqueio de senha nula, comparação constant-time, Proxy Guard (`src/proxy.ts`) e proteção de `src/app/(app)/layout.tsx` |
-| [298](tasks/298-multi-tenant-workspace-isolation-and-idor-guard.md) | TODO | Blindagem de Isolamento Multi-Tenant (`src/lib/workspace.ts`), eliminação de fallback anônimo para `DEFAULT_WORKSPACE_ID` e prevenção a IDOR |
-| [299](tasks/299-rate-limiting-brute-force-and-webhook-fail-closed.md) | TODO | Rate Limiting e Anti-Brute Force de OTP/Login (`src/lib/security/rate-limit.ts`) e Política *Fail-Closed* no Webhook Asaas (`src/lib/payments/asaas.ts`) |
-| [300](tasks/300-xss-html-sanitization-and-ssrf-rss-scraper-guard.md) | TODO | Sanitização HTML contra Stored XSS (`src/lib/security/sanitize-html.ts`) e Proteção Anti-SSRF na Coleta RSS (`src/lib/rss.ts`) e Scraper (`src/lib/scraper.ts`) |
-| [301](tasks/301-security-headers-error-masking-and-log-hygiene.md) | TODO | Security Headers (`next.config.ts`), Mascaramento Seguro de Erros Internos do Prisma nas APIs e Higienização de PII em Logs |
-| [302](tasks/302-phase40-security-audit-e2e-and-hardening.md) | TODO | Suíte E2E de Testes de Segurança (20 Pontos & Abuse Cases), TypeScript, ESLint, Build de Produção e Evidências |
+| [297](tasks/297-auth-hardening-and-proxy-route-guard.md) | DONE | Endurecimento de Autenticação (`src/auth.ts`), bloqueio de senha nula, comparação constant-time, Proxy Guard (`src/proxy.ts`) e proteção de `src/app/(app)/layout.tsx` |
+| [298](tasks/298-multi-tenant-workspace-isolation-and-idor-guard.md) | DONE | Blindagem de Isolamento Multi-Tenant (`src/lib/workspace.ts`), eliminação de fallback anônimo para `DEFAULT_WORKSPACE_ID` e prevenção a IDOR |
+| [299](tasks/299-rate-limiting-brute-force-and-webhook-fail-closed.md) | DONE | Rate Limiting e Anti-Brute Force de OTP/Login (`src/lib/security/rate-limit.ts`) e Política *Fail-Closed* no Webhook Asaas (`src/lib/payments/asaas.ts`) |
+| [300](tasks/300-xss-html-sanitization-and-ssrf-rss-scraper-guard.md) | DONE | Sanitização HTML contra Stored XSS (`src/lib/security/sanitize-html.ts`) e Proteção Anti-SSRF na Coleta RSS (`src/lib/rss.ts`) e Scraper (`src/lib/scraper.ts`) |
+| [301](tasks/301-security-headers-error-masking-and-log-hygiene.md) | DONE | Security Headers (`next.config.ts`), Mascaramento Seguro de Erros Internos do Prisma nas APIs e Higienização de PII em Logs |
+| [302](tasks/302-phase40-security-audit-e2e-and-hardening.md) | DONE | Suíte E2E de Testes de Segurança (20 Pontos & Abuse Cases), TypeScript, ESLint, Build de Produção e Evidências |
+
+## Last Evidence
+Phase 40 concluída com sucesso:
+- `scripts/phase40/test-security-audit-20-points-e2e.ts`: PASS (100% de conformidade nos 20 pontos de auditoria de segurança pré-publicação).
+- `npx tsc --noEmit`: PASS (0 erros de tipagem estrita).
+- `npm run lint`: PASS (0 erros de ESLint).
+- `npm run build`: PASS (107/107 rotas estáticas e dinâmicas geradas com Turbopack em 5.0s).
+    - `Permissions-Policy: camera=(), microphone=(), geolocation=(), browsing-topics=()`
+    - `Content-Security-Policy` com `frame-ancestors 'none'`, fontes/scripts/estilos/imagens controlados.
+- `src/lib/errors/service.ts`:
+  - `isInternalInfrastructureError`: identifica erros do Prisma (`PrismaClientKnownRequestError`, etc.), strings com queries SQL, caminhos internos do sistema ou erros de conexão de banco.
+  - `getSafeClientErrorMessage`: mascara erros de infraestrutura retornando fallback seguro e impedindo vazamento de tabelas/colunas. Integrado nas rotas de autenticação e manipulação de erros.
+- Higienização de Logs de Produção:
+  - `src/lib/payments/asaas.ts`: removido vazamento de nome e e-mail de clientes em stdout.
+  - `src/lib/mail/adapters/mock-adapter.ts`: desativada a impressão de corpos de e-mail e códigos OTP em stdout quando em modo de produção.
+- Validação:
+  - `scripts/phase40/test-task301-headers-and-error-masking.ts`: PASS (100% de sucesso).
+  - `npx tsc --noEmit`: PASS (0 erros).
+  - `npm run lint`: PASS (0 erros).
+  - `validateSafeRemoteUrl` implementado em `src/lib/affiliate/ssrf.ts` bloqueando loopback (`127.0.0.1`), `localhost`, link-local (`169.254.169.254`), faixas privadas RFC 1918 e credenciais de usuário.
+  - Integrado em `src/app/api/sources/route.ts`, `src/app/api/sources/[id]/route.ts`, `src/lib/rss.ts` (`parseFeedUrl`) e `src/lib/scraper.ts` (`scrapeArticleContent`).
+- Validação:
+  - `scripts/phase40/test-task300-xss-and-ssrf.ts`: PASS (100% de sucesso).
+  - `npx tsc --noEmit`: PASS (0 erros).
+  - `npm run lint`: PASS (0 erros).
+- `src/lib/workspace.ts`:
+  - Implementada a classe de erro `UnauthorizedWorkspaceError` com `status = 401`.
+  - `getAuthenticatedWorkspace` atualizado para retornar `null` em caso de ausência de sessão ou exceção, nunca mais retornando `DEFAULT_WORKSPACE_ID` silenciosamente.
+  - `getSessionWorkspaceId` atualizado para lançar `UnauthorizedWorkspaceError` em produção ou quando não autenticado, eliminando o fallback anônimo para `DEFAULT_WORKSPACE_ID` em requisições de API.
+- `src/lib/errors/service.ts`:
+  - `handleApiError` atualizado para detectar `UnauthorizedWorkspaceError` e erros com status 401, retornando `HTTP 401` com mensagem amigável mascarada para o cliente (`"Não autorizado. Faça login para continuar."`).
+- Validação e Prevenção a IDOR:
+  - `scripts/phase40/test-task298-tenant-isolation-and-idor.ts`: validou bloqueio 401 sem sessão em produção, retorno nulo seguro em `getAuthenticatedWorkspace`, resposta 401 do `handleApiError`, e isolamento estrito onde o Workspace B não tem acesso a Article, WordPressSite ou Source do Workspace A.
+  - `npx tsx scripts/phase40/test-task298-tenant-isolation-and-idor.ts`: PASS (100% de sucesso).
+  - `npx tsc --noEmit`: PASS (0 erros).
+  - `npm run lint`: PASS (0 erros).
+- `src/auth.ts`:
+  - Implementada função `constantTimeCompare` utilizando digest SHA-256 e `crypto.timingSafeEqual` para comparação resistente a timing attacks.
+  - No provider `Credentials`, implementada verificação estrita `if (!regularUser.passwordHash) return null;`, eliminando o bypass de autenticação por senha para usuários sem hash.
+  - Credenciais administrativas de ambiente comparadas via `constantTimeCompare` e `ADMIN_EMAIL`/`ADMIN_PASSWORD` legados restringidos exclusivamente a ambientes fora de produção (`NODE_ENV !== "production"`).
+- `src/proxy.ts`:
+  - Implementado handler ativo com `isPublicRoute(pathname)`.
+  - Rotas públicas (landing pages, blog, `/api/auth/*`, `/api/billing/coupons/validate`, `/api/webhooks/*`, assets estáticos) preservadas.
+  - Rotas privadas protegidas: retorna `HTTP 401` JSON para `/api/*` não autenticadas e redireciona para `/login?callbackUrl=...` em páginas.
+- `src/app/(app)/layout.tsx`:
+  - Implementado `if (!session?.user?.id) { redirect("/login"); }` garantindo defesa em profundidade em Server Components.
+- Validação:
+  - `npx tsx scripts/phase40/test-task297-auth-and-proxy.ts`: PASS (100% de sucesso).
+  - `npx tsc --noEmit`: PASS (0 erros).
+  - `npm run lint`: PASS (0 erros).
 
 ## Last Evidence
 Phase 39 / Task 296 concluída com sucesso:

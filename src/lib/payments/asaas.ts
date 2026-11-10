@@ -15,6 +15,7 @@ import {
 } from "./types";
 import { prisma } from "@/lib/prisma";
 import { logSystemError } from "@/lib/errors/service";
+import { constantTimeCompare } from "@/auth";
 
 export interface AsaasConfig {
   apiKey?: string;
@@ -99,7 +100,9 @@ export class AsaasGateway implements PaymentGateway {
 
     const cleanDoc = params.cpfCnpj ? params.cpfCnpj.replace(/\D/g, "") : undefined;
 
-    console.log(`[Asaas] createCustomer initiating for workspace ${params.workspaceId || "unknown"} (name: ${params.name}, email: ${params.email})`);
+    if (process.env.NODE_ENV !== "production") {
+      console.log(`[Asaas] createCustomer initiating for workspace ${params.workspaceId || "unknown"}`);
+    }
 
     const payload = {
       name: params.name,
@@ -158,7 +161,9 @@ export class AsaasGateway implements PaymentGateway {
    */
   async ensureCustomer(params: CreateCustomerParams): Promise<CustomerResult> {
     const workspaceId = params.workspaceId;
-    console.log(`[Asaas] ensureCustomer starting for workspace: ${workspaceId}, email: ${params.email}`);
+    if (process.env.NODE_ENV !== "production") {
+      console.log(`[Asaas] ensureCustomer starting for workspace: ${workspaceId}`);
+    }
 
     // Check database for existing providerCustomerId
     let existingCustomerId = params.providerCustomerId;
@@ -591,10 +596,23 @@ export class AsaasGateway implements PaymentGateway {
     payload: unknown,
     headers?: Record<string, string>
   ): Promise<WebhookEventResult> {
-    if (this.webhookToken && headers) {
-      const token = headers["asaas-access-token"] || headers["access_token"];
-      if (token !== this.webhookToken) {
-        throw this.normalizeError("Token de autenticação do Webhook Asaas inválido.");
+    const configuredToken = this.webhookToken || process.env.ASAAS_WEBHOOK_TOKEN;
+    const isTestMode =
+      process.env.NODE_ENV === "test" ||
+      process.env.ALLOW_INSECURE_WEBHOOK_TEST === "true";
+
+    // Política Fail-Closed: se nenhum token estiver configurado no servidor, recusar obrigatoriamente
+    if (!configuredToken && !isTestMode) {
+      throw this.normalizeError("Configuração de segurança ausente: ASAAS_WEBHOOK_TOKEN não definido no servidor.");
+    }
+
+    if (configuredToken) {
+      const incomingToken = headers
+        ? headers["asaas-access-token"] || headers["access_token"]
+        : undefined;
+
+      if (!incomingToken || !constantTimeCompare(incomingToken, configuredToken)) {
+        throw this.normalizeError("Token de autenticação do Webhook Asaas inválido ou ausente.");
       }
     }
 

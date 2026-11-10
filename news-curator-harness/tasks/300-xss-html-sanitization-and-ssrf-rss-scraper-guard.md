@@ -1,7 +1,7 @@
 # Task 300: Sanitização HTML contra Stored XSS e Proteção Anti-SSRF na Coleta RSS e Scraper
 
 ## Status
-TODO
+DONE
 
 ## Contexto
 A auditoria de segurança pré-produção identificou nos itens **14 (Sanitização contra XSS)** e **20 (Abuse Cases — SSRF)**:
@@ -41,10 +41,18 @@ A auditoria de segurança pré-produção identificou nos itens **14 (Sanitizaç
    - Executar `await validateSafeRemoteUrl(url)` antes de requisitar a página e validar redirecionamentos HTTP (máximo de 5 hops, validando `validateSafeRemoteUrl` em cada `Location` de redirect, usando `safeFetchWithRedirects` de `src/lib/affiliate/ssrf.ts`).
 
 ## Critérios de Aceitação (Definition of Done)
-- [ ] `sanitizeHtml` criado em `src/lib/security/sanitize-html.ts` e aplicado em `affiliate-article-editor.tsx`, `affiliate-block-manager.tsx` e `article-persistence-service.ts`.
-- [ ] Payloads XSS (`<script>`, `onerror=`, `javascript:`, `<iframe>`) são 100% neutralizados sem quebrar HTML editorial válido nem Data URIs de imagens (`data:image/...`).
-- [ ] `validateSafeRemoteUrl` bloqueia `http://127.0.0.1`, `http://localhost`, `http://169.254.169.254`, `http://10.0.0.1`, `http://192.168.1.1` e `file://` em `/api/sources`, `src/lib/rss.ts` e `src/lib/scraper.ts`.
-- [ ] Teste automatizado `scripts/phase40/test-task300-xss-and-ssrf.ts` validando todos os vetores.
-- [ ] `npx tsc --noEmit`: PASS (0 erros).
-- [ ] `npm run lint`: PASS (0 erros).
+- [x] `sanitizeHtml` criado em `src/lib/security/sanitize-html.ts` e aplicado em `affiliate-article-editor.tsx`, `affiliate-block-manager.tsx` e `article-persistence-service.ts`.
+- [x] Payloads XSS (`<script>`, `onerror=`, `javascript:`, `<iframe>`) são 100% neutralizados sem quebrar HTML editorial válido nem Data URIs de imagens (`data:image/...`).
+- [x] `validateSafeRemoteUrl` bloqueia `http://127.0.0.1`, `http://localhost`, `http://169.254.169.254`, `http://10.0.0.1`, `http://192.168.1.1` e `file://` em `/api/sources`, `src/lib/rss.ts` e `src/lib/scraper.ts`.
+- [x] Teste automatizado `scripts/phase40/test-task300-xss-and-ssrf.ts` validando todos os vetores.
+- [x] `npx tsc --noEmit`: PASS (0 erros).
+- [x] `npm run lint`: PASS (0 erros).
+
+## Evidências
+- `src/lib/security/sanitize-html.ts`: criado e implementado.
+- Sanitização aplicada em `src/components/affiliate/affiliate-article-editor.tsx`, `src/components/affiliate/affiliate-block-manager.tsx` e `src/lib/affiliate/article-persistence-service.ts`.
+- Anti-SSRF unificado via `validateSafeRemoteUrl` em `src/lib/affiliate/ssrf.ts`, `src/app/api/sources/route.ts`, `src/app/api/sources/[id]/route.ts`, `src/lib/rss.ts` e `src/lib/scraper.ts`.
+- `npx tsx scripts/phase40/test-task300-xss-and-ssrf.ts`: PASS (todos os vetores testados e validados).
+- `npx tsc --noEmit`: PASS (0 erros).
+- `npm run lint`: PASS (0 erros).
 

@@ -1,7 +1,7 @@
 # Task 301: Security Headers (`next.config.ts`), Mascaramento Seguro de Erros nas APIs e Higienização de Logs
 
 ## Status
-TODO
+DONE
 
 ## Contexto
 A auditoria de segurança pré-produção identificou nos itens **11 (Modo Debug desativado)**, **12 (Tratamento seguro de erros)** e **19 (Headers de segurança e CORS)**:
@@ -36,10 +36,18 @@ A auditoria de segurança pré-produção identificou nos itens **11 (Modo Debug
    - Em `process.env.NODE_ENV === "production"`, nunca imprimir o código OTP ou o corpo do e-mail em texto aberto no `console.log`.
 
 ## Critérios de Aceitação (Definition of Done)
-- [ ] `next.config.ts` exporta todos os headers de segurança (`CSP`, `HSTS`, `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, `Referrer-Policy`, `Permissions-Policy`).
-- [ ] `isInternalInfrastructureError` e `getSafeClientErrorMessage` implementados em `src/lib/errors/service.ts` e aplicados nas rotas de API para impedir vazamento de detalhes do Prisma/PostgreSQL.
-- [ ] Logs de console em `asaas.ts`, `webhooks/asaas/route.ts` e `mock-adapter.ts` higienizados contra vazamento de PII e OTPs em produção.
-- [ ] Teste automatizado `scripts/phase40/test-task301-headers-and-error-masking.ts` validando os headers e o mascaramento de erros do Prisma.
-- [ ] `npx tsc --noEmit`: PASS (0 erros).
-- [ ] `npm run lint`: PASS (0 erros).
+- [x] `next.config.ts` exporta todos os headers de segurança (`CSP`, `HSTS`, `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, `Referrer-Policy`, `Permissions-Policy`).
+- [x] `isInternalInfrastructureError` e `getSafeClientErrorMessage` implementados em `src/lib/errors/service.ts` e aplicados nas rotas de API para impedir vazamento de detalhes do Prisma/PostgreSQL.
+- [x] Logs de console em `asaas.ts`, `webhooks/asaas/route.ts` e `mock-adapter.ts` higienizados contra vazamento de PII e OTPs em produção.
+- [x] Teste automatizado `scripts/phase40/test-task301-headers-and-error-masking.ts` validando os headers e o mascaramento de erros do Prisma.
+- [x] `npx tsc --noEmit`: PASS (0 erros).
+- [x] `npm run lint`: PASS (0 erros).
+
+## Evidências
+- `next.config.ts`: adicionada a função `async headers()` configurando CSP restrito, HSTS com preload, X-Frame-Options: DENY, X-Content-Type-Options: nosniff, Referrer-Policy e Permissions-Policy.
+- `src/lib/errors/service.ts`: implementadas as funções `isInternalInfrastructureError` e `getSafeClientErrorMessage`. Integradas nas rotas de autenticação e manipulação de erros.
+- `src/lib/payments/asaas.ts` e `src/lib/mail/adapters/mock-adapter.ts`: registros de log com e-mails, nomes de clientes e códigos OTP desativados no ambiente de produção (`NODE_ENV === "production"`).
+- `scripts/phase40/test-task301-headers-and-error-masking.ts`: PASS (100% de sucesso).
+- `npx tsc --noEmit`: PASS (0 erros).
+- `npm run lint`: PASS (0 erros).
 

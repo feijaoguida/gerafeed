@@ -1,7 +1,22 @@
 # Task 299: Rate Limiting, Proteção contra Brute Force de OTP/Login e Política Fail-Closed no Webhook Asaas
 
 ## Status
-TODO
+DONE
+
+## Evidências de Conclusão
+- `src/lib/security/rate-limit.ts`:
+  - Implementado sistema em memória de rate limiting e anti-brute force (`checkRateLimit`, `recordFailedAttempt`, `getLockStatus`, `clearFailedAttempts`, `extractClientIp`) com expurgo automático de chaves para evitar vazamento de memória.
+- Proteção Anti-Força Bruta em OTP:
+  - `src/app/api/auth/verify-code/route.ts`: limita a 5 tentativas incorretas por e-mail; na 5ª falha, destrói o `VerificationToken` no banco, grava em `SystemErrorLog` (`module: "AUTH"`, `statusCode: 429`) e bloqueia novas tentativas por 15 minutos (`HTTP 429`).
+  - `src/app/api/auth/forgot-password/reset/route.ts`: proteção idêntica para o fluxo de recuperação de senha.
+  - `src/app/api/auth/register/route.ts`: proteção integrada para impedir bypass chamando o registro em loop.
+- Webhook Asaas Fail-Closed:
+  - `src/lib/payments/asaas.ts`: exige `ASAAS_WEBHOOK_TOKEN` no servidor e valida o cabeçalho `asaas-access-token` usando `constantTimeCompare`. Se o token não estiver configurado no servidor, rejeita com erro sem processar o webhook (*Fail-Closed*).
+  - `src/app/api/webhooks/asaas/route.ts`: grava tentativas não autorizadas em `SystemErrorLog` (`module: "BILLING"`, `statusCode: 401`).
+- Validação:
+  - `scripts/phase40/test-task299-rate-limit-and-webhook.ts`: PASS (100% de sucesso).
+  - `npx tsc --noEmit`: PASS (0 erros).
+  - `npm run lint`: PASS (0 erros).
 
 ## Contexto
 A auditoria de segurança pré-produção identificou nos itens **17 (Rate Limiting e Brute Force)** e **20 (Abuse Cases)**:
@@ -47,10 +62,10 @@ A auditoria de segurança pré-produção identificou nos itens **17 (Rate Limit
    - Quando `gateway.handleWebhook` lançar erro de autenticação (`401`), gravar obrigatoriamente registro em `SystemErrorLog` (`module: "BILLING"`, `statusCode: 401`, `path: "/api/webhooks/asaas"`) antes de responder `HTTP 401`.
 
 ## Critérios de Aceitação (Definition of Done)
-- [ ] `src/lib/security/rate-limit.ts` implementado com controle de janela deslizante/fixa, bloqueio após $N$ falhas e limpeza de memória.
-- [ ] `/api/auth/verify-code`, `/api/auth/forgot-password/reset` e `/api/auth/register` invalidam o OTP no banco e bloqueiam com `HTTP 429` + `SystemErrorLog` na 5ª tentativa incorreta.
-- [ ] `AsaasGateway.handleWebhook` opera em modo *Fail-Closed* (rejeita requisições quando `ASAAS_WEBHOOK_TOKEN` está ausente ou quando o header `asaas-access-token` diverge).
-- [ ] Teste automatizado `scripts/phase40/test-task299-rate-limit-and-webhook.ts` validando todos os fluxos.
-- [ ] `npx tsc --noEmit`: PASS (0 erros).
-- [ ] `npm run lint`: PASS (0 erros).
+- [x] `src/lib/security/rate-limit.ts` implementado com controle de janela deslizante/fixa, bloqueio após $N$ falhas e limpeza de memória.
+- [x] `/api/auth/verify-code`, `/api/auth/forgot-password/reset` e `/api/auth/register` invalidam o OTP no banco e bloqueiam com `HTTP 429` + `SystemErrorLog` na 5ª tentativa incorreta.
+- [x] `AsaasGateway.handleWebhook` opera em modo *Fail-Closed* (rejeita requisições quando `ASAAS_WEBHOOK_TOKEN` está ausente ou quando o header `asaas-access-token` diverge).
+- [x] Teste automatizado `scripts/phase40/test-task299-rate-limit-and-webhook.ts` validando todos os fluxos.
+- [x] `npx tsc --noEmit`: PASS (0 erros).
+- [x] `npm run lint`: PASS (0 erros).
 

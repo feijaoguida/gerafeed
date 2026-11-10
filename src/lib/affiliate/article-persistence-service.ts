@@ -11,6 +11,7 @@ import {
 } from "./editor-document";
 import { AffiliateContentError } from "./block-contract";
 import { AttachProductItemInput } from "./article-product-service";
+import { sanitizeHtml } from "@/lib/security/sanitize-html";
 
 export interface UpdateArticlePayload {
   title?: string;
@@ -102,6 +103,7 @@ export class ArticlePersistenceService {
     if (doc && payload.content === undefined) {
       effectiveContent = documentToEditorHtml(doc);
     }
+    effectiveContent = sanitizeHtml(effectiveContent);
 
     // 3. Extract referenced products from the document
     const referencedProductIds = doc ? CanonicalDocumentService.extractReferencedProductIds(doc) : [];

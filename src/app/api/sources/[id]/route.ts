@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSessionWorkspaceId } from "@/lib/workspace";
+import { validateSafeRemoteUrl } from "@/lib/affiliate/ssrf";
+import { handleApiError } from "@/lib/errors/service";
 
 export async function PATCH(
   request: Request,
@@ -34,7 +36,16 @@ export async function PATCH(
       dataToUpdate.creditName = null;
     }
     if (typeof body.rssUrl === "string" && body.rssUrl.trim()) {
-      dataToUpdate.rssUrl = body.rssUrl.trim();
+      const sanitizedUrl = body.rssUrl.trim();
+      try {
+        await validateSafeRemoteUrl(sanitizedUrl);
+      } catch (urlErr) {
+        return NextResponse.json(
+          { error: urlErr instanceof Error ? urlErr.message : "URL de RSS inválida ou não permitida." },
+          { status: 400 }
+        );
+      }
+      dataToUpdate.rssUrl = sanitizedUrl;
     }
     if (typeof body.defaultPromptType === "string") {
       dataToUpdate.defaultPromptType = body.defaultPromptType.trim() || null;
@@ -52,13 +63,16 @@ export async function PATCH(
 
     return NextResponse.json(updated);
   } catch (error) {
-    console.error("PATCH /api/sources/[id] error:", error);
-    return NextResponse.json({ error: "Erro ao atualizar fonte RSS" }, { status: 500 });
+    return handleApiError(error, request, {
+      module: "RSS",
+      screen: "Fontes RSS",
+      userFacingMessage: "Erro ao atualizar fonte RSS",
+    });
   }
 }
 
 export async function DELETE(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
@@ -75,8 +89,11 @@ export async function DELETE(
     await prisma.source.delete({ where: { id: existing.id } });
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error("DELETE /api/sources/[id] error:", error);
-    return NextResponse.json({ error: "Erro ao excluir fonte RSS" }, { status: 500 });
+    return handleApiError(error, request, {
+      module: "RSS",
+      screen: "Fontes RSS",
+      userFacingMessage: "Erro ao excluir fonte RSS",
+    });
   }
 }
 

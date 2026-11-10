@@ -8,15 +8,18 @@ export class MockAdapter implements EmailAdapter {
     const from = options.from || process.env.EMAIL_FROM || "GeraFeed <nao-responda@gerafeed.com.br>";
     const messageId = `mock-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
 
-    console.log("==================== [MOCK EMAIL ADAPTER] ====================");
-    console.log(`[MockEmail] De:      ${from}`);
-    console.log(`[MockEmail] Para:    ${to}`);
-    console.log(`[MockEmail] Assunto: ${options.subject}`);
-    if (options.text) {
-      console.log(`[MockEmail] Texto:\n${options.text}`);
+    const isProduction = process.env.NODE_ENV === "production";
+    if (!isProduction) {
+      console.log("==================== [MOCK EMAIL ADAPTER] ====================");
+      console.log(`[MockEmail] De:      ${from}`);
+      console.log(`[MockEmail] Para:    ${to}`);
+      console.log(`[MockEmail] Assunto: ${options.subject}`);
+      if (options.text) {
+        console.log(`[MockEmail] Texto:\n${options.text}`);
+      }
+      console.log(`[MockEmail] MessageId: ${messageId}`);
+      console.log("==============================================================");
     }
-    console.log(`[MockEmail] MessageId: ${messageId}`);
-    console.log("==============================================================");
 
     return {
       success: true,

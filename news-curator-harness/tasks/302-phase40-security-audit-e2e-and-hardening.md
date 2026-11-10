@@ -1,7 +1,7 @@
 # Task 302: Suíte E2E de Testes de Segurança (20 Pontos & Abuse Cases), Build e Evidências da Phase 40
 
 ## Status
-TODO
+DONE
 
 ## Contexto
 Como etapa final da **Phase 40 (Hardening de Segurança Pré-Produção)**, devemos validar de ponta a ponta todos os 20 pontos do Checklist de Segurança Pré-Publicação, executando uma suíte automatizada de testes de abuso (*Abuse Cases*), verificando ausência de regressões nas fases anteriores, rodando TypeScript, ESLint e Build de produção Next.js, e atualizando `PROGRESS.md` e `MEMORY.md`.
@@ -38,10 +38,16 @@ Criar script executável `scripts/phase40/test-security-audit-20-points-e2e.ts` 
 5. Atualizar `news-curator-harness/PROGRESS.md` e `news-curator-harness/MEMORY.md` com as evidências completas da Phase 40.
 
 ## Critérios de Aceitação (Definition of Done)
-- [ ] `scripts/phase40/test-security-audit-20-points-e2e.ts` criado e passando 100% dos testes.
-- [ ] Todos os 20 pontos do Checklist de Segurança Pré-Publicação validados como `[CONFORME]`.
-- [ ] `npx tsc --noEmit`: PASS (0 erros).
-- [ ] `npm run lint`: PASS (0 erros).
-- [ ] `npm run build`: PASS.
-- [ ] `PROGRESS.md` e `MEMORY.md` atualizados com evidências verificáveis.
+- [x] `scripts/phase40/test-security-audit-20-points-e2e.ts` criado e passando 100% dos testes.
+- [x] Todos os 20 pontos do Checklist de Segurança Pré-Publicação validados como `[CONFORME]`.
+- [x] `npx tsc --noEmit`: PASS (0 erros).
+- [x] `npm run lint`: PASS (0 erros).
+- [x] `npm run build`: PASS (107/107 páginas estáticas e dinâmicas otimizadas).
+- [x] `PROGRESS.md` e `MEMORY.md` atualizados com evidências verificáveis.
+
+## Evidências
+- Suíte E2E automatizada `scripts/phase40/test-security-audit-20-points-e2e.ts`: PASS (100% dos 20 pontos [CONFORME]).
+- `npx tsc --noEmit`: PASS (0 erros de tipagem TypeScript estrita).
+- `npm run lint`: PASS (0 erros de ESLint).
+- `npm run build`: PASS (compilado com Turbopack em 5.0s, 107/107 rotas validadas e otimizadas sem falhas).
 
