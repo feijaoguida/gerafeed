@@ -3576,4 +3576,52 @@ Sequência detalhada em `news-curator-harness/PLAN-phase39-coupons-plan-history-
 - [x] **Task 295** (`tasks/295-billing-settings-base-coupon-and-plan-history-ui.md`): Opção de informar e aplicar Cupom de Desconto em **Plano & Cobrança** (`/settings/billing` e `/settings/billing/upgrade`), endpoint `POST /api/billing/coupons/apply` validando cupom ativo/válido/plano do cliente/Cliente Base e atualizando a assinatura no Asaas, além da exibição do **Histórico de Planos** na tela.
 - [x] **Task 296** (`tasks/296-phase39-e2e-tests-and-hardening.md`): Testes E2E automatizados (`scripts/phase39/test-coupons-history-and-site-antifraud-e2e.ts`), auditoria de segurança (`run-security-scanner`), `npx tsc --noEmit`, `npm run lint`, `npm run build` e atualização de `PROGRESS.md` e `MEMORY.md`.
 
+---
+
+# Phase 40. Hardening de Segurança Pré-Produção (Auditoria de 20 Pontos)
+
+## 1. Estado e autorização
+Planejada em 2026-11-10 a partir da Auditoria Completa de Segurança e Confiabilidade de 20 Pontos.
+Em andamento: Task 297 TODO.
+
+## 2. Objetivo e escopo
+Remediar integralmente os itens classificados como `[VULNERÁVEL]` ou `[ALERTA]` na auditoria pré-publicação, elevando todos os 20 pontos de verificação ao status `[CONFORME]`:
+
+1. **Autenticação Robusta e Bloqueio de Senha Nula (`src/auth.ts`)**:
+   - Impedir login via `Credentials` para qualquer usuário cujo `passwordHash` seja `null` ou vazio (`if (!regularUser.passwordHash) return null;`).
+   - Substituir igualdade direta de strings (`===`) na verificação de `SUPERADMIN_PASSWORD` e `ADMIN_PASSWORD` por comparação criptográfica em tempo constante (`crypto.timingSafeEqual` sobre digest SHA-256).
+   - Desativar o fallback legado `ADMIN_EMAIL` / `ADMIN_PASSWORD` quando `NODE_ENV === "production"`, exigindo contas com `passwordHash` bcrypt ou `SUPERADMIN_EMAIL` / `SUPERADMIN_PASSWORD`.
+2. **Autorização no Servidor, Proxy Guard e Proteção de Layout (`src/proxy.ts` e `src/app/(app)/layout.tsx`)**:
+   - No `src/proxy.ts`, inspecionar ativamente a sessão (`await auth()`) para todas as rotas cobertas pelo `matcher` (preservando públicas: `/`, `/login`, `/register`, `/forgot-password`, landing pages de SEO, `/blog*`, `/sitemap.xml`, `/robots.txt`, `/api/auth/*`, `/api/billing/coupons/validate`, `/api/webhooks/*`).
+   - Retornar `HTTP 401` JSON para requisições `/api/*` sem sessão válida e redirecionar páginas privadas (`/(app)/*`, `/backoffice/*`) para `/login`.
+   - Em `src/app/(app)/layout.tsx`, exigir `session?.user?.id` com `redirect("/login")`.
+3. **Isolamento Multi-Tenant Estrito e Prevenção a IDOR (`src/lib/workspace.ts`)**:
+   - Remover o fallback automático para `DEFAULT_WORKSPACE_ID` em requisições não autenticadas.
+   - Lançar `UnauthorizedWorkspaceError` (`status: 401`) quando `getSessionWorkspaceId()` for chamado sem sessão válida em produção (permitindo fallback para `TEST_WORKSPACE_ID || DEFAULT_WORKSPACE_ID` apenas em scripts locais de teste fora de produção).
+   - Garantir que `getAuthenticatedWorkspace()` retorne `null` quando não autenticado ou em caso de erro.
+   - Integrar `UnauthorizedWorkspaceError` ao `handleApiError` (`src/lib/errors/service.ts`) para responder `HTTP 401`.
+4. **Rate Limiting, Anti-Brute Force de OTP/Login e Webhook Asaas Fail-Closed (`src/lib/security/rate-limit.ts` e `src/lib/payments/asaas.ts`)**:
+   - Criar `src/lib/security/rate-limit.ts` em memória (sem dependência de Redis) com controle de tentativas falhas e bloqueio temporário (`HTTP 429`).
+   - Em `POST /api/auth/verify-code`, `POST /api/auth/forgot-password/reset` e `POST /api/auth/register`: limitar a **5 tentativas incorretas** por e-mail; ao atingir a 5ª falha, **deletar imediatamente o `VerificationToken` no banco**, bloquear por 15 minutos (`HTTP 429`) e registrar em `SystemErrorLog` (`module: "AUTH"`, `statusCode: 429`).
+   - Em `AsaasGateway.handleWebhook` (`src/lib/payments/asaas.ts`): adotar política **Fail-Closed**, rejeitando com `401` se `ASAAS_WEBHOOK_TOKEN` não estiver configurado ou se o header `asaas-access-token` não corresponder em tempo constante, registrando a tentativa em `SystemErrorLog`.
+5. **Sanitização contra Stored XSS e Proteção contra SSRF em RSS/Scraper (`src/lib/security/sanitize-html.ts`, `src/lib/rss.ts`, `src/lib/scraper.ts`)**:
+   - Criar `sanitizeHtml` em `src/lib/security/sanitize-html.ts` removendo `<script>`, `<iframe>`, `<object>`, `<embed>`, `<form>`, atributos de evento `on*` (`onerror`, `onload`, `onclick`, etc.) e protocolos `javascript:` / `vbscript:` / `data:text/html`, preservando HTML editorial e `data:image/*`.
+   - Aplicar `sanitizeHtml` antes de qualquer `dangerouslySetInnerHTML` em `affiliate-article-editor.tsx`, `affiliate-block-manager.tsx` e no salvamento de artigos em `article-persistence-service.ts`.
+   - Reutilizar e expandir a proteção anti-SSRF (`src/lib/affiliate/ssrf.ts` → `validateSafeRemoteUrl`) para validar URLs de feeds em `POST /api/sources`, `PATCH /api/sources/[id]`, `fetchAndParseRss` (`src/lib/rss.ts`) e `scrapeArticleContent` (`src/lib/scraper.ts`), bloqueando `localhost`, `127.0.0.1`, `::1`, `169.254.169.254` e faixas privadas RFC 1918.
+6. **Security Headers (`next.config.ts`), Mascaramento Seguro de Erros e Higienização de Logs (`src/lib/errors/service.ts`)**:
+   - Configurar `headers()` em `next.config.ts` com `Content-Security-Policy`, `Strict-Transport-Security`, `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin` e `Permissions-Policy`.
+   - Criar `getSafeClientErrorMessage` em `src/lib/errors/service.ts` para impedir que erros internos do Prisma/banco vazem nomes de tabelas, constraints ou stack traces em respostas JSON `500`, mantendo os detalhes restritos ao `SystemErrorLog`.
+   - Higienizar `console.log` com PII (nomes, e-mails, documentos) em `asaas.ts`, `webhooks/asaas/route.ts` e `mock-adapter.ts` em produção.
+
+## 3. Plano de Tasks e Definition of Done Phase 40
+Sequência detalhada em `news-curator-harness/PLAN-phase40-security-hardening-and-pre-production-audit.md` e `news-curator-harness/tasks/297-*.md` a `302-*.md`:
+
+- [ ] **Task 297** (`tasks/297-auth-hardening-and-proxy-route-guard.md`): Autenticação Robusta (`src/auth.ts`), Bloqueio de Senha Nula, Comparação Constant-Time, Proxy Guard (`src/proxy.ts`) e Proteção do Layout Autenticado (`src/app/(app)/layout.tsx`).
+- [ ] **Task 298** (`tasks/298-multi-tenant-workspace-isolation-and-idor-guard.md`): Blindagem de Isolamento Multi-Tenant (`src/lib/workspace.ts`), Remoção de Fallback Anônimo para `DEFAULT_WORKSPACE_ID` e Prevenção a IDOR.
+- [ ] **Task 299** (`tasks/299-rate-limiting-brute-force-and-webhook-fail-closed.md`): Rate Limiting e Anti-Brute Force de OTP/Login (`src/lib/security/rate-limit.ts`) e Política *Fail-Closed* no Webhook Asaas (`src/lib/payments/asaas.ts`).
+- [ ] **Task 300** (`tasks/300-xss-html-sanitization-and-ssrf-rss-scraper-guard.md`): Sanitização HTML contra Stored XSS (`src/lib/security/sanitize-html.ts`) e Proteção contra SSRF na Coleta RSS (`src/lib/rss.ts`) e Scraper (`src/lib/scraper.ts`).
+- [ ] **Task 301** (`tasks/301-security-headers-error-masking-and-log-hygiene.md`): Security Headers no `next.config.ts`, Mascaramento Seguro de Erros Internos nas APIs e Higienização de PII em Logs de Console.
+- [ ] **Task 302** (`tasks/302-phase40-security-audit-e2e-and-hardening.md`): Suíte E2E de Testes de Segurança (20 Pontos & Abuse Cases), Validação TypeScript, ESLint, Build de Produção e Registro de Evidências.
+
+
 

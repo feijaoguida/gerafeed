@@ -1,13 +1,29 @@
 # PROGRESS.md
 
 ## Current Phase
-Phase 39. Cupons de Desconto, Ciclos Promocionais no Asaas, Histórico de Planos e Trava Anti-Fraude de Cadastro de Sites (DONE)
+Phase 40. Hardening de Segurança Pré-Produção (Auditoria de 20 Pontos)
 
 ## Current Task
-Nenhuma — Phase 39 concluída com sucesso (Tasks 290 a 296).
+Task 297 (`tasks/297-auth-hardening-and-proxy-route-guard.md`) — TODO
 
 ## Status
-DONE — Todas as tasks da Phase 39 (290, 291, 292, 293, 294, 295 e 296) foram implementadas e validadas com 100% de sucesso. Testes E2E, TypeScript, ESLint e build de produção Next.js finalizados sem erros.
+PLANNED — Phase 40 estruturada no harness e no speckit (`SPEC.md`, `PLAN-phase40-security-hardening-and-pre-production-audit.md` e tasks `297` a `302`) após auditoria completa de segurança e confiabilidade de 20 pontos. Pronta para iniciar execução na Task 297.
+
+## Phase 40 (PLANNED / TODO)
+
+Hardening de Segurança Pré-Produção cobrindo Autenticação Robusta (bloqueio de senha nula e constant-time compare), Autorização no Proxy e Layout, Isolamento Multi-Tenant sem fallback anônimo para `DEFAULT_WORKSPACE_ID`, Rate Limiting e Anti-Brute Force de OTP/Login, Política Fail-Closed no Webhook Asaas, Sanitização HTML contra Stored XSS, Proteção Anti-SSRF em RSS/Scraper, Security Headers (`next.config.ts`) e Mascaramento Seguro de Erros Internos.
+
+Plano: [PLAN-phase40-security-hardening-and-pre-production-audit.md](PLAN-phase40-security-hardening-and-pre-production-audit.md).
+Spec: [Phase 40](SPEC.md#phase-40-hardening-de-segurança-pré-produção-auditoria-de-20-pontos).
+
+| Task | Status | Entrega |
+|---|---|---|
+| [297](tasks/297-auth-hardening-and-proxy-route-guard.md) | TODO | Endurecimento de Autenticação (`src/auth.ts`), bloqueio de senha nula, comparação constant-time, Proxy Guard (`src/proxy.ts`) e proteção de `src/app/(app)/layout.tsx` |
+| [298](tasks/298-multi-tenant-workspace-isolation-and-idor-guard.md) | TODO | Blindagem de Isolamento Multi-Tenant (`src/lib/workspace.ts`), eliminação de fallback anônimo para `DEFAULT_WORKSPACE_ID` e prevenção a IDOR |
+| [299](tasks/299-rate-limiting-brute-force-and-webhook-fail-closed.md) | TODO | Rate Limiting e Anti-Brute Force de OTP/Login (`src/lib/security/rate-limit.ts`) e Política *Fail-Closed* no Webhook Asaas (`src/lib/payments/asaas.ts`) |
+| [300](tasks/300-xss-html-sanitization-and-ssrf-rss-scraper-guard.md) | TODO | Sanitização HTML contra Stored XSS (`src/lib/security/sanitize-html.ts`) e Proteção Anti-SSRF na Coleta RSS (`src/lib/rss.ts`) e Scraper (`src/lib/scraper.ts`) |
+| [301](tasks/301-security-headers-error-masking-and-log-hygiene.md) | TODO | Security Headers (`next.config.ts`), Mascaramento Seguro de Erros Internos do Prisma nas APIs e Higienização de PII em Logs |
+| [302](tasks/302-phase40-security-audit-e2e-and-hardening.md) | TODO | Suíte E2E de Testes de Segurança (20 Pontos & Abuse Cases), TypeScript, ESLint, Build de Produção e Evidências |
 
 ## Last Evidence
 Phase 39 / Task 296 concluída com sucesso:

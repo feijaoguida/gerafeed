@@ -67,7 +67,7 @@ Plano: [Phase 32](../PLAN-phase32-password-recovery.md). Tasks 261–265 DONE.
 
 # Phase 39 Tasks — Cupons de Desconto, Ciclos Promocionais no Asaas, Histórico de Planos e Anti-Fraude de Cadastro de Sites
 
-Plano: [Phase 39](../PLAN-phase39-coupons-plan-history-and-site-antifraud.md). Tasks `290`–`296` TODO.
+Plano: [Phase 39](../PLAN-phase39-coupons-plan-history-and-site-antifraud.md). Tasks `290`–`296` DONE.
 
 | Task | Objetivo |
 |---|---|
@@ -78,5 +78,19 @@ Plano: [Phase 39](../PLAN-phase39-coupons-plan-history-and-site-antifraud.md). T
 | [294](294-register-and-onboarding-coupon-flow.md) | Opção de Cupom de Desconto na Criação da Conta (`/register` e `/checkout/billing`) para Cliente Novo + envio ao Asaas + `SystemErrorLog` |
 | [295](295-billing-settings-base-coupon-and-plan-history-ui.md) | Opção de Cupom de Desconto em **Plano & Cobrança** (`/settings/billing` e `/settings/billing/upgrade`) para Cliente Base + atualização no Asaas + exibição do Histórico de Planos |
 | [296](296-phase39-e2e-tests-and-hardening.md) | Bateria de testes E2E automatizados da Phase 39, auditoria de logs de erro e segurança, `npx tsc --noEmit`, `npm run lint` e `npm run build` |
+
+# Phase 40 Tasks — Hardening de Segurança Pré-Produção (Auditoria de 20 Pontos)
+
+Plano: [Phase 40](../PLAN-phase40-security-hardening-and-pre-production-audit.md). Tasks `297`–`302` TODO.
+
+| Task | Objetivo |
+|---|---|
+| [297](297-auth-hardening-and-proxy-route-guard.md) | Endurecimento de Autenticação (`src/auth.ts`), bloqueio de senha nula, comparação constant-time, Proxy Guard (`src/proxy.ts`) e proteção de `src/app/(app)/layout.tsx` |
+| [298](298-multi-tenant-workspace-isolation-and-idor-guard.md) | Blindagem de Isolamento Multi-Tenant (`src/lib/workspace.ts`), eliminação de fallback anônimo para `DEFAULT_WORKSPACE_ID` e prevenção a IDOR |
+| [299](299-rate-limiting-brute-force-and-webhook-fail-closed.md) | Rate Limiting e Anti-Brute Force de OTP/Login (`src/lib/security/rate-limit.ts`) e Política *Fail-Closed* no Webhook Asaas (`src/lib/payments/asaas.ts`) |
+| [300](300-xss-html-sanitization-and-ssrf-rss-scraper-guard.md) | Sanitização HTML contra Stored XSS (`src/lib/security/sanitize-html.ts`) e Proteção Anti-SSRF na Coleta RSS (`src/lib/rss.ts`) e Scraper (`src/lib/scraper.ts`) |
+| [301](301-security-headers-error-masking-and-log-hygiene.md) | Security Headers (`next.config.ts`), Mascaramento Seguro de Erros Internos do Prisma nas APIs e Higienização de PII em Logs |
+| [302](302-phase40-security-audit-e2e-and-hardening.md) | Suíte E2E de Testes de Segurança (20 Pontos & Abuse Cases), TypeScript, ESLint, Build de Produção e Evidências |
+
 
 

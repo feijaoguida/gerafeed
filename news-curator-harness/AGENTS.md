@@ -534,4 +534,22 @@ Uma task por vez. Discovered Work fora do escopo deve ser registrado e não impl
 ## Logs de Erro Obrigatórios (`SystemErrorLog`)
 - Qualquer erro, falha de validação de cupom, tentativa bloqueada de cadastro de site na 3ª conta ou erro na API do Asaas deve obrigatoriamente gerar log em `SystemErrorLog` via `logSystemError` / `handleApiError`.
 
+# Phase 40. Regras Permanentes de Segurança Pré-Produção (20 Pontos)
+
+## Autenticação, Proxy e Isolamento Multi-Tenant
+- Nenhum usuário com `passwordHash` nulo ou vazio pode autenticar via provedor `Credentials` (`src/auth.ts`).
+- Credenciais administrativas baseadas em variáveis de ambiente devem ser comparadas exclusivamente com `crypto.timingSafeEqual` (constant-time).
+- O proxy (`src/proxy.ts`) e o layout autenticado (`src/app/(app)/layout.tsx`) devem rejeitar requisições anônimas (retornando `HTTP 401` em `/api/*` privadas e redirecionando para `/login` em páginas privadas).
+- `getSessionWorkspaceId()` (`src/lib/workspace.ts`) jamais pode fazer fallback silencioso para `DEFAULT_WORKSPACE_ID` em requisições HTTP sem sessão autenticada em produção; deve lançar `UnauthorizedWorkspaceError` (`401`).
+
+## Rate Limiting, Brute Force e Webhooks Fail-Closed
+- Validações de códigos OTP de 6 dígitos (`/api/auth/verify-code`, `/api/auth/forgot-password/reset`, `/api/auth/register`) devem invalidar/apagar o `VerificationToken` no banco e bloquear com `HTTP 429` após no máximo 5 tentativas incorretas, registrando em `SystemErrorLog`.
+- Webhooks externos (`/api/webhooks/asaas`) operam obrigatoriamente em modo **Fail-Closed**: se `ASAAS_WEBHOOK_TOKEN` não estiver configurado ou se o header `asaas-access-token` divergir, a requisição é recusada com `HTTP 401` e registrada em `SystemErrorLog`.
+
+## Sanitização contra XSS, Prevenção a SSRF e Mascaramento de Erros
+- Todo conteúdo HTML dinâmico renderizado via `dangerouslySetInnerHTML` deve passar por `sanitizeHtml` (`src/lib/security/sanitize-html.ts`).
+- Toda coleta remota de URLs (importação de afiliados, feeds RSS em `src/lib/rss.ts` e scraper em `src/lib/scraper.ts`) deve validar DNS/IP com `validateSafeRemoteUrl` (`src/lib/affiliate/ssrf.ts`), bloqueando loopback (`127.0.0.1`, `::1`), link-local (`169.254.169.254`) e redes privadas RFC 1918.
+- Erros internos do Prisma/PostgreSQL nunca podem ser retornados em texto cru no JSON de resposta ao cliente (`getSafeClientErrorMessage` / `handleApiError`).
+
+
 
