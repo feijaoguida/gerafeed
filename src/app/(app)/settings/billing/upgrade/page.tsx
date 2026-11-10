@@ -10,6 +10,7 @@ import {
   Lock,
   Sparkles,
   Crown,
+  Tag,
 } from "lucide-react";
 
 import { PageHeader } from "@/components/design-system/page-header";
@@ -159,6 +160,67 @@ export default function UpgradePage() {
   const [isCheckingOut, setIsCheckingOut] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
+  // Cupom de Desconto para Cliente Base
+  const [couponInput, setCouponInput] = useState("");
+  const [isValidatingCoupon, setIsValidatingCoupon] = useState(false);
+  const [couponError, setCouponError] = useState<string | null>(null);
+  const [appliedCoupon, setAppliedCoupon] = useState<{
+    code: string;
+    name: string;
+    discountType: string;
+    discountValue: number;
+    durationMonths: number;
+    durationLabel: string;
+    applicablePlanIds?: string[];
+  } | null>(null);
+
+  const handleValidateCoupon = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const clean = couponInput.trim().toUpperCase();
+    if (!clean || isValidatingCoupon) return;
+
+    setIsValidatingCoupon(true);
+    setCouponError(null);
+
+    try {
+      const res = await fetch("/api/billing/coupons/validate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          code: clean,
+          customerTypeContext: "BASE",
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok || !data.valid) {
+        setCouponError(data.error || "Cupom inválido ou expirado.");
+        setAppliedCoupon(null);
+        return;
+      }
+
+      setAppliedCoupon({
+        code: data.coupon.code,
+        name: data.coupon.name,
+        discountType: data.coupon.discountType,
+        discountValue: Number(data.coupon.discountValue),
+        durationMonths: data.coupon.durationMonths,
+        durationLabel: data.coupon.durationLabel,
+        applicablePlanIds: data.coupon.plans?.map((p: { planId: string }) => p.planId) || [],
+      });
+    } catch {
+      setCouponError("Erro ao validar cupom. Tente novamente.");
+    } finally {
+      setIsValidatingCoupon(false);
+    }
+  };
+
+  const handleRemoveCoupon = () => {
+    setAppliedCoupon(null);
+    setCouponInput("");
+    setCouponError(null);
+  };
+
   useEffect(() => {
     let active = true;
 
@@ -245,7 +307,8 @@ export default function UpgradePage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           planId: plan.id,
-          billingCycle: cycle,
+          cycle,
+          couponCode: appliedCoupon?.code || undefined,
         }),
       });
 
@@ -264,8 +327,9 @@ export default function UpgradePage() {
       }
 
       // 3. Redirect to invoice/payment URL
-      if (data.invoiceUrl) {
-        window.location.assign(data.invoiceUrl);
+      const redirectUrl = data.checkoutUrl || data.invoiceUrl;
+      if (redirectUrl) {
+        window.location.assign(redirectUrl);
       } else {
         router.push("/settings/billing?checkout=success");
       }
@@ -337,6 +401,68 @@ export default function UpgradePage() {
         </Alert>
       )}
 
+      {/* Barra de Cupom de Desconto para Cliente Base */}
+      <div className="p-4 rounded-2xl bg-surface border border-border shadow-xs">
+        {appliedCoupon ? (
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
+                <Tag className="w-4 h-4" />
+              </div>
+              <div>
+                <span className="font-bold text-foreground">
+                  Cupom {appliedCoupon.code} aplicado: {appliedCoupon.durationLabel}
+                </span>
+                <p className="text-muted-foreground text-[11px]">
+                  Os planos elegíveis abaixo já estão exibindo os valores promocionais calculados.
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={handleRemoveCoupon}
+              className="text-xs text-rose-500 hover:underline font-semibold cursor-pointer text-left sm:text-right"
+            >
+              Remover cupom
+            </button>
+          </div>
+        ) : (
+          <form onSubmit={handleValidateCoupon} className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <Tag className="w-4 h-4 text-primary shrink-0" />
+              <span className="text-xs font-semibold text-foreground">
+                Possui um cupom de desconto?
+              </span>
+            </div>
+
+            <div className="flex items-center gap-2 w-full sm:w-auto">
+              <input
+                type="text"
+                value={couponInput}
+                onChange={(e) => {
+                  setCouponInput(e.target.value.toUpperCase());
+                  if (couponError) setCouponError(null);
+                }}
+                placeholder="Código do cupom (Ex: PROMO3MESES)"
+                className="px-3 py-1.5 rounded-lg border border-border bg-background text-xs font-mono uppercase w-full sm:w-64"
+              />
+              <Button
+                type="submit"
+                size="sm"
+                variant="outline"
+                disabled={!couponInput.trim() || isValidatingCoupon}
+                isLoading={isValidatingCoupon}
+              >
+                Aplicar
+              </Button>
+            </div>
+          </form>
+        )}
+        {couponError && (
+          <p className="text-xs text-rose-500 mt-2">{couponError}</p>
+        )}
+      </div>
+
       {/* Plans Grid */}
       {plans.length === 0 ? (
         <div className="text-center py-12 text-sm text-muted-foreground border border-dashed border-border rounded-xl">
@@ -368,6 +494,29 @@ export default function UpgradePage() {
             const isHighlight = Boolean(plan.highlight);
             const isPro = plan.slug === "pro";
             const features = getPlanFeatureList(plan);
+
+            const isCouponApplicable =
+              appliedCoupon &&
+              (!appliedCoupon.applicablePlanIds ||
+                appliedCoupon.applicablePlanIds.length === 0 ||
+                appliedCoupon.applicablePlanIds.includes(plan.id));
+
+            let promotionalPrice: number | null = null;
+            if (isCouponApplicable && displayPrice > 0) {
+              if (appliedCoupon.discountType === "PERCENTAGE") {
+                promotionalPrice = Math.max(
+                  0,
+                  Math.round(displayPrice * (1 - appliedCoupon.discountValue / 100) * 100) / 100
+                );
+              } else if (appliedCoupon.discountType === "FIXED_DISCOUNT") {
+                promotionalPrice = Math.max(
+                  0,
+                  Math.round((displayPrice - appliedCoupon.discountValue) * 100) / 100
+                );
+              } else if (appliedCoupon.discountType === "FIXED_PRICE") {
+                promotionalPrice = appliedCoupon.discountValue;
+              }
+            }
 
             return (
               <Card
@@ -420,14 +569,34 @@ export default function UpgradePage() {
 
                   {/* Price */}
                   <CardContent className="p-0 space-y-4">
-                    <div className="flex items-baseline gap-1">
-                      <span className="font-heading text-3xl font-extrabold text-foreground tracking-tight">
-                        {formatCurrency(displayPrice)}
-                      </span>
-                      <span className="text-sm text-muted-foreground">
-                        {periodLabel}
-                      </span>
-                    </div>
+                    {promotionalPrice !== null ? (
+                      <div className="space-y-1">
+                        <div className="flex items-baseline gap-2">
+                          <span className="font-heading text-3xl font-extrabold text-foreground tracking-tight">
+                            {formatCurrency(promotionalPrice)}
+                          </span>
+                          <span className="text-sm text-muted-foreground line-through">
+                            {formatCurrency(displayPrice)}
+                          </span>
+                          <span className="text-sm text-muted-foreground font-normal">
+                            {periodLabel}
+                          </span>
+                        </div>
+                        <div className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded">
+                          <Tag className="w-3 h-3 shrink-0" />
+                          Cupom {appliedCoupon?.code} ({appliedCoupon?.durationLabel})
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex items-baseline gap-1">
+                        <span className="font-heading text-3xl font-extrabold text-foreground tracking-tight">
+                          {formatCurrency(displayPrice)}
+                        </span>
+                        <span className="text-sm text-muted-foreground">
+                          {periodLabel}
+                        </span>
+                      </div>
+                    )}
 
                     {cycle === "YEARLY" && monthlyPrice > 0 && discountPercent > 0 && (
                       <p className="text-[11px] text-[#00C2A8] font-semibold">

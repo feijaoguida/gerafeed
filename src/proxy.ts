@@ -18,9 +18,11 @@ export const config = {
      * - /register (página de cadastro)
      * - /forgot-password (recuperação de senha)
      * - /api/auth/* (rotas internas do Auth.js)
+     * - /api/billing/coupons/validate (validação de cupons públicos no cadastro)
+     * - /api/webhooks/* (webhooks externos de gateway de pagamento)
      * - _next/static, _next/image, favicon.ico, assets estáticos
      */
-    "/((?!$|login|register|forgot-password|api/auth|_next/static|_next/image|favicon\\.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)).*)",
+    "/((?!$|login|register|forgot-password|api/auth|api/billing/coupons/validate|api/webhooks|_next/static|_next/image|favicon\\.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)).*)",
   ],
 };
 

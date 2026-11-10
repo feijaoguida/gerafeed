@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ArrowUpCircle, XCircle, RotateCcw, AlertTriangle, Calendar, ShieldCheck } from "lucide-react";
+import { ArrowUpCircle, XCircle, RotateCcw, AlertTriangle, Calendar, ShieldCheck, Tag } from "lucide-react";
 import Link from "next/link";
 import { formatCurrency, calculateAnnualPlanPrice } from "@/lib/pricing";
 
@@ -18,6 +18,12 @@ interface SubscriptionCardProps {
     nextDueDate?: string | Date | null;
     cancelAtPeriodEnd?: boolean;
     canceledAt?: string | Date | null;
+    couponId?: string | null;
+    originalPlanAmount?: number | string | null;
+    discountedAmount?: number | string | null;
+    discountDurationMonths?: number | null;
+    discountCyclesUsed?: number;
+    coupon?: { code: string; name: string } | null;
     plan: {
       id: string;
       name: string;
@@ -34,12 +40,60 @@ export function SubscriptionManagementCard({ subscription }: SubscriptionCardPro
   const [msg, setMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [isCanceled, setIsCanceled] = useState(Boolean(subscription.cancelAtPeriodEnd));
 
+  // Estado de Cupons de Desconto
+  const [couponCodeInput, setCouponCodeInput] = useState("");
+  const [applyingCoupon, setApplyingCoupon] = useState(false);
+  const [couponMessage, setCouponMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const [activeCoupon, setActiveCoupon] = useState<{
+    code: string;
+    name?: string;
+    durationLabel?: string;
+  } | null>(subscription.coupon ? { code: subscription.coupon.code, name: subscription.coupon.name } : null);
+
   const plan = subscription.plan;
   const isFree = plan.slug === "free";
   const monthlyPrice = plan.monthlyPrice !== undefined ? Number(plan.monthlyPrice) : plan.price;
   const discountPercent = plan.annualDiscountPercent !== undefined ? Number(plan.annualDiscountPercent) : 0;
   const annualCalculated = calculateAnnualPlanPrice(monthlyPrice, discountPercent);
   const isYearly = subscription.billingCycle === "YEARLY";
+
+  const handleApplyCoupon = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const clean = couponCodeInput.trim().toUpperCase();
+    if (!clean || applyingCoupon) return;
+
+    setApplyingCoupon(true);
+    setCouponMessage(null);
+
+    try {
+      const res = await fetch("/api/billing/coupons/apply", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code: clean }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        setCouponMessage({ type: "error", text: data.error || "Não foi possível aplicar o cupom." });
+        return;
+      }
+
+      setCouponMessage({ type: "success", text: data.message || "Cupom aplicado com sucesso!" });
+      setActiveCoupon({
+        code: data.coupon.code,
+        name: data.coupon.name,
+        durationLabel: data.coupon.durationLabel,
+      });
+      setCouponCodeInput("");
+      setTimeout(() => {
+        window.location.reload();
+      }, 1500);
+    } catch {
+      setCouponMessage({ type: "error", text: "Erro de conexão ao aplicar cupom." });
+    } finally {
+      setApplyingCoupon(false);
+    }
+  };
 
   const handleCancel = async () => {
     if (!confirm("Deseja realmente cancelar a renovação automática da sua assinatura? Seu acesso permanecerá ativo até o final do período já pago.")) {
@@ -176,6 +230,83 @@ export function SubscriptionManagementCard({ subscription }: SubscriptionCardPro
             </div>
           </div>
         </div>
+      )}
+
+      {/* Banner de Cupom Ativo */}
+      {activeCoupon && (
+        <div className="p-4 rounded-xl text-xs bg-emerald-500/10 border border-emerald-500/20 text-emerald-800 dark:text-emerald-300 flex items-start justify-between gap-3">
+          <div className="flex items-start gap-2.5">
+            <Tag className="w-5 h-5 shrink-0 mt-0.5 text-emerald-600 dark:text-emerald-400" />
+            <div className="space-y-0.5">
+              <p className="font-bold">
+                Cupom {activeCoupon.code} aplicado na assinatura
+              </p>
+              <p className="text-[11px] opacity-90 leading-relaxed">
+                {subscription.discountDurationMonths === 0
+                  ? "Desconto vitalício aplicado às suas faturas."
+                  : subscription.discountDurationMonths
+                  ? `Desconto vigente: ciclo ${subscription.discountCyclesUsed || 0} de ${subscription.discountDurationMonths}. As próximas faturas virão com o desconto promocional.`
+                  : "Desconto aplicado às suas faturas recorrentes."}
+              </p>
+            </div>
+          </div>
+          {subscription.discountedAmount && (
+            <div className="text-right shrink-0">
+              <span className="font-bold text-sm block">
+                {formatCurrency(Number(subscription.discountedAmount))}/{isYearly ? "ano" : "mês"}
+              </span>
+              {subscription.originalPlanAmount && (
+                <span className="text-[10px] line-through opacity-70">
+                  de {formatCurrency(Number(subscription.originalPlanAmount))}
+                </span>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Formulário para Aplicar Cupom para Clientes da Base */}
+      {!isFree && !activeCoupon && (
+        <form onSubmit={handleApplyCoupon} className="p-4 rounded-xl bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800/80 space-y-3">
+          <div className="flex items-center gap-2">
+            <Tag className="w-4 h-4 text-indigo-500" />
+            <span className="text-xs font-bold text-zinc-900 dark:text-white">
+              Possui um cupom de desconto para clientes ativos?
+            </span>
+          </div>
+
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={couponCodeInput}
+              onChange={(e) => {
+                setCouponCodeInput(e.target.value.toUpperCase());
+                if (couponMessage) setCouponMessage(null);
+              }}
+              placeholder="Digite o código do cupom (Ex: PROMO3MESES)"
+              className="flex-1 px-3 py-1.5 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 text-xs font-mono uppercase text-zinc-900 dark:text-white placeholder:text-zinc-400"
+            />
+            <button
+              type="submit"
+              disabled={!couponCodeInput.trim() || applyingCoupon}
+              className="px-4 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-lg transition-colors disabled:opacity-50 cursor-pointer"
+            >
+              {applyingCoupon ? "Aplicando..." : "Aplicar Cupom"}
+            </button>
+          </div>
+
+          {couponMessage && (
+            <p
+              className={`text-[11px] font-medium ${
+                couponMessage.type === "success"
+                  ? "text-emerald-600 dark:text-emerald-400"
+                  : "text-rose-600 dark:text-rose-400"
+              }`}
+            >
+              {couponMessage.text}
+            </p>
+          )}
+        </form>
       )}
 
       {/* Actions */}

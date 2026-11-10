@@ -8,6 +8,8 @@ import {
   AlertCircle,
   Search,
   ExternalLink,
+  Tag,
+  Check,
 } from "lucide-react";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Button } from "@/components/ui/button";
@@ -50,6 +52,110 @@ export function BillingOnboardingView() {
 
   const planSlug = planConfig.slug;
   const cycle = planConfig.cycle;
+
+  // Cupom de Desconto
+  const urlCoupon = searchParams.get("coupon");
+  const initialCoupon = urlCoupon || getStoredPlanIntent()?.couponCode || "";
+
+  const [couponCodeInput, setCouponCodeInput] = useState(initialCoupon);
+  const [appliedCoupon, setAppliedCoupon] = useState<{
+    code: string;
+    name: string;
+    durationLabel?: string;
+    summaryText?: string;
+    originalAmount?: number;
+    discountedAmount?: number;
+  } | null>(null);
+  const [isValidatingCoupon, setIsValidatingCoupon] = useState(false);
+  const [couponError, setCouponError] = useState<string | null>(null);
+
+  const validateCoupon = async (codeToTest?: string) => {
+    const raw = codeToTest ?? couponCodeInput;
+    const clean = raw.trim().toUpperCase();
+    if (!clean) return;
+
+    setIsValidatingCoupon(true);
+    setCouponError(null);
+
+    try {
+      const res = await fetch("/api/billing/coupons/validate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          code: clean,
+          planSlug,
+          cycle,
+          customerTypeContext: "NEW",
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok || !data.valid) {
+        setCouponError(data.error || "Cupom inválido para este plano ou expirado.");
+        setAppliedCoupon(null);
+        return;
+      }
+
+      setAppliedCoupon({
+        code: data.coupon.code,
+        name: data.coupon.name,
+        durationLabel: data.coupon.durationLabel,
+        summaryText: data.pricing?.summaryText,
+        originalAmount: data.pricing?.originalAmount,
+        discountedAmount: data.pricing?.discountedAmount,
+      });
+      setCouponCodeInput(data.coupon.code);
+    } catch {
+      setCouponError("Erro ao validar cupom. Tente novamente.");
+    } finally {
+      setIsValidatingCoupon(false);
+    }
+  };
+
+  const handleRemoveCoupon = () => {
+    setAppliedCoupon(null);
+    setCouponCodeInput("");
+    setCouponError(null);
+  };
+
+  useEffect(() => {
+    if (!initialCoupon) return;
+    let isCancelled = false;
+
+    async function autoValidate() {
+      try {
+        const res = await fetch("/api/billing/coupons/validate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            code: initialCoupon.trim().toUpperCase(),
+            planSlug,
+            cycle,
+            customerTypeContext: "NEW",
+          }),
+        });
+        const data = await res.json();
+        if (!isCancelled && res.ok && data.valid) {
+          setAppliedCoupon({
+            code: data.coupon.code,
+            name: data.coupon.name,
+            durationLabel: data.coupon.durationLabel,
+            summaryText: data.pricing?.summaryText,
+            originalAmount: data.pricing?.originalAmount,
+            discountedAmount: data.pricing?.discountedAmount,
+          });
+          setCouponCodeInput(data.coupon.code);
+        }
+      } catch {
+        // Silencioso na validação automática inicial
+      }
+    }
+
+    autoValidate();
+    return () => {
+      isCancelled = true;
+    };
+  }, [initialCoupon, planSlug, cycle]);
 
   // Dados Fiscais
   const [name, setName] = useState("");
@@ -183,6 +289,7 @@ export function BillingOnboardingView() {
           planSlug,
           cycle,
           billingMethod: "CREDIT_CARD",
+          couponCode: appliedCoupon?.code || undefined,
         }),
       });
 
@@ -234,6 +341,33 @@ export function BillingOnboardingView() {
             <span>Ambiente Criptografado</span>
           </div>
         </div>
+
+        {/* Card de Cupom Aplicado */}
+        {appliedCoupon && (
+          <div className="p-4 rounded-3xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-800 dark:text-emerald-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-xl bg-emerald-500/20 flex items-center justify-center text-emerald-600 dark:text-emerald-400 shrink-0">
+                <Tag className="w-5 h-5" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="font-bold text-sm">Cupom {appliedCoupon.code} aplicado</span>
+                  <Check className="w-4 h-4 text-emerald-500" />
+                </div>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  {appliedCoupon.summaryText || appliedCoupon.durationLabel}
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={handleRemoveCoupon}
+              className="text-xs text-rose-500 hover:underline font-semibold cursor-pointer text-left sm:text-right"
+            >
+              Remover cupom
+            </button>
+          </div>
+        )}
 
         {/* Título da Seção */}
         <div>
@@ -381,6 +515,46 @@ export function BillingOnboardingView() {
               </FormField>
             </div>
           </div>
+
+          {/* Seção de Cupom se não aplicado */}
+          {!appliedCoupon && (
+            <div className="p-5 rounded-3xl bg-surface border border-border space-y-3 shadow-xs">
+              <div className="flex items-center gap-2 text-sm font-semibold">
+                <Tag className="w-4 h-4 text-primary" />
+                <span>Possui um cupom de desconto?</span>
+              </div>
+              <div className="flex gap-2">
+                <Input
+                  type="text"
+                  value={couponCodeInput}
+                  onChange={(e) => {
+                    setCouponCodeInput(e.target.value.toUpperCase());
+                    if (couponError) setCouponError(null);
+                  }}
+                  placeholder="Ex: PROMO3MESES"
+                  className="uppercase font-mono text-sm"
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      validateCoupon();
+                    }
+                  }}
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => validateCoupon()}
+                  isLoading={isValidatingCoupon}
+                  disabled={!couponCodeInput.trim() || isValidatingCoupon}
+                >
+                  Aplicar
+                </Button>
+              </div>
+              {couponError && (
+                <p className="text-xs text-rose-500">{couponError}</p>
+              )}
+            </div>
+          )}
 
           <div className="space-y-3 pt-2">
             <Button

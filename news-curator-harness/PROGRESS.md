@@ -1,13 +1,57 @@
 # PROGRESS.md
 
 ## Current Phase
-Phase 38. Chaves da API do WooCommerce nos Destinos WordPress (Multi-Site) com Guardrail de Plano de Afiliados (IN_PROGRESS)
+Phase 39. Cupons de Desconto, Ciclos Promocionais no Asaas, Histórico de Planos e Trava Anti-Fraude de Cadastro de Sites (DONE)
 
 ## Current Task
-Task 287: Validação de Plano e Endpoint de Teste WooCommerce (IN_PROGRESS)
+Nenhuma — Phase 39 concluída com sucesso (Tasks 290 a 296).
 
 ## Status
-IN_PROGRESS — Phase 38 iniciada em 2026-11-04. Task 286 concluída (schema Prisma e serviço de credenciais WooCommerce com encriptação AES-256 e sanitização). Em andamento Task 287 (validação de plano de afiliados e endpoint de teste).
+DONE — Todas as tasks da Phase 39 (290, 291, 292, 293, 294, 295 e 296) foram implementadas e validadas com 100% de sucesso. Testes E2E, TypeScript, ESLint e build de produção Next.js finalizados sem erros.
+
+## Last Evidence
+Phase 39 / Task 296 concluída com sucesso:
+- `scripts/phase39/test-coupons-history-and-site-antifraud-e2e.ts`: Suíte de testes E2E executada com 100% de sucesso validando:
+  - **Cenário 1**: Cadastro de cupons no Backoffice (`INFLUENCER19` FIXED_PRICE R$ 19,90 por 3 meses para Cliente Novo; `BASE50FOREVER` PERCENTAGE 50% vitalício para múltiplos planos e Cliente Base).
+  - **Cenário 2**: Validação de cupom no cadastro de Cliente Novo e rejeição de cupom exclusivo de Cliente Base com gravação em `SystemErrorLog` (`module: "BILLING"`).
+  - **Cenário 3**: Ciclo de vida promocional automatizado no Asaas: 3 faturas pagas a R$ 19,90, e ao atingir a 3ª fatura, transição automática e idempotente para o valor original de R$ 89,90 (`updatePendingPayments: true`), marcação de `CouponRedemption` como `COMPLETED` e gravação de `DISCOUNT_ENDED` em `PlanHistory`.
+  - **Cenário 4**: Aplicação de cupom em Plano & Cobrança para Cliente Base, atualização da assinatura no Asaas com `updatePendingPayments: true`, persistência na `Subscription` e registro `COUPON_APPLIED` no histórico de planos.
+  - **Cenário 5**: Histórico perpétuo e Trava Anti-Fraude de Sites em múltiplas contas: 1ª conta OK (`ALLOWED`), 2ª conta OK (`ALLOWED`), 3ª conta bloqueada (`BLOCKED`, HTTP 403) com alerta de suporte e registro em `SystemErrorLog` (`module: "WORDPRESS"`), e posterior desbloqueio administrativo via `clearDomainForWorkspace`.
+- `npx tsx scripts/phase39/test-coupons-history-and-site-antifraud-e2e.ts`: PASS (todos os 5 cenários validados).
+- `npx tsc --noEmit`: PASS (0 erros).
+- `npm run lint`: PASS (0 erros).
+- `npm run build`: PASS (107/107 páginas compiladas com Turbopack em produção).
+
+## Phase 39 (DONE)
+
+Cupons de Desconto no Backoffice, Aplicação na Criação da Conta (Cliente Novo) e em Plano & Cobrança (Cliente Base), Ciclos Promocionais no Asaas, Histórico de Planos e Trava Anti-Fraude de Cadastro de Sites (1ª e 2ª vez OK, 3ª vez Bloqueia com alerta para suporte) + Logs de Erro (`SystemErrorLog`).
+
+Plano: [PLAN-phase39-coupons-plan-history-and-site-antifraud.md](PLAN-phase39-coupons-plan-history-and-site-antifraud.md).
+Spec: [Phase 39](SPEC.md#phase-39-cupons-de-desconto-ciclos-promocionais-no-asaas-histórico-de-planos-e-trava-anti-fraude-de-cadastro-de-sites).
+
+| Task | Status | Entrega |
+|---|---|---|
+| [290](tasks/290-coupons-plan-history-and-site-antifraud-schema.md) | DONE | Schema Prisma (`Coupon`, `CouponPlan`, `CouponRedemption`, `PlanHistory`, `SiteRegistrationHistory`, campos em `Subscription`) e serviços base com `SystemErrorLog` |
+| [291](tasks/291-site-antifraud-guard-and-history.md) | DONE | Trava Anti-Fraude de Cadastro de Sites (1ª vez OK, 2ª vez OK, 3ª vez Bloqueia + Alerta de Suporte + `SystemErrorLog`) em `/api/wordpress/sites`, `/settings/wordpress` e `/register` |
+| [292](tasks/292-backoffice-coupons-and-history-management.md) | DONE | CRUD de Cupons no Backoffice (`/backoffice/coupons`) + visualização de Histórico de Planos e Histórico/Liberação de Sites no Backoffice |
+| [293](tasks/293-asaas-subscription-discount-lifecycle.md) | DONE | Evolução de `AsaasGateway` (`PUT /v3/subscriptions/{id}` com `updatePendingPayments: true`) e automação de ciclos promocionais no Webhook Asaas e `BillingService` |
+| [294](tasks/294-register-and-onboarding-coupon-flow.md) | DONE | Opção de Cupom de Desconto na Criação da Conta (`/register` e `/checkout/billing`) para Cliente Novo + envio ao Asaas + `SystemErrorLog` |
+| [295](tasks/295-billing-settings-base-coupon-and-plan-history-ui.md) | DONE | Opção de Cupom de Desconto em **Plano & Cobrança** (`/settings/billing` e `/settings/billing/upgrade`) para Cliente Base + atualização no Asaas + exibição do Histórico de Planos |
+| [296](tasks/296-phase39-e2e-tests-and-hardening.md) | DONE | Testes E2E automatizados da Phase 39, auditoria de logs de erro e segurança, `npx tsc --noEmit`, `npm run lint` e `npm run build` |
+
+## Phase 38 (DONE)
+
+Chaves da API do WooCommerce nos Destinos WordPress (Multi-Site) com Guardrail de Plano de Afiliados.
+
+Plano: [PLAN-phase38-woocommerce-site-keys-and-plan-guard.md](PLAN-phase38-woocommerce-site-keys-and-plan-guard.md).
+Spec: [Phase 38](SPEC.md#phase-38-chaves-da-api-do-woocommerce-nos-destinos-wordpress-multi-site-com-guardrail-de-plano-de-afiliados).
+
+| Task | Status | Entrega |
+|---|---|---|
+| [286](tasks/286-woocommerce-site-keys-schema-and-service.md) | DONE | Schema Prisma e serviço de credenciais WooCommerce com encriptação AES-256-GCM e sanitização |
+| [287](tasks/287-woocommerce-keys-plan-validation-and-test-api.md) | DONE | Validação de plano de afiliados (`canConfigureWooCommerce`) e endpoint `/api/wordpress/sites/[id]/test-woocommerce` |
+| [288](tasks/288-wordpress-sites-woocommerce-ui.md) | DONE | Interface de configuração de chaves WooCommerce em `/settings/wordpress` |
+| [289](tasks/289-woocommerce-publisher-auth-and-e2e-tests.md) | DONE | Autenticação prioritária via `ck:cs` no `WooCommercePublisherService`, testes E2E e build |
 
 ## Phase 33 (DONE)
 

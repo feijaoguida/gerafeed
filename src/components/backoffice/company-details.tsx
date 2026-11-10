@@ -21,6 +21,8 @@ import {
   Power,
   RefreshCw,
   Zap,
+  Clock,
+  ShieldAlert,
 } from "lucide-react";
 
 import { PageHeader } from "@/components/design-system/page-header";
@@ -161,6 +163,28 @@ export interface WorkspaceDetailData {
   wordpressSites?: WordPressSiteItem[];
   configurations?: ConfigItem[];
   stats?: WorkspaceStats;
+  planHistories?: Array<{
+    id: string;
+    eventType: string;
+    previousPlanName?: string | null;
+    newPlanName: string;
+    billingCycle: string;
+    originalAmount: number | string;
+    chargedAmount: number | string;
+    couponCode?: string | null;
+    discountDurationMonths?: number | null;
+    notes?: string | null;
+    createdAt: string;
+  }>;
+  siteRegistrationHistories?: Array<{
+    id: string;
+    normalizedDomain: string;
+    rawUrl: string;
+    attemptNumber: number;
+    status: string;
+    sourceContext: string;
+    createdAt: string;
+  }>;
 }
 
 interface CompanyDetailsProps {
@@ -209,6 +233,33 @@ export function CompanyDetails({ initialWorkspace, availablePlans }: CompanyDeta
   const [wpSelectedSources, setWpSelectedSources] = useState<string[]>([]);
   const [isTestingWpId, setIsTestingWpId] = useState<string | null>(null);
   const [isSyncingWpId, setIsSyncingWpId] = useState<string | null>(null);
+  const [clearingDomain, setClearingDomain] = useState<string | null>(null);
+
+  const handleClearDomainLock = async (normalizedDomain: string) => {
+    if (!confirm(`Confirmar liberação do domínio "${normalizedDomain}" para esta empresa?`)) return;
+    setClearingDomain(normalizedDomain);
+    try {
+      const res = await fetch(`/api/backoffice/companies/${workspace.id}/wordpress/clear-domain-lock`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ domain: normalizedDomain }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Erro ao liberar domínio.");
+
+      alert(data.message);
+      setWorkspace((prev) => ({
+        ...prev,
+        siteRegistrationHistories: prev.siteRegistrationHistories?.map((item) =>
+          item.normalizedDomain === normalizedDomain ? { ...item, status: "CLEARED_BY_SUPPORT" } : item
+        ),
+      }));
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Erro ao liberar domínio.");
+    } finally {
+      setClearingDomain(null);
+    }
+  };
 
   // AI & Prompts state
   const initialAi = (workspace.configurations?.find((c) => c.key === "aiProvider")?.value || {}) as Record<string, unknown>;
@@ -1138,6 +1189,155 @@ export function CompanyDetails({ initialWorkspace, availablePlans }: CompanyDeta
                 </div>
               )}
             </div>
+
+            {/* Plan History Table */}
+            <div className="p-6 rounded-xl bg-surface border border-border shadow-xs space-y-4">
+              <h3 className="text-base font-bold text-white flex items-center gap-2">
+                <Clock className="w-5 h-5 text-indigo-400" />
+                Histórico de Planos & Cupons ({workspace.planHistories?.length || 0})
+              </h3>
+
+              {!workspace.planHistories || workspace.planHistories.length === 0 ? (
+                <div className="py-6 text-center text-xs text-zinc-500 bg-zinc-900/50 rounded-lg border border-dashed border-zinc-800">
+                  Nenhum registro histórico de plano para esta empresa.
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs border-collapse">
+                    <thead>
+                      <tr className="border-b border-zinc-800 text-zinc-400">
+                        <th className="py-2.5 font-medium">Data</th>
+                        <th className="py-2.5 font-medium">Evento</th>
+                        <th className="py-2.5 font-medium">Plano Anterior</th>
+                        <th className="py-2.5 font-medium">Novo Plano</th>
+                        <th className="py-2.5 font-medium">Valor Cobrado</th>
+                        <th className="py-2.5 font-medium">Cupom Aplicado</th>
+                        <th className="py-2.5 font-medium">Notas</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-zinc-800/60 font-mono text-[11px]">
+                      {workspace.planHistories.map((hist) => (
+                        <tr key={hist.id} className="hover:bg-zinc-900/30">
+                          <td className="py-2.5 text-zinc-300">
+                            {new Date(hist.createdAt).toLocaleDateString("pt-BR")}{" "}
+                            <span className="text-zinc-500 text-[10px]">
+                              {new Date(hist.createdAt).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
+                            </span>
+                          </td>
+                          <td className="py-2.5">
+                            <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 font-bold">
+                              {hist.eventType}
+                            </span>
+                          </td>
+                          <td className="py-2.5 text-zinc-400">{hist.previousPlanName || "—"}</td>
+                          <td className="py-2.5 text-white font-semibold">{hist.newPlanName}</td>
+                          <td className="py-2.5 text-emerald-400 font-bold">
+                            R$ {Number(hist.chargedAmount).toFixed(2)}
+                            {Number(hist.chargedAmount) < Number(hist.originalAmount) && (
+                              <span className="text-[10px] text-zinc-500 block line-through">
+                                R$ {Number(hist.originalAmount).toFixed(2)}
+                              </span>
+                            )}
+                          </td>
+                          <td className="py-2.5">
+                            {hist.couponCode ? (
+                              <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-bold">
+                                {hist.couponCode}
+                                {hist.discountDurationMonths !== null && hist.discountDurationMonths !== undefined && (
+                                  <span className="text-zinc-400 ml-1">
+                                    ({hist.discountDurationMonths === 0 ? "Sempre" : `${hist.discountDurationMonths}m`})
+                                  </span>
+                                )}
+                              </span>
+                            ) : (
+                              <span className="text-zinc-600">—</span>
+                            )}
+                          </td>
+                          <td className="py-2.5 text-zinc-400 font-sans text-xs">{hist.notes || "—"}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+
+            {/* Anti-fraud Site Registration History & Support Unlock */}
+            <div className="p-6 rounded-xl bg-zinc-900/40 border border-zinc-800 space-y-4 mt-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h4 className="text-sm font-bold text-white flex items-center gap-2">
+                    <ShieldAlert className="w-4 h-4 text-amber-400" />
+                    Histórico Anti-Fraude de Cadastro de Sites ({workspace.siteRegistrationHistories?.length || 0})
+                  </h4>
+                  <p className="text-xs text-zinc-400 mt-0.5">
+                    Histórico permanente de auditoria. Caso o cliente legítimo atinja a 3ª conta e seja bloqueado, utilize o botão ao lado para liberar.
+                  </p>
+                </div>
+              </div>
+
+              {!workspace.siteRegistrationHistories || workspace.siteRegistrationHistories.length === 0 ? (
+                <div className="py-4 text-center text-xs text-zinc-500 bg-zinc-900/60 rounded-lg border border-dashed border-zinc-800">
+                  Nenhum registro histórico de site para esta empresa.
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs border-collapse">
+                    <thead>
+                      <tr className="border-b border-zinc-800 text-zinc-400">
+                        <th className="py-2 font-medium">Data</th>
+                        <th className="py-2 font-medium">Domínio Normalizado</th>
+                        <th className="py-2 font-medium">Tentativa #</th>
+                        <th className="py-2 font-medium">Origem</th>
+                        <th className="py-2 font-medium">Status Anti-Fraude</th>
+                        <th className="py-2 font-medium text-right">Ação do Suporte</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-zinc-800/60 font-mono text-[11px]">
+                      {workspace.siteRegistrationHistories.map((siteHist) => (
+                        <tr key={siteHist.id} className="hover:bg-zinc-900/30">
+                          <td className="py-2 text-zinc-400">
+                            {new Date(siteHist.createdAt).toLocaleDateString("pt-BR")}{" "}
+                            <span className="text-zinc-500 text-[10px]">
+                              {new Date(siteHist.createdAt).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
+                            </span>
+                          </td>
+                          <td className="py-2 text-white font-semibold">{siteHist.normalizedDomain}</td>
+                          <td className="py-2 text-zinc-300">Tentativa #{siteHist.attemptNumber}</td>
+                          <td className="py-2 text-zinc-400">{siteHist.sourceContext}</td>
+                          <td className="py-2">
+                            <span
+                              className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                                siteHist.status === "ALLOWED"
+                                  ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
+                                  : siteHist.status === "BLOCKED"
+                                  ? "bg-rose-500/10 text-rose-400 border border-rose-500/20"
+                                  : "bg-amber-500/10 text-amber-400 border border-amber-500/20"
+                              }`}
+                            >
+                              {siteHist.status}
+                            </span>
+                          </td>
+                          <td className="py-2 text-right">
+                            {siteHist.status === "BLOCKED" ? (
+                              <button
+                                onClick={() => handleClearDomainLock(siteHist.normalizedDomain)}
+                                disabled={clearingDomain === siteHist.normalizedDomain}
+                                className="px-2.5 py-1 rounded bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-400 text-[10px] font-semibold transition disabled:opacity-50"
+                              >
+                                {clearingDomain === siteHist.normalizedDomain ? "Liberando..." : "Liberar no Suporte"}
+                              </button>
+                            ) : (
+                              <span className="text-zinc-600 text-[10px]">—</span>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
           </div>
         )}
 
@@ -1387,6 +1587,83 @@ export function CompanyDetails({ initialWorkspace, availablePlans }: CompanyDeta
                     </div>
                   </div>
                 ))
+              )}
+            </div>
+
+            {/* Anti-fraud Site Registration History & Support Unlock */}
+            <div className="p-6 rounded-xl bg-zinc-900/40 border border-zinc-800 space-y-4 mt-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h4 className="text-sm font-bold text-white flex items-center gap-2">
+                    <ShieldAlert className="w-4 h-4 text-amber-400" />
+                    Histórico Anti-Fraude de Cadastro de Sites ({workspace.siteRegistrationHistories?.length || 0})
+                  </h4>
+                  <p className="text-xs text-zinc-400 mt-0.5">
+                    Histórico permanente de auditoria. Caso o cliente legítimo atinja a 3ª conta e seja bloqueado, utilize o botão ao lado para liberar.
+                  </p>
+                </div>
+              </div>
+
+              {!workspace.siteRegistrationHistories || workspace.siteRegistrationHistories.length === 0 ? (
+                <div className="py-4 text-center text-xs text-zinc-500 bg-zinc-900/60 rounded-lg border border-dashed border-zinc-800">
+                  Nenhum registro histórico de site para esta empresa.
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs border-collapse">
+                    <thead>
+                      <tr className="border-b border-zinc-800 text-zinc-400">
+                        <th className="py-2 font-medium">Data</th>
+                        <th className="py-2 font-medium">Domínio Normalizado</th>
+                        <th className="py-2 font-medium">Tentativa #</th>
+                        <th className="py-2 font-medium">Origem</th>
+                        <th className="py-2 font-medium">Status Anti-Fraude</th>
+                        <th className="py-2 font-medium text-right">Ação do Suporte</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-zinc-800/60 font-mono text-[11px]">
+                      {workspace.siteRegistrationHistories.map((siteHist) => (
+                        <tr key={siteHist.id} className="hover:bg-zinc-900/30">
+                          <td className="py-2 text-zinc-400">
+                            {new Date(siteHist.createdAt).toLocaleDateString("pt-BR")}{" "}
+                            <span className="text-zinc-500 text-[10px]">
+                              {new Date(siteHist.createdAt).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
+                            </span>
+                          </td>
+                          <td className="py-2 text-white font-semibold">{siteHist.normalizedDomain}</td>
+                          <td className="py-2 text-zinc-300">Tentativa #{siteHist.attemptNumber}</td>
+                          <td className="py-2 text-zinc-400">{siteHist.sourceContext}</td>
+                          <td className="py-2">
+                            <span
+                              className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                                siteHist.status === "ALLOWED"
+                                  ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
+                                  : siteHist.status === "BLOCKED"
+                                  ? "bg-rose-500/10 text-rose-400 border border-rose-500/20"
+                                  : "bg-amber-500/10 text-amber-400 border border-amber-500/20"
+                              }`}
+                            >
+                              {siteHist.status}
+                            </span>
+                          </td>
+                          <td className="py-2 text-right">
+                            {siteHist.status === "BLOCKED" ? (
+                              <button
+                                onClick={() => handleClearDomainLock(siteHist.normalizedDomain)}
+                                disabled={clearingDomain === siteHist.normalizedDomain}
+                                className="px-2.5 py-1 rounded bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-400 text-[10px] font-semibold transition disabled:opacity-50"
+                              >
+                                {clearingDomain === siteHist.normalizedDomain ? "Liberando..." : "Liberar no Suporte"}
+                              </button>
+                            ) : (
+                              <span className="text-zinc-600 text-[10px]">—</span>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               )}
             </div>
           </div>

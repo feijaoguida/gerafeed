@@ -57,3 +57,26 @@ Plano: [Phase 32](../PLAN-phase32-password-recovery.md). Tasks 261–265 DONE.
 | [264](264-forgot-password-page-and-view.md) | Página `/forgot-password` e view em 2 passos com timer regressivo, acessibilidade e design GeraFeed |
 | [265](265-phase32-integration-and-hardening.md) | Script de testes automatizados, validação de segurança (anti-flood, anti-enumeração, expiração), lint, tsc e build |
 
+# Phase 33 a 38 Tasks — Concluídas
+
+- **Phase 33** ([PLAN-phase33-ai-image-generation.md](../PLAN-phase33-ai-image-generation.md)): Tasks `267`–`272` DONE.
+- **Phase 35** ([PLAN-phase35-manual-article-creation.md](../PLAN-phase35-manual-article-creation.md)): Tasks `273`–`277` DONE.
+- **Phase 36** ([PLAN-phase36-huggingface-free-image-ai.md](../PLAN-phase36-huggingface-free-image-ai.md)): Tasks `278`–`281` DONE.
+- **Phase 37** ([PLAN-phase37-woocommerce-and-sales-ai.md](../PLAN-phase37-woocommerce-and-sales-ai.md)): Tasks `282`–`285` DONE.
+- **Phase 38** ([PLAN-phase38-woocommerce-site-keys-and-plan-guard.md](../PLAN-phase38-woocommerce-site-keys-and-plan-guard.md)): Tasks `286`–`289` DONE.
+
+# Phase 39 Tasks — Cupons de Desconto, Ciclos Promocionais no Asaas, Histórico de Planos e Anti-Fraude de Cadastro de Sites
+
+Plano: [Phase 39](../PLAN-phase39-coupons-plan-history-and-site-antifraud.md). Tasks `290`–`296` TODO.
+
+| Task | Objetivo |
+|---|---|
+| [290](290-coupons-plan-history-and-site-antifraud-schema.md) | Schema Prisma (`Coupon`, `CouponPlan`, `CouponRedemption`, `PlanHistory`, `SiteRegistrationHistory`, campos em `Subscription`) e serviços de domínio com logging em `SystemErrorLog` |
+| [291](291-site-antifraud-guard-and-history.md) | Normalização de domínio/URL e trava anti-fraude (1ª vez OK, 2ª vez OK, 3ª vez Bloqueia + Alerta de Suporte + `SystemErrorLog`) em `/api/wordpress/sites`, `/settings/wordpress` e `/register` |
+| [292](292-backoffice-coupons-and-history-management.md) | CRUD completo de Cupons de Desconto no Backoffice (`/backoffice/coupons`) + visualização de Histórico de Planos e Histórico/Liberação de Sites no Backoffice |
+| [293](293-asaas-subscription-discount-lifecycle.md) | Integração Asaas (`PUT /v3/subscriptions/{id}` com `updatePendingPayments: true`) e automação de ciclos promocionais no Webhook Asaas e `BillingService` |
+| [294](294-register-and-onboarding-coupon-flow.md) | Opção de Cupom de Desconto na Criação da Conta (`/register` e `/checkout/billing`) para Cliente Novo + envio ao Asaas + `SystemErrorLog` |
+| [295](295-billing-settings-base-coupon-and-plan-history-ui.md) | Opção de Cupom de Desconto em **Plano & Cobrança** (`/settings/billing` e `/settings/billing/upgrade`) para Cliente Base + atualização no Asaas + exibição do Histórico de Planos |
+| [296](296-phase39-e2e-tests-and-hardening.md) | Bateria de testes E2E automatizados da Phase 39, auditoria de logs de erro e segurança, `npx tsc --noEmit`, `npm run lint` e `npm run build` |
+
+

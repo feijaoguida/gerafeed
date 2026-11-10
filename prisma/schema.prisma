@@ -105,6 +105,8 @@ model Workspace {
   checkoutSessions           BillingCheckoutSession[]
   invoices                   Invoice[]
   systemErrorLogs            SystemErrorLog[]
+  couponRedemptions          CouponRedemption[]
+  planHistories              PlanHistory[]
 }
 
 // ---------------------------------------------------------------------------
@@ -146,6 +148,8 @@ model Plan {
   subscriptions    Subscription[]
   planFeatures     PlanFeature[]
   checkoutSessions BillingCheckoutSession[]
+  couponPlans      CouponPlan[]
+  couponRedemptions CouponRedemption[]
 }
 
 model Feature {
@@ -199,6 +203,12 @@ model Subscription {
   canceledAt                    DateTime?
   gracePeriodEndsAt             DateTime?
   pendingPlanId                 String?
+  couponId                      String?
+  coupon                        Coupon?            @relation(fields: [couponId], references: [id], onDelete: SetNull)
+  originalPlanAmount            Decimal?           @db.Decimal(10, 2)
+  discountedAmount              Decimal?           @db.Decimal(10, 2)
+  discountDurationMonths        Int?
+  discountCyclesUsed            Int                @default(0)
   invoices                      Invoice[]
   createdAt                     DateTime           @default(now())
   updatedAt                     DateTime           @updatedAt
@@ -700,6 +710,9 @@ model BillingCheckoutSession {
   cycle              BillingCycle  @default(MONTHLY)
   billingMethod      BillingMethod @default(CREDIT_CARD)
   amount             Decimal       @db.Decimal(10, 2)
+  originalAmount     Decimal?      @db.Decimal(10, 2)
+  couponId           String?
+  couponCode         String?
   status             String        @default("PENDING") // PENDING, COMPLETED, EXPIRED, CANCELED
   providerCheckoutId String?
   checkoutUrl        String?
@@ -809,4 +822,129 @@ model SystemSetting {
   description String?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+}
+
+// ---------------------------------------------------------------------------
+// Phase 39: Cupons de Desconto, Histórico de Planos e Anti-Fraude de Sites
+// ---------------------------------------------------------------------------
+
+enum CouponDiscountType {
+  PERCENTAGE
+  FIXED_DISCOUNT
+  FIXED_PRICE
+}
+
+enum CouponCustomerType {
+  NEW
+  BASE
+  BOTH
+}
+
+model Coupon {
+  id                  String             @id @default(cuid())
+  code                String             @unique
+  name                String
+  description         String?
+  discountType        CouponDiscountType @default(PERCENTAGE)
+  discountValue       Decimal            @db.Decimal(10, 2)
+  durationMonths      Int                @default(1) // 0 = Para Sempre, 1 = Primeiro Mês, 3 = 3 Primeiros Meses, etc
+  customerType        CouponCustomerType @default(NEW)
+  validFrom           DateTime?          @default(now())
+  validUntil          DateTime?
+  maxUses             Int?
+  maxUsesPerWorkspace Int                @default(1)
+  usedCount           Int                @default(0)
+  active              Boolean            @default(true)
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
+
+  plans               CouponPlan[]
+  redemptions         CouponRedemption[]
+  subscriptions       Subscription[]
+  planHistories       PlanHistory[]
+
+  @@index([code])
+  @@index([active])
+}
+
+model CouponPlan {
+  id        String   @id @default(cuid())
+  couponId  String
+  coupon    Coupon   @relation(fields: [couponId], references: [id], onDelete: Cascade)
+  planId    String
+  plan      Plan     @relation(fields: [planId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([couponId, planId])
+  @@index([couponId])
+  @@index([planId])
+}
+
+model CouponRedemption {
+  id               String    @id @default(cuid())
+  couponId         String
+  coupon           Coupon    @relation(fields: [couponId], references: [id], onDelete: Cascade)
+  workspaceId      String
+  workspace        Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  userId           String?
+  planId           String
+  plan             Plan      @relation(fields: [planId], references: [id], onDelete: Cascade)
+  subscriptionId   String?
+  originalAmount   Decimal   @db.Decimal(10, 2)
+  discountedAmount Decimal   @db.Decimal(10, 2)
+  durationMonths   Int
+  cyclesUsed       Int       @default(0)
+  status           String    @default("ACTIVE") // ACTIVE, COMPLETED, CANCELED
+  appliedAt        DateTime  @default(now())
+  completedAt      DateTime?
+
+  @@index([couponId])
+  @@index([workspaceId])
+  @@index([status])
+}
+
+model PlanHistory {
+  id                     String    @id @default(cuid())
+  workspaceId            String
+  workspace              Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  userId                 String?
+  userEmail              String?
+  previousPlanId         String?
+  previousPlanName       String?
+  newPlanId              String
+  newPlanName            String
+  eventType              String    // ACCOUNT_CREATED, CHECKOUT_STARTED, SUBSCRIPTION_ACTIVATED, PLAN_CHANGED, COUPON_APPLIED, DISCOUNT_ENDED, SUBSCRIPTION_CANCELED, SUBSCRIPTION_REACTIVATED, BACKOFFICE_UPDATE
+  billingCycle           String    @default("MONTHLY")
+  originalAmount         Decimal   @db.Decimal(10, 2)
+  chargedAmount          Decimal   @db.Decimal(10, 2)
+  couponId               String?
+  coupon                 Coupon?   @relation(fields: [couponId], references: [id], onDelete: SetNull)
+  couponCode             String?
+  discountDurationMonths Int?
+  asaasSubscriptionId    String?
+  notes                  String?   @db.Text
+  createdAt              DateTime  @default(now())
+
+  @@index([workspaceId])
+  @@index([eventType])
+  @@index([createdAt])
+}
+
+model SiteRegistrationHistory {
+  id               String   @id @default(cuid())
+  normalizedDomain String
+  rawUrl           String
+  workspaceId      String?
+  userId           String?
+  userEmail        String?
+  wordpressSiteId  String?
+  sourceContext    String   @default("WORDPRESS_SITE") // REGISTER | WORDPRESS_SITE
+  attemptNumber    Int
+  status           String   @default("ALLOWED") // ALLOWED, BLOCKED, CLEARED_BY_SUPPORT
+  createdAt        DateTime @default(now())
+
+  @@index([normalizedDomain])
+  @@index([workspaceId])
+  @@index([status])
+  @@index([createdAt])
 }

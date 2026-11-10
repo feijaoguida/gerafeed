@@ -515,3 +515,23 @@ A contratação de planos no Asaas deve ser feita gerando a assinatura (`POST /v
   - Ao publicar produtos do catálogo de afiliados para o WooCommerce, o serviço utiliza `Basic base64(ck:cs)` como autenticação primária para a REST API `/wp-json/wc/v3/products`.
   - Para uploads de arquivos de imagem na biblioteca de mídia do WordPress (`/wp-json/wp/v2/media`), continua utilizando as credenciais de usuário WordPress (`username:applicationPassword`), pois a REST API de mídia do core do WordPress não aceita credenciais do WooCommerce.
 
+
+# Phase 39 — Cupons de Desconto, Ciclos Promocionais no Asaas, Histórico de Planos e Trava Anti-Fraude de Cadastro de Sites
+
+- **Domínio de Cupons de Desconto (`Coupon`, `CouponPlan`, `CouponRedemption`)**:
+  - Gerenciado no Backoffice (`/backoffice/coupons` exclusivo para `isSuperAdmin === true`).
+  - Campos principais: `name`, `code` (único, uppercase), `description`, `validFrom`, `validUntil`, relação N:N `plans` (`CouponPlan`), `discountType` (`PERCENTAGE`, `FIXED_DISCOUNT` ou `FIXED_PRICE`), `discountValue`, `durationMonths` (`0` = Para Sempre, `1` = 1º Mês, `3` = 3 Primeiros Meses, $N \ge 0$), `customerType` (`NEW` = Novo, `BASE` = Base, `BOTH` = Ambos), `maxUses`, `maxUsesPerWorkspace` (default `1`), `usedCount` e `active`.
+- **Integração com Assinaturas do Asaas e Transição Automática de Valor**:
+  - Na contratação com cupom (`POST /api/billing/checkout`) ou aplicação em Cliente Base (`POST /api/billing/coupons/apply`), a assinatura no Asaas é criada (`POST /v3/subscriptions`) ou atualizada (`PUT /v3/subscriptions/{id}` com `"updatePendingPayments": true`) com `value = discountedAmount` (ex.: `R$ 19,90`).
+  - Para cupons temporários (`durationMonths > 0`, ex.: 3 meses a R$ 19,90 em um plano de R$ 89,90), a `Subscription` armazena `originalPlanAmount` (`89.90`), `discountedAmount` (`19.90`), `discountDurationMonths` (`3`) e `discountCyclesUsed`.
+  - No Webhook do Asaas (`/api/webhooks/asaas`) e na reconciliação (`BillingService.syncWorkspaceWithGateway`), cada cobrança confirmada contabiliza um ciclo promocional usado. Ao atingir `discountCyclesUsed >= discountDurationMonths` (ex.: 3ª cobrança confirmada, ou ao ser gerada a $(N+1)$-ésima fatura), o sistema atualiza automaticamente a assinatura no Asaas via `PUT /v3/subscriptions/{id}` com `{ value: originalPlanAmount, updatePendingPayments: true }`, passando as cobranças seguintes para o valor cheio (`R$ 89,90`).
+- **Histórico de Planos (`PlanHistory`)**:
+  - Registra toda mudança de plano, ativação, aplicação de cupom, fim de ciclo promocional, cancelamento e reativação, visível em `/settings/billing` e em `/backoffice/companies/[id]`.
+- **Histórico Perpétuo e Anti-Fraude de Cadastro de Sites (`SiteRegistrationHistory`)**:
+  - Toda URL de site informada no cadastro (`/api/auth/register`) ou em Destinos WordPress (`/api/wordpress/sites`) é normalizada (`normalizedDomain`).
+  - A exclusão de um `WordPressSite` nunca apaga o histórico em `SiteRegistrationHistory`.
+  - Regra de bloqueio por contas distintas: **1ª conta = OK (`ALLOWED`)**, **2ª conta distinta = OK (`ALLOWED`)**, **3ª conta distinta em diante = BLOQUEADO (`BLOCKED`, HTTP 403)** com mensagem de alerta orientando o usuário a procurar o suporte.
+- **Obrigatoriedade de Logs de Erro (`SystemErrorLog`)**:
+  - Qualquer erro ou rejeição nos fluxos de cupom, checkout/atualização Asaas ou bloqueio anti-fraude de site gera obrigatoriamente registro detalhado em `SystemErrorLog` via `logSystemError` / `handleApiError`.
+
+

@@ -8,6 +8,8 @@ import {
   WebhookEventResult,
   PaymentProviderType,
   PaymentProviderCapabilities,
+  UpdateSubscriptionParams,
+  UpdateSubscriptionResult,
 } from "./types";
 
 export interface PaymentGateway {
@@ -44,6 +46,11 @@ export interface PaymentGateway {
    * Cancels an active subscription in the payment gateway.
    */
   cancelSubscription(subscriptionId: string): Promise<boolean>;
+
+  /**
+   * Updates an existing subscription in the payment gateway (e.g. Asaas PUT /v3/subscriptions/{id}).
+   */
+  updateSubscription(params: UpdateSubscriptionParams): Promise<UpdateSubscriptionResult>;
 
   /**
    * Processes a webhook event received from the payment gateway.

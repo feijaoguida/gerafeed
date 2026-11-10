@@ -3,6 +3,7 @@ export interface PlanIntent {
   cycle: "MONTHLY" | "YEARLY";
   planName?: string;
   price?: number;
+  couponCode?: string;
 }
 
 const STORAGE_KEY = "gerafeed_plan_intent";

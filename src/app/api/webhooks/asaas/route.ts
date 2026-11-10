@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 import { getPaymentGateway } from "@/lib/payments";
 import { prisma } from "@/lib/prisma";
+import { BillingService } from "@/lib/billing";
+import { PlanHistoryService } from "@/lib/plan-history";
+import { logSystemError } from "@/lib/errors/service";
 
 export async function POST(request: Request) {
   try {
@@ -219,7 +222,49 @@ export async function POST(request: Request) {
         }
       }
 
-      // 4. Mark Webhook Event as PROCESSED
+      // 4. Avaliação do Ciclo de Vida Promocional de Descontos (PUT /v3/subscriptions/{id})
+      if (subscription) {
+        const rawPayment = (body as { payment?: Record<string, unknown> })?.payment;
+        const paymentValue = typeof rawPayment?.value === "number" ? rawPayment.value : Number(rawPayment?.value) || undefined;
+        await BillingService.evaluateSubscriptionDiscountLifecycle(subscription.id, {
+          eventType: type,
+          paymentId: paymentId || (rawPayment?.id ? String(rawPayment.id) : undefined),
+          paymentValue,
+        });
+
+        // Registrar ativação ou cancelamento no Histórico de Planos quando o status mudar
+        if (type === "PAYMENT_CONFIRMED" || type === "PAYMENT_RECEIVED") {
+          const invoicesCount = await prisma.invoice.count({
+            where: { subscriptionId: subscription.id, status: { in: ["CONFIRMED", "RECEIVED"] } },
+          });
+          if (invoicesCount === 1) {
+            await PlanHistoryService.recordPlanEvent({
+              workspaceId: subscription.workspaceId,
+              newPlanId: subscription.planId,
+              newPlanName: subscription.plan?.name || "Plano",
+              eventType: "SUBSCRIPTION_ACTIVATED",
+              originalAmount: subscription.originalPlanAmount || subscription.amount || 0,
+              chargedAmount: subscription.amount || 0,
+              couponId: subscription.couponId,
+              asaasSubscriptionId: subscription.asaasSubscriptionId,
+              notes: "Primeiro pagamento confirmado via Webhook Asaas. Assinatura ativada.",
+            });
+          }
+        } else if (type === "SUBSCRIPTION_DELETED" || type === "SUBSCRIPTION_INACTIVATED") {
+          await PlanHistoryService.recordPlanEvent({
+            workspaceId: subscription.workspaceId,
+            newPlanId: subscription.planId,
+            newPlanName: subscription.plan?.name || "Plano",
+            eventType: "SUBSCRIPTION_CANCELED",
+            originalAmount: subscription.amount || 0,
+            chargedAmount: 0,
+            asaasSubscriptionId: subscription.asaasSubscriptionId,
+            notes: `Assinatura cancelada no gateway (${type}).`,
+          });
+        }
+      }
+
+      // 5. Mark Webhook Event as PROCESSED
       if (webhookEventRecord) {
         await prisma.providerWebhookEvent.update({
           where: { id: webhookEventRecord.id },
@@ -232,6 +277,15 @@ export async function POST(request: Request) {
 
       return NextResponse.json({ received: true, event: type });
     } catch (processError) {
+      await logSystemError({
+        path: "/api/webhooks/asaas",
+        module: "BILLING",
+        statusCode: 500,
+        errorMessage: `Erro ao processar evento do webhook Asaas (${type}): ${processError instanceof Error ? processError.message : String(processError)}`,
+        error: processError,
+        query: { type, providerEventId, subscriptionId },
+      });
+
       if (webhookEventRecord) {
         await prisma.providerWebhookEvent.update({
           where: { id: webhookEventRecord.id },
@@ -246,6 +300,15 @@ export async function POST(request: Request) {
   } catch (error) {
     console.error("POST /api/webhooks/asaas error:", error);
     const message = error instanceof Error ? error.message : "Erro ao processar webhook do Asaas";
+
+    await logSystemError({
+      path: "/api/webhooks/asaas",
+      module: "BILLING",
+      statusCode: 500,
+      errorMessage: `Falha geral no webhook Asaas: ${message}`,
+      error,
+    });
+
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

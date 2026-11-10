@@ -217,3 +217,23 @@ Ao concluir:
 7. atualize PROGRESS.md.
 ```
 
+# Phase 39. Cupons de Desconto, Ciclos Promocionais no Asaas, Histórico de Planos e Trava Anti-Fraude de Cadastro de Sites
+
+## Objetivo
+Implementar o domínio de **Cupons de Desconto** administrado no Backoffice (`/backoffice/coupons`), integrado à **Criação da Conta** (`/register` e `/checkout/billing` para Cliente Novo), à tela **Plano & Cobrança** (`/settings/billing` e `/settings/billing/upgrade` para Cliente Base) e à **API v3 do Asaas** (`/v3/subscriptions` com transição automática após $N$ meses promocionais), além do **Histórico de Planos (`PlanHistory`)** e da **Trava Anti-Fraude de Cadastro de Sites (`SiteRegistrationHistory` — 1ª vez OK, 2ª vez OK, 3ª vez em diante bloqueia e pede para procurar o suporte)**, com registro obrigatório em `SystemErrorLog`.
+
+## Ordem de Execução
+```text
+290 → 291 → 292 → 293 → 294 → 295 → 296
+```
+
+## Tasks da Phase 39
+- [290](tasks/290-coupons-plan-history-and-site-antifraud-schema.md): Schema Prisma e Serviços Base (`CouponService`, `PlanHistoryService`, `SiteAntifraudService`) com `SystemErrorLog`.
+- [291](tasks/291-site-antifraud-guard-and-history.md): Trava Anti-Fraude de Cadastro de Sites (1ª e 2ª vez OK, 3ª vez Bloqueia + Alerta de Suporte + `SystemErrorLog`).
+- [292](tasks/292-backoffice-coupons-and-history-management.md): Gestão de Cupons (`/backoffice/coupons`), Histórico de Planos e Histórico de Sites no Backoffice.
+- [293](tasks/293-asaas-subscription-discount-lifecycle.md): Integração Asaas (`PUT /v3/subscriptions/{id}` com `updatePendingPayments: true`) e Automação do Ciclo Promocional ($N$ meses).
+- [294](tasks/294-register-and-onboarding-coupon-flow.md): Cupom de Desconto na Criação da Conta (`/register` e `/checkout/billing`) para Cliente Novo.
+- [295](tasks/295-billing-settings-base-coupon-and-plan-history-ui.md): Cupom de Desconto em Plano & Cobrança (`/settings/billing` e `/settings/billing/upgrade`) para Cliente Base e Histórico de Planos.
+- [296](tasks/296-phase39-e2e-tests-and-hardening.md): Testes E2E Automatizados da Phase 39, Auditoria de Logs de Erro e Build.
+
+

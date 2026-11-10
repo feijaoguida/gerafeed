@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
 import { getSessionWorkspaceId } from "@/lib/workspace";
 import { BillingService } from "@/lib/billing";
+import { handleApiError } from "@/lib/errors/service";
 
-export async function POST() {
+export async function POST(request: Request) {
   try {
     const workspaceId = await getSessionWorkspaceId();
     if (!workspaceId) {
@@ -17,8 +18,10 @@ export async function POST() {
       subscription: updated,
     });
   } catch (error) {
-    console.error("POST /api/billing/subscription/cancel error:", error);
-    const message = error instanceof Error ? error.message : "Erro ao cancelar assinatura";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return handleApiError(error, request, {
+      module: "BILLING",
+      screen: "Cancelamento de Assinatura",
+      userFacingMessage: "Erro ao cancelar renovação automática da assinatura.",
+    });
   }
 }

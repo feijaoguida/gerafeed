@@ -70,6 +70,23 @@ export interface SubscriptionResult {
   raw?: unknown;
 }
 
+export interface UpdateSubscriptionParams {
+  subscriptionId: string;
+  value: number;
+  cycle?: BillingCycle;
+  billingType?: BillingType;
+  description?: string;
+  updatePendingPayments?: boolean;
+  nextDueDate?: string;
+}
+
+export interface UpdateSubscriptionResult {
+  updated: boolean;
+  subscriptionId: string;
+  value: number;
+  raw?: unknown;
+}
+
 export interface CheckoutParams {
   workspaceId: string;
   planSlug: string;

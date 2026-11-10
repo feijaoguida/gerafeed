@@ -1,7 +1,10 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { BillingService } from "@/lib/billing";
+import { PlanHistoryService } from "@/lib/plan-history";
 import { hashPassword } from "@/lib/security/password";
+import { SiteAntifraudService, type SiteAntifraudValidationResult } from "@/lib/site-antifraud";
+import { logSystemError } from "@/lib/errors/service";
 
 export async function POST(request: Request) {
   try {
@@ -56,6 +59,29 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Este e-mail já está cadastrado. Faça login." }, { status: 409 });
     }
 
+    // Trava Anti-Fraude de Cadastro de Sites em Múltiplas Contas (1ª e 2ª vez OK, 3ª vez Bloqueia com Suporte)
+    let antifraudCheck: SiteAntifraudValidationResult | null = null;
+    if (cleanWebsite) {
+      antifraudCheck = await SiteAntifraudService.validateAndRecordSiteRegistration({
+        rawUrl: cleanWebsite,
+        userEmail: cleanEmail,
+        sourceContext: "REGISTER",
+        reqPath: "/api/auth/register",
+      });
+
+      if (!antifraudCheck.allowed) {
+        return NextResponse.json(
+          {
+            error: antifraudCheck.blockedMessage || "Cadastro deste site bloqueado por segurança.",
+            siteBlockedByAntifraud: true,
+            attemptNumber: antifraudCheck.attemptNumber,
+            supportRequired: true,
+          },
+          { status: 403 }
+        );
+      }
+    }
+
     // 3. Hash Password with SALT rounds
     const passwordHash = await hashPassword(password);
 
@@ -105,6 +131,37 @@ export async function POST(request: Request) {
     await BillingService.ensureDefaultPlans();
     await BillingService.getWorkspaceSubscription(workspace.id);
 
+    const freePlan = await prisma.plan.findUnique({ where: { slug: "free" } });
+    if (freePlan) {
+      await PlanHistoryService.recordEvent({
+        workspaceId: workspace.id,
+        userId: user.id,
+        userEmail: cleanEmail,
+        newPlanId: freePlan.id,
+        newPlanName: freePlan.name,
+        eventType: "ACCOUNT_CREATED",
+        billingCycle: "MONTHLY",
+        originalAmount: 0,
+        chargedAmount: 0,
+        notes: `Conta e Workspace criados por ${cleanEmail}`,
+      });
+    }
+
+    // Vincula o workspace ao registro de antifraude caso um site tenha sido cadastrado
+    if (antifraudCheck?.historyRecordId) {
+      try {
+        await prisma.siteRegistrationHistory.update({
+          where: { id: antifraudCheck.historyRecordId },
+          data: {
+            workspaceId: workspace.id,
+            userId: user.id,
+          },
+        });
+      } catch {
+        // Vinculação não-bloqueante
+      }
+    }
+
     return NextResponse.json({
       success: true,
       user: {
@@ -116,6 +173,15 @@ export async function POST(request: Request) {
   } catch (error) {
     console.error("POST /api/auth/register error:", error);
     const message = error instanceof Error ? error.message : "Erro ao criar conta de usuário.";
+
+    await logSystemError({
+      path: "/api/auth/register",
+      module: "AUTH",
+      statusCode: 500,
+      errorMessage: `Falha ao registrar novo usuário: ${message}`,
+      error,
+    });
+
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

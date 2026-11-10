@@ -21,6 +21,7 @@ import {
   Building2,
   Globe,
   Phone,
+  Tag,
 } from "lucide-react";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Button } from "@/components/ui/button";
@@ -74,6 +75,80 @@ export function RegisterView() {
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [resendCooldown, setResendCooldown] = useState(0);
+
+  // Estados de Cupom
+  const [couponCodeInput, setCouponCodeInput] = useState("");
+  const [isValidatingCoupon, setIsValidatingCoupon] = useState(false);
+  const [couponError, setCouponError] = useState<string | null>(null);
+  const [appliedCoupon, setAppliedCoupon] = useState<{
+    code: string;
+    name: string;
+    durationLabel: string;
+    summaryText?: string;
+    planSlug?: string;
+  } | null>(null);
+  const [activePlanSlug, setActivePlanSlug] = useState<string>(planSlug);
+
+  const handleValidateCoupon = async () => {
+    if (!couponCodeInput.trim() || isValidatingCoupon) return;
+    setIsValidatingCoupon(true);
+    setCouponError(null);
+
+    try {
+      const res = await fetch("/api/billing/coupons/validate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          code: couponCodeInput.trim(),
+          planSlug: activePlanSlug,
+          customerTypeContext: "NEW",
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok || !data.valid) {
+        setCouponError(data.error || "Cupom inválido ou expirado.");
+        setAppliedCoupon(null);
+        return;
+      }
+
+      const targetPlanSlug = data.pricing?.planSlug || data.suggestedPlanSlug || activePlanSlug;
+
+      setAppliedCoupon({
+        code: data.coupon.code,
+        name: data.coupon.name,
+        durationLabel: data.coupon.durationLabel,
+        summaryText: data.pricing?.summaryText,
+        planSlug: targetPlanSlug,
+      });
+
+      if (targetPlanSlug && activePlanSlug === "free") {
+        setActivePlanSlug(targetPlanSlug);
+        savePlanIntent({
+          slug: targetPlanSlug,
+          cycle,
+          couponCode: data.coupon.code,
+        });
+      } else {
+        savePlanIntent({
+          slug: activePlanSlug,
+          cycle,
+          couponCode: data.coupon.code,
+        });
+      }
+    } catch {
+      setCouponError("Erro ao validar cupom. Tente novamente.");
+    } finally {
+      setIsValidatingCoupon(false);
+    }
+  };
+
+  const handleRemoveCoupon = () => {
+    setAppliedCoupon(null);
+    setCouponCodeInput("");
+    setCouponError(null);
+    savePlanIntent({ slug: activePlanSlug, cycle });
+  };
 
   // Sincronizar storage externo
   useEffect(() => {
@@ -134,7 +209,10 @@ export function RegisterView() {
       const res = await fetch("/api/auth/send-verification-code", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email }),
+        body: JSON.stringify({
+          email,
+          website: website.trim() || undefined,
+        }),
       });
 
       const data = await res.json();
@@ -275,9 +353,13 @@ export function RegisterView() {
       }
 
       // 3. Bifurcação: Se for plano pago, direcionar para onboarding de faturamento
-      const isPaidPlan = planSlug && planSlug !== "free";
+      const isPaidPlan = activePlanSlug && activePlanSlug !== "free";
       if (isPaidPlan) {
-        router.push(`/checkout/billing?plan=${encodeURIComponent(planSlug)}&cycle=${cycle}`);
+        let checkoutUrl = `/checkout/billing?plan=${encodeURIComponent(activePlanSlug)}&cycle=${cycle}`;
+        if (appliedCoupon?.code) {
+          checkoutUrl += `&coupon=${encodeURIComponent(appliedCoupon.code)}`;
+        }
+        router.push(checkoutUrl);
       } else {
         router.push("/dashboard");
       }
@@ -289,7 +371,7 @@ export function RegisterView() {
     }
   };
 
-  const isPaid = planSlug && planSlug !== "free";
+  const isPaid = activePlanSlug && activePlanSlug !== "free";
 
   return (
     <div className="min-h-screen flex flex-col lg:flex-row bg-background text-foreground transition-colors duration-200">
@@ -381,7 +463,7 @@ export function RegisterView() {
               <div className="flex items-center gap-2">
                 <span className="w-2 h-2 rounded-full bg-primary animate-pulse" />
                 <span className="text-foreground font-medium">
-                  Plano selecionado: <strong className="uppercase text-primary">{planSlug}</strong> ({cycle === "YEARLY" ? "Anual" : "Mensal"})
+                  Plano selecionado: <strong className="uppercase text-primary">{activePlanSlug}</strong> ({cycle === "YEARLY" ? "Anual" : "Mensal"})
                 </span>
               </div>
               <Link
@@ -390,6 +472,27 @@ export function RegisterView() {
               >
                 Trocar
               </Link>
+            </div>
+          )}
+
+          {/* Badge de Cupom Ativo */}
+          {appliedCoupon && (
+            <div className="p-3.5 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-between text-xs text-emerald-700 dark:text-emerald-300">
+              <div className="flex items-center gap-2">
+                <Tag className="w-4 h-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
+                <span>
+                  Cupom <strong>{appliedCoupon.code}</strong> ativo: {appliedCoupon.summaryText || appliedCoupon.durationLabel}
+                </span>
+              </div>
+              {step === "email_step" && (
+                <button
+                  type="button"
+                  onClick={handleRemoveCoupon}
+                  className="text-rose-500 hover:underline font-semibold ml-2 cursor-pointer"
+                >
+                  Remover
+                </button>
+              )}
             </div>
           )}
 
@@ -416,9 +519,30 @@ export function RegisterView() {
 
           {/* Feedback de Erro ou Sucesso */}
           {error && (
-            <div className="p-3.5 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-600 dark:text-rose-400 text-sm flex items-center gap-2.5">
-              <AlertCircle className="w-4 h-4 shrink-0 text-rose-500" />
-              <span>{error}</span>
+            <div
+              className={`p-4 rounded-xl border text-sm flex items-start gap-3 ${
+                error.toLowerCase().includes("suporte")
+                  ? "bg-amber-500/10 border-amber-500/30 text-amber-700 dark:text-amber-300"
+                  : "bg-rose-500/10 border-rose-500/20 text-rose-600 dark:text-rose-400"
+              }`}
+            >
+              <AlertCircle
+                className={`w-5 h-5 shrink-0 mt-0.5 ${
+                  error.toLowerCase().includes("suporte") ? "text-amber-500" : "text-rose-500"
+                }`}
+              />
+              <div className="space-y-1">
+                <span className="font-medium leading-relaxed block">{error}</span>
+                {error.toLowerCase().includes("suporte") && (
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Se você é o proprietário legítimo deste site, entre em contato através de{" "}
+                    <a href="mailto:suporte@gerafeed.com.br" className="underline font-semibold hover:text-foreground">
+                      suporte@gerafeed.com.br
+                    </a>{" "}
+                    para solicitar a liberação de uso.
+                  </p>
+                )}
+              </div>
             </div>
           )}
 
@@ -491,6 +615,43 @@ export function RegisterView() {
                   leadingIcon={<Mail className="w-4 h-4 text-muted-foreground" />}
                 />
               </FormField>
+
+              {/* Seção Opcional de Cupom de Desconto */}
+              {!appliedCoupon && (
+                <FormField label="Cupom de desconto (opcional)">
+                  <div className="flex gap-2">
+                    <Input
+                      type="text"
+                      value={couponCodeInput}
+                      onChange={(e) => {
+                        setCouponCodeInput(e.target.value.toUpperCase());
+                        if (couponError) setCouponError(null);
+                      }}
+                      placeholder="Ex: PROMO3MESES"
+                      className="uppercase font-mono text-sm"
+                      leadingIcon={<Tag className="w-4 h-4 text-muted-foreground" />}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          handleValidateCoupon();
+                        }
+                      }}
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={handleValidateCoupon}
+                      isLoading={isValidatingCoupon}
+                      disabled={!couponCodeInput.trim() || isValidatingCoupon}
+                    >
+                      Aplicar
+                    </Button>
+                  </div>
+                  {couponError && (
+                    <p className="text-xs text-rose-500 mt-1">{couponError}</p>
+                  )}
+                </FormField>
+              )}
 
               <div className="pt-1">
                 <label className="flex items-start gap-2.5 cursor-pointer text-xs text-muted-foreground leading-relaxed select-none">

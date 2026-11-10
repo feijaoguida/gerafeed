@@ -9,6 +9,8 @@ import {
 } from "@/lib/wordpress-sites";
 import { getSourcesForWordPressSite } from "@/lib/wordpress-site-sources";
 import { BillingService, AFFILIATE_FEATURES } from "@/lib/billing";
+import { SiteAntifraudService } from "@/lib/site-antifraud";
+import { logSystemError } from "@/lib/errors/service";
 
 export async function GET(
   _request: Request,
@@ -82,7 +84,35 @@ export async function PATCH(
     } = {};
 
     if (body.name !== undefined) updateData.name = body.name;
-    if (body.url !== undefined) updateData.url = body.url;
+    if (body.url !== undefined && typeof body.url === "string" && body.url.trim()) {
+      const existingSite = await getWordPressSiteById(workspaceId, id);
+      if (existingSite) {
+        const oldDomain = SiteAntifraudService.normalizeSiteDomain(existingSite.url);
+        const newDomain = SiteAntifraudService.normalizeSiteDomain(body.url);
+        if (oldDomain !== newDomain) {
+          const antifraudCheck = await SiteAntifraudService.validateAndRecordSiteRegistration({
+            rawUrl: body.url.trim(),
+            workspaceId,
+            wordpressSiteId: id,
+            sourceContext: "WORDPRESS_SITE",
+            reqPath: `/api/wordpress/sites/${id}`,
+          });
+
+          if (!antifraudCheck.allowed) {
+            return NextResponse.json(
+              {
+                error: antifraudCheck.blockedMessage || "Alteração para este domínio bloqueada pelo sistema de segurança.",
+                siteBlockedByAntifraud: true,
+                attemptNumber: antifraudCheck.attemptNumber,
+                supportRequired: true,
+              },
+              { status: 403 }
+            );
+          }
+        }
+      }
+      updateData.url = body.url.trim();
+    }
     if (body.username !== undefined) updateData.username = body.username;
     if (body.defaultPromptType !== undefined) updateData.defaultPromptType = body.defaultPromptType;
     if (body.active !== undefined) updateData.active = body.active;
@@ -123,6 +153,15 @@ export async function PATCH(
     console.error("PATCH /api/wordpress/sites/[id] error:", error);
     const message = error instanceof Error ? error.message : "Erro ao atualizar site WordPress.";
     const status = message.includes("módulo de Afiliados") ? 403 : 400;
+
+    await logSystemError({
+      path: "/api/wordpress/sites/[id]",
+      module: "WORDPRESS",
+      statusCode: status,
+      errorMessage: `Falha ao atualizar site WordPress: ${message}`,
+      error,
+    });
+
     return NextResponse.json({ error: message }, { status });
   }
 }
@@ -144,6 +183,15 @@ export async function DELETE(
   } catch (error: unknown) {
     console.error("DELETE /api/wordpress/sites/[id] error:", error);
     const message = error instanceof Error ? error.message : "Erro ao remover site WordPress.";
+
+    await logSystemError({
+      path: "/api/wordpress/sites/[id]",
+      module: "WORDPRESS",
+      statusCode: 400,
+      errorMessage: `Falha ao remover site WordPress: ${message}`,
+      error,
+    });
+
     return NextResponse.json({ error: message }, { status: 400 });
   }
 }

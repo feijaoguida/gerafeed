@@ -154,6 +154,35 @@ export async function logSystemError(input: LogSystemErrorInput): Promise<string
 
     return record.id;
   } catch (loggingErr) {
+    // Se falhou (ex.: chave estrangeira inválida em workspaceId), tenta salvar sem workspaceId para não perder o log
+    if (input.workspaceId) {
+      try {
+        const rawMessage = input.errorMessage || extractErrorMessage(input.error);
+        const stack = input.errorStack !== undefined ? input.errorStack : extractErrorStack(input.error);
+        const sanitizedQuery = input.query !== undefined && input.query !== null ? sanitizeData(input.query) : null;
+        const fallback = await prisma.systemErrorLog.create({
+          data: {
+            workspaceId: null,
+            userId: input.userId || null,
+            userEmail: input.userEmail || null,
+            userName: input.userName || null,
+            screen: input.screen || null,
+            path: input.path || "unknown",
+            method: input.method ? input.method.toUpperCase() : "GET",
+            query: sanitizedQuery as Prisma.InputJsonValue,
+            module: input.module || "GENERAL",
+            errorMessage: `[workspaceId original: ${input.workspaceId}] ${rawMessage || "Erro desconhecido"}`,
+            errorStack: stack,
+            statusCode: input.statusCode || 500,
+            ipAddress: input.ipAddress || null,
+            userAgent: input.userAgent || null,
+          },
+        });
+        return fallback.id;
+      } catch {
+        // Fallback silencioso
+      }
+    }
     // Log não-bloqueante: preserva a integridade da aplicação
     console.error("[logSystemError] Falha ao persistir erro no banco de dados:", loggingErr);
     return null;

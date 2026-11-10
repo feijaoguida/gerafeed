@@ -9,6 +9,8 @@ import {
   WebhookEventResult,
   PaymentProviderType,
   PaymentProviderCapabilities,
+  UpdateSubscriptionParams,
+  UpdateSubscriptionResult,
 } from "./types";
 
 export class MockPaymentGateway implements PaymentGateway {
@@ -64,6 +66,15 @@ export class MockPaymentGateway implements PaymentGateway {
   async cancelSubscription(subscriptionId: string): Promise<boolean> {
     void subscriptionId;
     return true;
+  }
+
+  async updateSubscription(params: UpdateSubscriptionParams): Promise<UpdateSubscriptionResult> {
+    return {
+      updated: true,
+      subscriptionId: params.subscriptionId,
+      value: params.value,
+      raw: params,
+    };
   }
 
   async handleWebhook(payload: unknown): Promise<WebhookEventResult> {

@@ -5,6 +5,7 @@ import { BillingService } from "@/lib/billing";
 import { BillingProfileForm } from "@/components/settings/billing-profile-form";
 import { BillingInvoicesList } from "@/components/settings/billing-invoices-list";
 import { SubscriptionManagementCard } from "@/components/settings/subscription-management-card";
+import { PlanHistoryList } from "@/components/settings/plan-history-list";
 import { CreditCard, Sparkles, Layers, Globe } from "lucide-react";
 
 import { PageHeader } from "@/components/design-system/page-header";
@@ -50,6 +51,12 @@ export default async function BillingSettingsPage({
     nextDueDate: subAny.nextDueDate instanceof Date ? subAny.nextDueDate.toISOString() : null,
     cancelAtPeriodEnd: Boolean(subAny.cancelAtPeriodEnd),
     canceledAt: subAny.canceledAt instanceof Date ? subAny.canceledAt.toISOString() : null,
+    couponId: subAny.couponId ? String(subAny.couponId) : null,
+    originalPlanAmount: subAny.originalPlanAmount ? Number(subAny.originalPlanAmount) : null,
+    discountedAmount: subAny.discountedAmount ? Number(subAny.discountedAmount) : null,
+    discountDurationMonths: typeof subAny.discountDurationMonths === "number" ? subAny.discountDurationMonths : null,
+    discountCyclesUsed: typeof subAny.discountCyclesUsed === "number" ? subAny.discountCyclesUsed : 0,
+    coupon: subAny.coupon ? { code: (subAny.coupon as { code: string }).code, name: (subAny.coupon as { name: string }).name } : null,
     plan: {
       id: subscription.plan.id,
       name: subscription.plan.name,
@@ -158,6 +165,9 @@ export default async function BillingSettingsPage({
 
       {/* Histórico de Cobranças / Faturas */}
       <BillingInvoicesList />
+
+      {/* Histórico de Planos & Assinaturas */}
+      <PlanHistoryList />
 
       {/* Formulário de Dados Cadastrais de Cobrança */}
       <BillingProfileForm />

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { prisma } from "@/lib/prisma";
 import { getSessionWorkspaceId } from "@/lib/workspace";
 import {
   createWordPressSite,
@@ -6,6 +7,8 @@ import {
   sanitizeWordPressSite,
 } from "@/lib/wordpress-sites";
 import { BillingService, AFFILIATE_FEATURES } from "@/lib/billing";
+import { SiteAntifraudService } from "@/lib/site-antifraud";
+import { logSystemError } from "@/lib/errors/service";
 
 export async function GET() {
   try {
@@ -89,6 +92,26 @@ export async function POST(request: Request) {
       );
     }
 
+    // Trava Anti-Fraude de Cadastro de Sites em Múltiplas Contas (1ª e 2ª vez OK, 3ª vez Bloqueia com Suporte)
+    const antifraudCheck = await SiteAntifraudService.validateAndRecordSiteRegistration({
+      rawUrl: url.trim(),
+      workspaceId,
+      sourceContext: "WORDPRESS_SITE",
+      reqPath: "/api/wordpress/sites",
+    });
+
+    if (!antifraudCheck.allowed) {
+      return NextResponse.json(
+        {
+          error: antifraudCheck.blockedMessage || "Cadastro do site bloqueado pelo sistema de segurança.",
+          siteBlockedByAntifraud: true,
+          attemptNumber: antifraudCheck.attemptNumber,
+          supportRequired: true,
+        },
+        { status: 403 }
+      );
+    }
+
     const created = await createWordPressSite({
       workspaceId,
       name: name.trim(),
@@ -102,6 +125,17 @@ export async function POST(request: Request) {
       woocommerceConsumerSecret: woocommerceConsumerSecret ? woocommerceConsumerSecret.trim() : null,
     });
 
+    if (antifraudCheck.historyRecordId) {
+      try {
+        await prisma.siteRegistrationHistory.update({
+          where: { id: antifraudCheck.historyRecordId },
+          data: { wordpressSiteId: created.id },
+        });
+      } catch {
+        // Vinculação não-bloqueante
+      }
+    }
+
     return NextResponse.json({
       success: true,
       message: "Site WordPress criado com sucesso!",
@@ -111,6 +145,15 @@ export async function POST(request: Request) {
     console.error("POST /api/wordpress/sites error:", error);
     const message = error instanceof Error ? error.message : "Erro ao criar site WordPress.";
     const status = message.includes("módulo de Afiliados") ? 403 : 400;
+
+    await logSystemError({
+      path: "/api/wordpress/sites",
+      module: "WORDPRESS",
+      statusCode: status,
+      errorMessage: `Falha ao cadastrar site WordPress: ${message}`,
+      error,
+    });
+
     return NextResponse.json({ error: message }, { status });
   }
 }

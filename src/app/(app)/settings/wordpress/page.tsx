@@ -17,6 +17,7 @@ import {
   Check,
   X,
   ShoppingBag,
+  AlertCircle,
 } from "lucide-react";
 
 import { PageHeader } from "@/components/design-system/page-header";
@@ -113,6 +114,7 @@ export default function SettingsWordPressPage() {
   const [isSyncing, setIsSyncing] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [modalError, setModalError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   const fetchSites = useCallback(async () => {
@@ -205,6 +207,7 @@ export default function SettingsWordPressPage() {
 
     setIsSaving(true);
     setErrorMessage(null);
+    setModalError(null);
     setSuccessMessage(null);
 
     try {
@@ -252,7 +255,9 @@ export default function SettingsWordPressPage() {
         loadSiteDetails(data.site.id);
       }
     } catch (err) {
-      setErrorMessage(err instanceof Error ? err.message : "Erro ao criar site.");
+      const msg = err instanceof Error ? err.message : "Erro ao criar site.";
+      setErrorMessage(msg);
+      setModalError(msg);
     } finally {
       setIsSaving(false);
     }
@@ -264,6 +269,7 @@ export default function SettingsWordPressPage() {
 
     setIsSaving(true);
     setErrorMessage(null);
+    setModalError(null);
     setSuccessMessage(null);
 
     try {
@@ -446,6 +452,7 @@ export default function SettingsWordPressPage() {
 
     setIsSaving(true);
     setErrorMessage(null);
+    setModalError(null);
     setSuccessMessage(null);
 
     try {
@@ -548,6 +555,33 @@ export default function SettingsWordPressPage() {
                 <X className="w-5 h-5" />
               </Button>
             </CardHeader>
+
+            {modalError && (
+              <div
+                className={`p-4 rounded-xl border text-xs flex items-start gap-3 ${
+                  modalError.toLowerCase().includes("suporte")
+                    ? "bg-amber-500/10 border-amber-500/30 text-amber-700 dark:text-amber-300"
+                    : "bg-rose-500/10 border-rose-500/20 text-rose-600 dark:text-rose-400"
+                }`}
+              >
+                <AlertCircle
+                  className={`w-4 h-4 shrink-0 mt-0.5 ${
+                    modalError.toLowerCase().includes("suporte") ? "text-amber-500" : "text-rose-500"
+                  }`}
+                />
+                <div className="space-y-1">
+                  <span className="font-semibold leading-relaxed block">{modalError}</span>
+                  {modalError.toLowerCase().includes("suporte") && (
+                    <p className="text-[11px] text-muted-foreground">
+                      Este domínio atingiu o limite de vinculações em múltiplas contas. Para desbloqueio, fale com o suporte oficial através de{" "}
+                      <a href="mailto:suporte@gerafeed.com.br" className="underline font-semibold hover:text-foreground">
+                        suporte@gerafeed.com.br
+                      </a>.
+                    </p>
+                  )}
+                </div>
+              </div>
+            )}
 
             <form onSubmit={handleCreateSite} className="space-y-4">
               <FormField label="Nome do Destino" required>

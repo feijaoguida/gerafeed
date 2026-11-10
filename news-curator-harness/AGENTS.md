@@ -510,3 +510,28 @@ Uma task por vez. Discovered Work fora do escopo deve ser registrado e não impl
 - Planos pagos exigem o preenchimento de dados fiscais (`BillingProfile`: CPF/CNPJ, Telefone, Endereço com CEP) e acionam `/api/billing/checkout`, redirecionando para a fatura oficial hospedada do Asaas.
 - Nenhuma informação de cartão de crédito/CVV trafega pela nossa aplicação.
 
+# Phase 39. Regras de Cupons de Desconto, Ciclos Promocionais no Asaas, Histórico de Planos e Anti-Fraude de Sites
+
+## Cupons de Desconto e Precificação Server-Side
+- Todo cálculo de desconto de cupom (`PERCENTAGE`, `FIXED_DISCOUNT`, `FIXED_PRICE`) é executado **exclusivamente no servidor** com `Prisma.Decimal`. Nunca confiar em valores calculados pelo client.
+- Validar sempre: existência do cupom, `active === true`, `validUntil` não expirado, `maxUses` global, `maxUsesPerWorkspace`, compatibilidade com o `Plan` (`CouponPlan`) e elegibilidade do `customerType` (`NEW` na criação de conta / 1ª assinatura vs `BASE` em Plano & Cobrança vs `BOTH`).
+
+## Ciclos Promocionais Temporários no Asaas
+- Para cupons com `durationMonths > 0` (ex.: 3 primeiros meses por R$ 19,90 e demais por R$ 89,90):
+  - Enviar ao Asaas (`POST /v3/subscriptions` ou `PUT /v3/subscriptions/{id}` com `updatePendingPayments: true`) o valor promocional (`discountedAmount`) durante os primeiros $N$ ciclos.
+  - Controlar `discountCyclesUsed` de forma idempotente por `providerPaymentId` no Webhook `/api/webhooks/asaas` e em `BillingService.syncWorkspaceWithGateway`.
+  - Assim que `discountCyclesUsed >= discountDurationMonths` (ou caso a $(N+1)$-ésima cobrança seja gerada), chamar `PUT /v3/subscriptions/{id}` no Asaas com `{ value: originalPlanAmount, updatePendingPayments: true }` para restaurar o valor cheio do plano nas cobranças seguintes.
+  - Não utilizar Cron externo para essa transição.
+
+## Histórico de Planos e Anti-Fraude de Cadastro de Sites
+- Toda alteração de plano, aplicação de cupom ou transição de ciclo promocional deve gravar um registro imutável em `PlanHistory`.
+- Todo cadastro de site (em `/api/auth/register` e `/api/wordpress/sites`) deve normalizar o domínio e verificar `SiteRegistrationHistory`:
+  - **1ª conta distinta**: permitido (`ALLOWED`).
+  - **2ª conta distinta**: permitido (`ALLOWED`).
+  - **3ª conta distinta em diante**: bloqueado (`BLOCKED`, HTTP 403), impedindo o cadastro, exibindo alerta para o usuário procurar o suporte e gravando log em `SystemErrorLog`.
+- A exclusão de um `WordPressSite` nunca deve apagar registros de `SiteRegistrationHistory`.
+
+## Logs de Erro Obrigatórios (`SystemErrorLog`)
+- Qualquer erro, falha de validação de cupom, tentativa bloqueada de cadastro de site na 3ª conta ou erro na API do Asaas deve obrigatoriamente gerar log em `SystemErrorLog` via `logSystemError` / `handleApiError`.
+
+

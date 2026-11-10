@@ -5,6 +5,9 @@ import { getPaymentGateway } from "@/lib/payments";
 import { BillingProfileService } from "@/lib/billing-profile";
 import { calculateAnnualPlanPrice } from "@/lib/pricing";
 import { handleApiError } from "@/lib/errors/service";
+import { auth } from "@/auth";
+import { CouponService } from "@/lib/coupons";
+import { PlanHistoryService } from "@/lib/plan-history";
 
 const FORBIDDEN_CARD_KEYS = [
   "cardNumber",
@@ -51,8 +54,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Plano selecionado não foi encontrado ou está inativo." }, { status: 404 });
     }
 
-    const cycle = inputCycle === "YEARLY" ? "YEARLY" : "MONTHLY";
-    const billingMethod = ["BOLETO", "PIX"].includes(inputMethod) ? inputMethod : "CREDIT_CARD";
+    const cycle: "MONTHLY" | "YEARLY" = inputCycle === "YEARLY" ? "YEARLY" : "MONTHLY";
+    const billingMethod: "CREDIT_CARD" | "BOLETO" | "PIX" = ["BOLETO", "PIX"].includes(inputMethod) ? inputMethod : "CREDIT_CARD";
 
     // Server-side amount computation (Never trust client amount)
     const planAny = plan as unknown as { price: number; monthlyPrice?: number | string; annualDiscountPercent?: number | string };
@@ -84,6 +87,67 @@ export async function POST(request: Request) {
         message: "Plano gratuito ativado com sucesso!",
         url: "/dashboard",
       });
+    }
+
+    const sessionUser = await auth();
+    const userId = sessionUser?.user?.id;
+    const userEmail = sessionUser?.user?.email;
+
+    // Check if Customer is NEW or BASE
+    const hasPaidInvoices = await prisma.invoice.count({
+      where: {
+        workspaceId,
+        status: { in: ["CONFIRMED", "RECEIVED"] },
+      },
+    });
+    const customerTypeContext: "NEW" | "BASE" = hasPaidInvoices > 0 ? "BASE" : "NEW";
+
+    let finalAmount = computedAmount;
+    let originalAmount = computedAmount;
+    let couponRecord: {
+      id: string;
+      code: string;
+      name: string;
+      durationMonths: number;
+      durationLabel: string;
+    } | null = null;
+    let couponPricingSummary: string | null = null;
+
+    if (body.couponCode && typeof body.couponCode === "string" && body.couponCode.trim()) {
+      const cleanCode = CouponService.normalizeCouponCode(body.couponCode);
+      const couponValidation = await CouponService.validateCouponForTarget({
+        code: cleanCode,
+        planId: plan.id,
+        planSlug: plan.slug,
+        customerTypeContext,
+        workspaceId,
+        userId,
+        userEmail,
+        reqPath: "/api/billing/checkout",
+      });
+
+      if (!couponValidation.valid) {
+        return NextResponse.json(
+          {
+            error: couponValidation.error,
+            code: couponValidation.code || "INVALID_COUPON",
+          },
+          { status: 400 }
+        );
+      }
+
+      if (couponValidation.pricing && couponValidation.coupon) {
+        finalAmount = couponValidation.pricing.discountedAmount.toNumber();
+        originalAmount = couponValidation.pricing.originalAmount.toNumber();
+        couponRecord = {
+          id: couponValidation.coupon.id,
+          code: couponValidation.coupon.code,
+          name: couponValidation.coupon.name,
+          durationMonths: couponValidation.coupon.durationMonths,
+          durationLabel: couponValidation.durationLabel,
+        };
+        couponPricingSummary = `${couponRecord.code} (${couponRecord.durationLabel}) — De R$ ${originalAmount.toFixed(2)} por R$ ${finalAmount.toFixed(2)}`;
+      }
     }
 
     // Check BillingProfile (Required before paid checkout)
@@ -143,7 +207,10 @@ export async function POST(request: Request) {
         planId: plan.id,
         cycle,
         billingMethod,
-        amount: computedAmount,
+        amount: finalAmount,
+        originalAmount: couponRecord ? originalAmount : null,
+        couponId: couponRecord?.id || null,
+        couponCode: couponRecord?.code || null,
         status: "PENDING",
         successUrl: finalSuccessUrl,
         cancelUrl: finalCancelUrl,
@@ -173,7 +240,7 @@ export async function POST(request: Request) {
       planId: plan.id,
       planSlug: plan.slug,
       planName: plan.name,
-      price: computedAmount,
+      price: finalAmount,
       billingType: resolvedBillingType,
       cycle,
       successUrl: fullSuccessUrl,
@@ -195,40 +262,106 @@ export async function POST(request: Request) {
       },
     });
 
-    // Upsert subscription with pendingPlanId and asaasSubscriptionId
+    // Upsert subscription with pendingPlanId, asaasSubscriptionId and coupon fields
     const existingSub = await prisma.subscription.findUnique({
       where: { workspaceId },
     });
+
+    const subscriptionData = {
+      pendingPlanId: plan.id,
+      asaasSubscriptionId: subscriptionResult.subscriptionId,
+      providerSubscriptionId: subscriptionResult.subscriptionId,
+      billingCycle: cycle,
+      billingMethod,
+      amount: finalAmount,
+      originalPlanAmount: couponRecord ? originalAmount : null,
+      discountedAmount: couponRecord ? finalAmount : null,
+      couponId: couponRecord?.id || null,
+      discountDurationMonths: couponRecord ? couponRecord.durationMonths : null,
+      discountCyclesUsed: 0,
+      annualDiscountPercentSnapshot: discountPercent,
+      providerCustomerId: customerResult.customerId,
+    };
 
     if (!existingSub) {
       await prisma.subscription.create({
         data: {
           workspaceId,
           planId: plan.id,
-          pendingPlanId: plan.id,
           status: "INCOMPLETE",
-          asaasSubscriptionId: subscriptionResult.subscriptionId,
-          providerSubscriptionId: subscriptionResult.subscriptionId,
-          billingCycle: cycle,
-          billingMethod,
-          amount: computedAmount,
-          annualDiscountPercentSnapshot: discountPercent,
-          providerCustomerId: customerResult.customerId,
+          ...subscriptionData,
         },
       });
     } else {
       await prisma.subscription.update({
         where: { id: existingSub.id },
+        data: subscriptionData,
+      });
+    }
+
+    // Se cupom aplicado, registra resgate e incrementa usedCount
+    if (couponRecord) {
+      await prisma.couponRedemption.create({
         data: {
-          pendingPlanId: plan.id,
-          asaasSubscriptionId: subscriptionResult.subscriptionId,
-          providerSubscriptionId: subscriptionResult.subscriptionId,
-          billingCycle: cycle,
-          billingMethod,
-          amount: computedAmount,
-          annualDiscountPercentSnapshot: discountPercent,
-          providerCustomerId: customerResult.customerId,
+          couponId: couponRecord.id,
+          workspaceId,
+          userId: userId || null,
+          planId: plan.id,
+          originalAmount,
+          discountedAmount: finalAmount,
+          durationMonths: couponRecord.durationMonths,
+          cyclesUsed: 0,
+          status: "ACTIVE",
+          appliedAt: new Date(),
         },
+      });
+
+      await prisma.coupon.update({
+        where: { id: couponRecord.id },
+        data: {
+          usedCount: { increment: 1 },
+        },
+      });
+    }
+
+    // Registra eventos no histórico de planos
+    await PlanHistoryService.recordEvent({
+      workspaceId,
+      userId: userId || null,
+      userEmail: userEmail || null,
+      previousPlanId: existingSub?.planId || null,
+      newPlanId: plan.id,
+      newPlanName: plan.name,
+      eventType: "CHECKOUT_STARTED",
+      billingCycle: cycle,
+      originalAmount,
+      chargedAmount: finalAmount,
+      couponId: couponRecord?.id || null,
+      couponCode: couponRecord?.code || null,
+      discountDurationMonths: couponRecord?.durationMonths || null,
+      asaasSubscriptionId: subscriptionResult.subscriptionId,
+      notes: couponRecord
+        ? `Checkout iniciado com cupom ${couponRecord.code} (${couponPricingSummary || couponRecord.name})`
+        : `Checkout iniciado para o plano ${plan.name}`,
+    });
+
+    if (couponRecord) {
+      await PlanHistoryService.recordEvent({
+        workspaceId,
+        userId: userId || null,
+        userEmail: userEmail || null,
+        previousPlanId: existingSub?.planId || null,
+        newPlanId: plan.id,
+        newPlanName: plan.name,
+        eventType: "COUPON_APPLIED",
+        billingCycle: cycle,
+        originalAmount,
+        chargedAmount: finalAmount,
+        couponId: couponRecord.id,
+        couponCode: couponRecord.code,
+        discountDurationMonths: couponRecord.durationMonths,
+        asaasSubscriptionId: subscriptionResult.subscriptionId,
+        notes: `Cupom ${couponRecord.code} aplicado na assinatura inicial: ${couponPricingSummary || couponRecord.name}`,
       });
     }
 
@@ -237,7 +370,9 @@ export async function POST(request: Request) {
       isFree: false,
       sessionId: session.id,
       checkoutUrl,
-      amount: computedAmount,
+      amount: finalAmount,
+      originalAmount: couponRecord ? originalAmount : undefined,
+      coupon: couponRecord ? { code: couponRecord.code } : undefined,
       cycle,
     });
   } catch (error) {

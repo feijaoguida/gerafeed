@@ -18,6 +18,7 @@ import {
   X,
   Palette,
   AlertTriangle,
+  Tag,
 } from "lucide-react";
 
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -122,6 +123,19 @@ export function BackofficeSidebar({ userEmail }: { userEmail?: string | null }) 
               >
                 <Layers className="w-4 h-4 text-purple-500" />
                 Planos & Features
+              </Link>
+
+              <Link
+                href="/backoffice/coupons"
+                onClick={() => setIsMobileOpen(false)}
+                className={`flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-medium transition-colors ${
+                  isActive("/backoffice/coupons")
+                    ? "bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 shadow-xs font-semibold"
+                    : "text-muted-foreground hover:text-foreground hover:bg-surface-muted"
+                }`}
+              >
+                <Tag className="w-4 h-4 text-emerald-500" />
+                Cupons de Desconto
               </Link>
 
               <Link

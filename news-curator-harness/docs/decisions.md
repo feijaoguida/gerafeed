@@ -645,7 +645,7 @@ Decisões:
 
 
 ## ADR-096 — Chaves da API do WooCommerce nos Destinos WordPress (Multi-Site) com Guardrail de Plano de Afiliados (Phase 38)
-Status: Accepted (Planejado e em execução em 2026-11-04).
+Status: Accepted (Executado e validado em 2026-11-04 nas tasks 286 a 289).
 
 Contexto:
 O usuário solicitou um local explícito para configuração das chaves da API do WooCommerce, sugerindo a página "Destinos WordPress (Multi-Site)" (`/settings/wordpress`). Além disso, exigiu que esse campo para inserir as chaves da API do WooCommerce esteja habilitado **somente se o plano do Workspace tiver o módulo de Afiliados ativo**.
@@ -665,4 +665,41 @@ Decisões:
 4. **Priorização de Autenticação no Publicador (`WooCommercePublisherService`)**:
    - Quando `woocommerceConsumerKey` e `woocommerceConsumerSecret` estiverem preenchidos no site selecionado, a REST API do WooCommerce é autenticada com as credenciais diretas do WooCommerce (`Basic base64(consumer_key:consumer_secret)`).
    - Se não estiverem preenchidos, preserva o fallback transparente para o par `username:applicationPassword` do WordPress.
+
+
+## ADR-097 — Cupons de Desconto, Ciclos Promocionais no Asaas, Histórico de Planos e Trava Anti-Fraude de Cadastro de Sites (Phase 39)
+Status: Accepted (Planejado em 2026-11-05; Tasks 290 a 296).
+
+Contexto:
+O usuário solicitou quatro melhorias críticas e interligadas para o domínio de Planos, Billing e Segurança:
+1. **Cupons de Desconto no Backoffice**: Cadastrar cupons com Nome, Código, Descrição, Válido até, Planos (múltiplos planos), Tipo de Desconto (Percentual, Valor Fixo de abatimento ou Valor Fixo final ex.: pagar R$ 19,90), Quanto Tempo (`0` = Para Sempre, `1` = Primeiro Mês, `3` = 3 Primeiros Meses, $N \ge 0$) e Tipo de Cliente (`NEW` = Novo, `BASE` = Base, `BOTH` = Ambos).
+2. **Aplicação de Cupom na Criação de Conta e em Plano & Cobrança + Integração Asaas**:
+   - Na criação da conta (`/register` e `/checkout/billing`), validar se o cupom é válido, ativo, elegível para **Cliente Novo** e compatível com o plano; aplicar o desconto e enviar ao Asaas para cobrar o valor promocional nas primeiras $N$ faturas e o valor normal nas demais (ex.: Plano Influencer de R$ 89,90 por R$ 19,90 nos 3 primeiros meses e R$ 89,90 do 4º mês em diante).
+   - Em **Plano & Cobrança** (`/settings/billing` e `/settings/billing/upgrade`), validar se o cupom é válido, ativo, compatível com o plano do cliente e elegível para **Cliente Base**; aplicar o cupom e atualizar a assinatura no Asaas.
+3. **Histórico de Planos (`PlanHistory`)**: Registrar todas as alterações de plano, contratações, aplicações de cupons, fim de ciclos promocionais e cancelamentos/reativações.
+4. **Histórico e Anti-Fraude de Cadastro de Sites (`SiteRegistrationHistory`)**: Impedir que um usuário crie contas sucessivas (`email1`, `email2`, `email3`...) cadastrando o mesmo site (`sitedoemail1`) após o vencimento. Regra estrita: **1ª vez OK, 2ª vez OK, 3ª vez em diante bloqueia o cadastro**, exibe alerta e pede para procurar o suporte.
+5. **Logs de Erros (`SystemErrorLog`)**: Qualquer erro ou rejeição nessa jornada deve gerar registro em `SystemErrorLog`.
+
+Decisões:
+1. **Modelagem de Cupons (`Coupon`, `CouponPlan`, `CouponRedemption`)**:
+   - `Coupon` terá relação `N:N` com `Plan` via `CouponPlan`.
+   - `discountType` suportará `PERCENTAGE` (ex.: 20% OFF), `FIXED_DISCOUNT` (ex.: -R$ 70,00) e `FIXED_PRICE` (ex.: mensalidade fixa de R$ 19,90 nos planos selecionados), eliminando qualquer ambiguidade operacional.
+   - `durationMonths` será um inteiro $\ge 0$, onde `0` significa desconto vitalício ("Para Sempre") e $N > 0$ significa que o desconto vale pelas primeiras $N$ cobranças da assinatura.
+   - `customerType` suportará `NEW` (Cliente Novo), `BASE` (Cliente Base) e `BOTH`.
+2. **Orquestração de Ciclos Promocionais na API v3 do Asaas (`POST /v3/subscriptions` e `PUT /v3/subscriptions/{id}`)**:
+   - Como a API de assinaturas do Asaas recebe um único `value` recorrente vigente e não um cronograma de múltiplos valores futuros (e `maxPayments` encerraria a assinatura após $N$ meses), o controle de transição do valor promocional (`discountedAmount`, ex.: `19.90`) para o valor cheio (`originalPlanAmount`, ex.: `89.90`) é orquestrado pelo GeraFeed sem necessidade de cron jobs externos:
+     - Na criação (`POST /v3/subscriptions`) ou aplicação em assinatura ativa (`PUT /v3/subscriptions/{id}` com `"updatePendingPayments": true`), a assinatura no Asaas é configurada com `value = discountedAmount` (`19.90`).
+     - A tabela `Subscription` armazena `couponId`, `originalPlanAmount`, `discountedAmount`, `discountDurationMonths` e `discountCyclesUsed`.
+     - No Webhook do Asaas (`POST /api/webhooks/asaas`) e em `BillingService.syncWorkspaceWithGateway`, a cada cobrança confirmada (`PAYMENT_CONFIRMED` / `PAYMENT_RECEIVED`, deduplicada por `providerPaymentId`), incrementa-se `discountCyclesUsed`.
+     - Assim que `discountCyclesUsed >= discountDurationMonths` (ex.: ao confirmar a 3ª cobrança de R$ 19,90 — ou em `PAYMENT_CREATED` caso uma $(N+1)$-ésima fatura seja gerada), o sistema invoca automaticamente `PUT /v3/subscriptions/{asaasSubscriptionId}` com `{ value: originalPlanAmount, updatePendingPayments: true }`, restaurando o valor cheio (`R$ 89,90`) para a 4ª cobrança e todas as subsequentes, e grava `DISCOUNT_CYCLE_COMPLETED` em `PlanHistory`.
+3. **Histórico Perpétuo Anti-Fraude de Sites (`SiteRegistrationHistory`)**:
+   - A tabela `SiteRegistrationHistory` armazena cada vinculação de domínio normalizado (`normalizedDomain`, sem protocolo, sem `www.` e sem sufixos `/wp-admin` ou `/wp-json`) por `workspaceId`.
+   - Mesmo que um `WordPressSite` seja excluído da conta anterior, seu registro em `SiteRegistrationHistory` jamais é removido.
+   - Ao cadastrar um site (no registro `/api/auth/register` ou em `/api/wordpress/sites`), conta-se quantos `workspaceId`s distintos já tiveram permissão (`status: "ALLOWED"`) para aquele `normalizedDomain`:
+     - 1ª conta distinta (`attemptNumber = 1`): `ALLOWED` (OK).
+     - 2ª conta distinta (`attemptNumber = 2`): `ALLOWED` (OK).
+     - 3ª conta distinta em diante (`attemptNumber >= 3`): `BLOCKED` (HTTP 403), grava em `SiteRegistrationHistory`, registra erro detalhado em `SystemErrorLog` e retorna alerta orientando o usuário a procurar o suporte.
+4. **Rastreabilidade Total em `SystemErrorLog`**:
+   - Todas as falhas de validação de cupom, bloqueios de 3ª tentativa de site e erros de comunicação com o Asaas geram registros estruturados em `SystemErrorLog` via `logSystemError` / `handleApiError`.
+
 

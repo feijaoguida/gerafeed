@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireSuperAdmin } from "@/lib/superadmin";
+import { PlanHistoryService } from "@/lib/plan-history";
 
 export async function GET(
   _request: Request,
@@ -16,7 +17,13 @@ export async function GET(
         subscription: {
           include: {
             plan: true,
+            coupon: true,
           },
+        },
+        planHistories: {
+          orderBy: { createdAt: "desc" },
+          take: 50,
+          include: { coupon: true },
         },
         members: {
           include: {
@@ -45,7 +52,7 @@ export async function GET(
     const now = new Date();
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
 
-    const [articlesProcessedThisMonth, totalArticlesCount] = await Promise.all([
+    const [articlesProcessedThisMonth, totalArticlesCount, siteRegistrationHistories] = await Promise.all([
       prisma.article.count({
         where: {
           workspaceId: id,
@@ -57,6 +64,10 @@ export async function GET(
       }),
       prisma.article.count({
         where: { workspaceId: id },
+      }),
+      prisma.siteRegistrationHistory.findMany({
+        where: { workspaceId: id },
+        orderBy: { createdAt: "desc" },
       }),
     ]);
 
@@ -106,6 +117,8 @@ export async function GET(
       sources: workspace.sources,
       wordpressSites: sanitizedWordPressSites,
       configurations: sanitizedConfigurations,
+      planHistories: workspace.planHistories || [],
+      siteRegistrationHistories: siteRegistrationHistories || [],
       stats: {
         articlesProcessedThisMonth,
         totalArticlesCount,
@@ -158,6 +171,12 @@ export async function PATCH(
 
     // Update plan if requested
     if (planId) {
+      const prevSub = await prisma.subscription.findUnique({
+        where: { workspaceId: id },
+        include: { plan: true },
+      });
+      const newPlan = await prisma.plan.findUnique({ where: { id: planId } });
+
       await prisma.subscription.upsert({
         where: { workspaceId: id },
         update: { planId, status: "ACTIVE" },
@@ -167,6 +186,20 @@ export async function PATCH(
           status: "ACTIVE",
         },
       });
+
+      if (newPlan) {
+        await PlanHistoryService.recordPlanEvent({
+          workspaceId: id,
+          previousPlanId: prevSub?.planId || null,
+          previousPlanName: prevSub?.plan?.name || null,
+          newPlanId: newPlan.id,
+          newPlanName: newPlan.name,
+          eventType: "BACKOFFICE_UPDATE",
+          originalAmount: newPlan.monthlyPrice,
+          chargedAmount: newPlan.monthlyPrice,
+          notes: "Plano atualizado manualmente pelo SuperAdmin no Backoffice",
+        });
+      }
     }
 
     const fullWorkspace = await prisma.workspace.findUnique({
@@ -175,7 +208,13 @@ export async function PATCH(
         subscription: {
           include: {
             plan: true,
+            coupon: true,
           },
+        },
+        planHistories: {
+          orderBy: { createdAt: "desc" },
+          take: 50,
+          include: { coupon: true },
         },
       },
     });

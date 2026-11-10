@@ -3373,7 +3373,7 @@ Sequência detalhada em `news-curator-harness/PLAN-phase37-woocommerce-and-sales
 # Phase 38. Chaves da API do WooCommerce nos Destinos WordPress (Multi-Site) com Guardrail de Plano de Afiliados
 
 ## 1. Estado e autorização
-Autorizada e em execução em 2026-11-04 (Task 286 IN_PROGRESS).
+Concluída em 2026-11-04 (Tasks 286–289 DONE).
 
 ## 2. Objetivo e escopo
 1. **Configuração de Chaves da API do WooCommerce por Destino WordPress**:
@@ -3390,8 +3390,190 @@ Autorizada e em execução em 2026-11-04 (Task 286 IN_PROGRESS).
 
 ## 3. Plano de tasks e Definition of Done
 Sequência detalhada em `news-curator-harness/PLAN-phase38-woocommerce-site-keys-and-plan-guard.md` e tasks 286 a 289:
-- [ ] Task 286: Schema & Backend de Credenciais WooCommerce em WordPressSite.
-- [ ] Task 287: Validação de Plano e Endpoint de Teste WooCommerce.
-- [ ] Task 288: Interface de Configuração em Destinos WordPress (`/settings/wordpress`).
-- [ ] Task 289: Autenticação no Publicador, Testes E2E Automatizados e Build.
+- [x] Task 286: Schema & Backend de Credenciais WooCommerce em WordPressSite.
+- [x] Task 287: Validação de Plano e Endpoint de Teste WooCommerce.
+- [x] Task 288: Interface de Configuração em Destinos WordPress (`/settings/wordpress`).
+- [x] Task 289: Autenticação no Publicador, Testes E2E Automatizados e Build.
+
+---
+
+# Phase 39. Cupons de Desconto, Ciclos Promocionais no Asaas, Histórico de Planos e Trava Anti-Fraude de Cadastro de Sites
+
+## 1. Estado e autorização
+Concluída em 2026-11-05. Todas as Tasks 290 a 296 concluídas com sucesso e validadas por suíte E2E, TypeScript, ESLint e build de produção.
+
+## 2. Objetivo e escopo
+1. **Cadastro e Gestão de Cupons de Desconto no Backoffice (`/backoffice/coupons`)**:
+   - Permitir que o SuperAdmin crie, edite, ative/inative e acompanhe cupons promocionais de assinatura.
+   - Suportar múltiplos planos por cupom (`CouponPlan` N:N), múltiplos tipos de desconto (`PERCENTAGE`, `FIXED_DISCOUNT`, `FIXED_PRICE`), duração configurável de `0` acima (`0` = Para Sempre, `1` = Primeiro Mês, `3` = 3 Primeiros Meses, $N$ = $N$ Primeiros Meses) e segmentação por Tipo de Cliente (`NEW` = Novo, `BASE` = Base, `BOTH` = Ambos).
+   - Exemplo concreto de negócio: criar um cupom para quem assinar o **Plano Influencer** (R$ 89,90/mês) pagar **R$ 19,90 nos 3 primeiros meses**, voltando automaticamente para **R$ 89,90** a partir do 4º mês.
+2. **Cupom na Criação da Conta (`/register` e `/checkout/billing`)**:
+   - Campo para informar e validar cupom de desconto durante a criação da conta / onboarding fiscal.
+   - Validar se o cupom existe, está ativo, dentro do prazo (`validUntil`), possui saldo de usos (`maxUses`), é elegível para **Cliente Novo** (`NEW` ou `BOTH`) e é compatível com o plano selecionado.
+   - Aplicar o desconto na assinatura enviada ao **Asaas** e programar a transição automática de valor após os $N$ primeiros ciclos promocionais.
+3. **Cupom em Plano & Cobrança (`/settings/billing` e `/settings/billing/upgrade`)**:
+   - Campo para informar e aplicar cupom de desconto para clientes já existentes.
+   - Validar se o cupom existe, está ativo, dentro do prazo (`validUntil`), ainda não foi consumido pelo mesmo workspace (`maxUsesPerWorkspace`), é compatível com o **plano do cliente** e é elegível para **Cliente Base** (`BASE` ou `BOTH`).
+   - Aplicar o cupom imediatamente e sincronizar com o **Asaas** (`PUT /v3/subscriptions/{id}` com `"updatePendingPayments": true`) para efetuar as cobranças futuras (e pendentes ainda não pagas) com o valor promocional pelo período determinado.
+4. **Histórico de Planos (`PlanHistory`)**:
+   - Registrar trilha completa de auditoria de todas as contratações, ativações, upgrades, downgrades, aplicações de cupons, términos de ciclos promocionais, cancelamentos e reativações por Workspace.
+   - Exibir o histórico tanto para o usuário em `/settings/billing` quanto para o SuperAdmin em `/backoffice/companies/[id]`.
+5. **Histórico Perpétuo e Anti-Fraude de Cadastro de Sites (`SiteRegistrationHistory`)**:
+   - Impedir que o mesmo usuário crie múltiplas contas (`email1`, `email2`, `email3`...) e vincule o mesmo site (`sitedoemail1`) repetidamente após o vencimento/cancelamento para obter benefícios de conta nova ou burlar o sistema.
+   - Regra estrita de contagem de contas distintas por domínio/site normalizado:
+     - **1ª vez (1ª conta)**: **OK** (permitido, gravado no histórico perpétuo).
+     - **2ª vez (2ª conta distinta)**: **OK** (permitido, gravado no histórico perpétuo).
+     - **3ª vez em diante (3ª conta distinta+)**: **BLOQUEADO!** Emite mensagem de alerta clara na interface, **não permite o cadastro desse site** e orienta o usuário a **procurar o suporte**.
+   - A exclusão de um `WordPressSite` jamais apaga seu registro em `SiteRegistrationHistory`.
+   - O SuperAdmin no Backoffice pode visualizar o histórico de domínios/tentativas e liberar manualmente um domínio caso o cliente comprove legitimidade junto ao suporte.
+6. **Geração Obrigatória de Logs de Erro (`SystemErrorLog`)**:
+   - Qualquer erro ou rejeição de regra de negócio (cupom inválido/expirado/inativo, tipo de cliente incompatível, plano incompatível, falha na API do Asaas, ou tentativa bloqueada de cadastro do mesmo site na 3ª conta em diante) **deve obrigatoriamente gerar registro detalhado em `SystemErrorLog`**.
+
+---
+
+## 3. Especificação Detalhada do Domínio de Cupons
+
+### 3.1. Atributos do Cupom (`Coupon`)
+- **`name` (Nome)**: Nome amigável/comercial da campanha (ex.: `"Promo Influencer 3 Meses por 19,90"`). Obrigatório.
+- **`code` (Código do Cupom)**: Código único alfanumérico digitado pelo usuário (ex.: `"INFLUENCER19"`, `"BEMVINDO3M"`). Sempre higienizado e salvo em `UPPERCASE` sem espaços. Obrigatório e `@unique`.
+- **`description` (Descrição)**: Explicação detalhada das condições do cupom. Opcional.
+- **`validFrom` (Válido a partir de)**: Data/hora inicial opcional de vigência (default `now()`).
+- **`validUntil` (Válido até)**: Data/hora limite para resgate do cupom. Quando preenchido, qualquer tentativa após `validUntil` é rejeitada como expirada. Quando `null`, não expira por data.
+- **`plans` (Planos Elegíveis — Múltiplos Planos)**: Relação `N:N` via tabela `CouponPlan` ligando o cupom a um ou múltiplos registros de `Plan`. O cupom só é válido se o plano alvo estiver na lista de planos associados.
+- **`discountType` (Tipo de Desconto)** e **`discountValue` (Valor)**:
+  - `PERCENTAGE` (**Percentual**): Desconto de $X\%$ ($0 < X \le 100$) sobre o valor do plano (`finalPrice = planPrice * (1 - X/100)`).
+  - `FIXED_DISCOUNT` (**Valor Fixo de Abatimento**): Desconto de $\text{R\$ } X$ subtraído do valor do plano (`finalPrice = max(0, planPrice - X)`).
+  - `FIXED_PRICE` (**Valor Fixo Final Promocional**): Define diretamente que o cliente pagará exatamente $\text{R\$ } X$ (ex.: `R$ 19,90`) durante a vigência promocional do cupom, independentemente do preço cheio do plano (desde que $X < \text{planPrice}$ e $X > 0$).
+  - > **Nota de Produto**: O modo `FIXED_PRICE` resolve de forma direta e à prova de erros o caso *"quem assinar o plano Influencer pague nos 3 primeiros meses R$ 19,90"*, enquanto `FIXED_DISCOUNT` e `PERCENTAGE` cobrem descontos clássicos em reais ou porcentagem. Na tela do Backoffice, o formulário mostra uma prévia em tempo real de quanto ficará a mensalidade em cada plano selecionado.
+- **`durationMonths` (Quanto tempo)**: Inteiro $\ge 0$:
+  - `0` = **Para Sempre** (desconto vitalício enquanto a assinatura permanecer ativa naquele plano).
+  - `1` = **Primeiro Mês** (apenas a 1ª cobrança tem desconto; da 2ª em diante cobra o valor cheio).
+  - `3` = **Os 3 Primeiros Meses** (as 3 primeiras cobranças têm desconto; da 4ª em diante cobra o valor cheio).
+  - Qualquer inteiro positivo $N \ge 1$ representa **os $N$ primeiros ciclos/meses**.
+- **`customerType` (Tipo de Cliente)**:
+  - `NEW` (**Cliente Novo**): Válido exclusivamente na criação da conta / primeira contratação paga de um Workspace que nunca teve assinatura paga confirmada anteriormente.
+  - `BASE` (**Cliente Base**): Válido exclusivamente na tela **Plano & Cobrança** (`/settings/billing` ou `/settings/billing/upgrade`) para contas já existentes na base.
+  - `BOTH` (**Ambos**): Válido tanto na criação da conta quanto em Plano & Cobrança.
+- **`maxUses` (Limite Global de Usos)** e **`usedCount`**:
+  - Permite limitar o cupom a $M$ resgates globais (`null` = ilimitado).
+- **`maxUsesPerWorkspace` (Limite por Conta/Workspace)**:
+  - Padrão `1`: impede que o mesmo Workspace aplique o mesmo cupom repetidas vezes para renovar o período promocional.
+- **`active` (Ativo/Inativo)**:
+  - Booleano (`default: true`) que permite suspender o cupom imediatamente no Backoffice sem apagar o histórico de resgates.
+
+---
+
+## 4. Integração com a API v3 do Asaas e Ciclo de Vida das Cobranças
+
+### 4.1. Regras da API do Asaas (`https://docs.asaas.com/docs/assinaturas-recorrência`)
+1. No Asaas, uma assinatura (`Subscription`) possui o campo `value` que determina o valor da cobrança gerada a cada ciclo (`MONTHLY` ou `YEARLY`).
+2. O Asaas **não possui** um array nativo de preços escalonados por mês em uma única chamada `POST /v3/subscriptions`.
+3. O endpoint **`PUT /v3/subscriptions/{id}`** permite atualizar o `value` da assinatura e enviar **`"updatePendingPayments": true`**, o que atualiza imediatamente qualquer cobrança com status `PENDING` já emitida para o ciclo seguinte, preservando intactas as cobranças já pagas (`CONFIRMED` / `RECEIVED`).
+
+### 4.2. Algoritmo de Cobrança Promocional ($N$ Primeiros Meses a R$ 19,90 e Demais a R$ 89,90)
+1. **No Momento da Contratação (`POST /api/billing/checkout`) ou Aplicação em Cliente Base (`POST /api/billing/coupons/apply`)**:
+   - Calcula-se server-side com `Prisma.Decimal`:
+     - `originalPlanAmount`: valor cheio do plano (ex.: `89.90`).
+     - `discountedAmount`: valor com o cupom aplicado (ex.: `19.90`).
+   - **Se `durationMonths === 0` (Para Sempre)**:
+     - Cria/atualiza a assinatura no Asaas com `value = 19.90`.
+     - Salva em `Subscription`: `amount = 19.90`, `originalPlanAmount = 89.90`, `discountedAmount = 19.90`, `discountDurationMonths = 0`, `discountCyclesUsed = 0`, `couponId = coupon.id`.
+   - **Se `durationMonths > 0` (ex.: `durationMonths = 3`)**:
+     - Cria (`POST /v3/subscriptions`) ou atualiza (`PUT /v3/subscriptions/{id}` com `updatePendingPayments: true`) a assinatura no Asaas com **`value = 19.90`** e descrição indicando a promoção:
+       `"Assinatura News Curator - Plano Influencer (Cupom INFLUENCER19: 3 primeiros meses por R$ 19,90, após R$ 89,90)"`.
+     - Salva em `Subscription`:
+       - `amount = 19.90`
+       - `originalPlanAmount = 89.90`
+       - `discountedAmount = 19.90`
+       - `discountDurationMonths = 3`
+       - `discountCyclesUsed = 0`
+       - `couponId = coupon.id`
+     - Cria registro em `CouponRedemption` (`status: "ACTIVE"`, `durationMonths: 3`, `cyclesUsed: 0`) e incrementa `Coupon.usedCount`.
+     - Cria registro em `PlanHistory` (`eventType: "COUPON_APPLIED"`).
+
+2. **Controle Automático de Ciclos Promocionais e Transição para o Valor Cheio (`R$ 89,90`)**:
+   - Executado de forma determinística e idempotente no **Webhook do Asaas (`POST /api/webhooks/asaas`)** e na **Sincronização (`BillingService.syncWorkspaceWithGateway`)**:
+   - Quando uma cobrança da assinatura com desconto temporário ativo (`discountDurationMonths > 0`) é confirmada/recebida (`PAYMENT_CONFIRMED` ou `PAYMENT_RECEIVED`):
+     - Verifica-se se a cobrança (`providerPaymentId`) já foi contabilizada para evitar incremento duplicado em caso de `PAYMENT_CONFIRMED` seguido de `PAYMENT_RECEIVED` para a mesma fatura (contando faturas distintas pagas desde `appliedAt` ou gravando `discountCountedAt` na `Invoice`).
+     - Incrementa-se `Subscription.discountCyclesUsed` (e `CouponRedemption.cyclesUsed`).
+     - **Regra de Transição**:
+       - Enquanto `discountCyclesUsed < discountDurationMonths` (ex.: pagou a 1ª ou a 2ª de 3): a assinatura no Asaas permanece em `value = 19.90` para gerar a próxima cobrança promocional.
+       - **Assim que `discountCyclesUsed >= discountDurationMonths` (ex.: quando a 1ª cobrança é paga em um cupom de `1 mês`, ou quando a 3ª cobrança é paga em um cupom de `3 meses`)**:
+         1. O sistema chama imediatamente `AsaasGateway.updateSubscription(asaasSubscriptionId, { value: originalPlanAmount, updatePendingPayments: true, description: "Assinatura News Curator - Plano Influencer" })`.
+         2. Atualiza `Subscription.amount = originalPlanAmount` (`89.90`), marca `CouponRedemption.status = "COMPLETED"` (`completedAt = now()`) e registra no `PlanHistory` o evento `DISCOUNT_CYCLE_COMPLETED` (`chargedAmount: 89.90`).
+   - **Salvaguarda Adicional em `PAYMENT_CREATED` (Boleto/Pix gerados antecipadamente)**:
+     - Se o Asaas emitir um evento `PAYMENT_CREATED` e o número total de faturas emitidas (não canceladas) desde a aplicação do cupom ultrapassar `discountDurationMonths` (ou seja, é a $(N+1)$-ésima fatura gerada antes da confirmação da $N$-ésima), o sistema também dispara `PUT /v3/subscriptions/{id}` (`value: originalPlanAmount, updatePendingPayments: true`), garantindo que a $(N+1)$-ésima fatura nunca seja cobrada com o valor promocional.
+
+---
+
+## 5. Histórico e Trava Anti-Fraude de Cadastro de Sites (`SiteRegistrationHistory`)
+
+### 5.1. Normalização Estrita de Domínio/Site
+- Função utilitária central `normalizeSiteDomain(rawUrl: string): string` em `src/lib/site-antifraud.ts`:
+  - Remove protocolo (`http://`, `https://`), credenciais, portas, prefixo `www.`, barras finais e sufixos administrativos do WordPress (`/wp-admin`, `/wp-login.php`, `/wp-json`, `/xmlrpc.php`, `/feed`).
+  - Converte para `lowercase`.
+  - Exemplo:
+    - `https://www.SiteDoEmail1.com.br/` → `sitedoemail1.com.br`
+    - `http://sitedoemail1.com.br/wp-json` → `sitedoemail1.com.br`
+    - Se for subpasta multisite real (ex.: `meusite.com.br/portal2`), normaliza o host principal ou `host + pathname base` de forma consistente para impedir bypass por variação de URL.
+
+### 5.2. Regra de Contagem de Contas (1ª Vez OK, 2ª Vez OK, 3ª Vez Bloqueia)
+- Ao tentar cadastrar ou atualizar um site em:
+  1. **Criação da Conta** (`POST /api/auth/register` e validação prévia no Passo 1 de `/register` quando o usuário informa o campo `website`);
+  2. **Destinos WordPress** (`POST /api/wordpress/sites` e `PATCH /api/wordpress/sites/[id]` quando a URL é alterada):
+- O serviço `SiteAntifraudService.checkAndRecordSiteRegistration` consulta `SiteRegistrationHistory` para o `normalizedDomain`:
+  - Obtém a lista de **`workspaceId` distintos** que já tiveram registro `ALLOWED` para aquele `normalizedDomain`.
+  - Se o `workspaceId` atual **já consta** entre os permitidos (ex.: o mesmo cliente editando ou recadastrando o site dentro da mesma conta), permite normalmente sem aumentar o contador de contas distintas.
+  - Se é uma **nova conta (`workspaceId` distinto)**:
+    - Calcula `distinctAccountCount = existingAllowedWorkspaces.size + 1`.
+    - **Se `distinctAccountCount === 1` (1ª vez)**:
+      - Grava em `SiteRegistrationHistory` com `attemptNumber: 1, status: "ALLOWED"`.
+      - Permite o cadastro normalmente.
+    - **Se `distinctAccountCount === 2` (2ª vez)**:
+      - Grava em `SiteRegistrationHistory` com `attemptNumber: 2, status: "ALLOWED"`.
+      - Permite o cadastro normalmente.
+    - **Se `distinctAccountCount >= 3` (3ª vez em diante)**:
+      - Grava em `SiteRegistrationHistory` com `attemptNumber: distinctAccountCount, status: "BLOCKED"`.
+      - **Gera obrigatoriamente um Log de Erro em `SystemErrorLog`** (`module: "WORDPRESS"` ou `"AUTH"`, `statusCode: 403`) detalhando o domínio normalizado, a URL informada, o `workspaceId`/`userEmail` atual e os `workspaceId`s/`userEmail`s anteriores onde o site já foi utilizado.
+      - **Bloqueia a operação (HTTP 403)** e retorna a mensagem de alerta:
+        > *"Alerta de Segurança: O site informado já foi cadastrado anteriormente em outras contas e atingiu o limite máximo permitido pelo sistema. Não é possível vincular este site a uma nova conta. Por favor, entre em contato com o nosso Suporte para regularizar seu acesso."*
+- **Persistência Perpétua**:
+  - Quando `deleteWordPressSite` é chamado, o registro na tabela `WordPressSite` é removido, mas o registro em `SiteRegistrationHistory` **jamais é apagado**.
+- **Gestão no Backoffice**:
+  - O SuperAdmin poderá consultar o histórico de sites por empresa ou globalmente e, caso o cliente entre em contato com o suporte com uma justificativa legítima (ex.: agência que comprou um domínio usado), o SuperAdmin terá um botão `"Liberar Domínio (Resetar Bloqueio)"` que marca os registros antigos como `CLEARED_BY_SUPPORT` com auditoria.
+
+---
+
+## 6. Obrigatoriedade de Logs de Erros (`SystemErrorLog`)
+
+Qualquer erro ou tentativa inválida nos fluxos desta fase **deve obrigatoriamente** invocar `logSystemError` / `handleApiError` (`src/lib/errors/service.ts`):
+1. **Validação/Aplicação de Cupom (`/api/billing/coupons/validate`, `/api/billing/coupons/apply`, `/api/billing/checkout`)**:
+   - Cupom não encontrado (`404`);
+   - Cupom inativo (`400`);
+   - Cupom expirado (`validUntil < now`) (`400`);
+   - Limite de usos atingido (`maxUses` ou `maxUsesPerWorkspace`) (`400`);
+   - Tipo de cliente incompatível (ex.: Cliente Base tentando usar cupom de Cliente Novo ou Cliente Novo tentando usar cupom de Cliente Base) (`403`);
+   - Plano selecionado não faz parte dos planos permitidos pelo cupom (`400`);
+   - Erro ao comunicar com o Asaas (`POST /v3/subscriptions` ou `PUT /v3/subscriptions/{id}`) (`502`/`500`).
+2. **Webhook Asaas e Transição de Ciclos (`/api/webhooks/asaas` e `BillingService.syncWorkspaceWithGateway`)**:
+   - Qualquer falha ao atualizar o valor da assinatura no Asaas após o término dos $N$ meses promocionais deve gerar log crítico em `SystemErrorLog` (`module: "BILLING"`, `screen: "Asaas Webhook / Ciclo de Cupom"`).
+3. **Anti-Fraude de Cadastro de Sites (`/api/wordpress/sites`, `/api/wordpress/sites/[id]`, `/api/auth/register`)**:
+   - Bloqueio na 3ª tentativa em diante gera log em `SystemErrorLog` (`module: "WORDPRESS"` ou `"AUTH"`, `statusCode: 403`) com metadados completos para o suporte.
+4. **Backoffice de Cupons (`/api/backoffice/coupons`)**:
+   - Tentativa de criar cupom com código duplicado, parâmetros inválidos ou falha de banco gera log em `SystemErrorLog` (`module: "BACKOFFICE"`).
+
+---
+
+## 7. Plano de Tasks e Definition of Done Phase 39
+
+Sequência detalhada em `news-curator-harness/PLAN-phase39-coupons-plan-history-and-site-antifraud.md` e `news-curator-harness/tasks/290-*.md` a `296-*.md`:
+
+- [x] **Task 290** (`tasks/290-coupons-plan-history-and-site-antifraud-schema.md`): Schema Prisma (`Coupon`, `CouponPlan`, `CouponRedemption`, `PlanHistory`, `SiteRegistrationHistory`, campos em `Subscription` e `BillingCheckoutSession`), migração do banco e serviços de domínio (`CouponService`, `PlanHistoryService`, `SiteAntifraudService`) com logging integrado em `SystemErrorLog`.
+- [x] **Task 291** (`tasks/291-site-antifraud-guard-and-history.md`): Normalização de domínio/URL e trava anti-fraude (1ª conta OK, 2ª conta OK, 3ª conta em diante Bloqueada com alerta pedindo para procurar o suporte + `SystemErrorLog`) em `/api/wordpress/sites`, `/api/wordpress/sites/[id]`, `/settings/wordpress`, `/api/auth/register` e `/register`.
+- [x] **Task 292** (`tasks/292-backoffice-coupons-and-history-management.md`): Tela e APIs de Cupons de Desconto no Backoffice (`/backoffice/coupons`) com Nome, Código, Descrição, Válido até, Múltiplos Planos, Tipo de Desconto (Percentual, Desconto Fixo ou Preço Fixo), Quanto Tempo (`0` = Para Sempre, `1` = 1º Mês, `3` = 3 Primeiros Meses...), Tipo de Cliente (`Novo`, `Base`, `Ambos`), além de visualização do Histórico de Planos e Histórico/Liberação de Sites no Backoffice.
+- [x] **Task 293** (`tasks/293-asaas-subscription-discount-lifecycle.md`): Evolução de `AsaasGateway` (`updateSubscription` via `PUT /v3/subscriptions/{id}` com `updatePendingPayments: true`), automação do ciclo de vida do desconto temporário no Webhook do Asaas (`/api/webhooks/asaas`) e no `BillingService.syncWorkspaceWithGateway` (cobrando ex.: R$ 19,90 nas 3 primeiras e atualizando automaticamente para R$ 89,90 nas demais).
+- [x] **Task 294** (`tasks/294-register-and-onboarding-coupon-flow.md`): Campo e validação de Cupom de Desconto na Criação da Conta (`/register` e `/checkout/billing`), endpoint `POST /api/billing/coupons/validate`, validação para Cliente Novo, resumo visual do desconto e envio ao Asaas em `/api/billing/checkout` com logs de erro.
+- [x] **Task 295** (`tasks/295-billing-settings-base-coupon-and-plan-history-ui.md`): Opção de informar e aplicar Cupom de Desconto em **Plano & Cobrança** (`/settings/billing` e `/settings/billing/upgrade`), endpoint `POST /api/billing/coupons/apply` validando cupom ativo/válido/plano do cliente/Cliente Base e atualizando a assinatura no Asaas, além da exibição do **Histórico de Planos** na tela.
+- [x] **Task 296** (`tasks/296-phase39-e2e-tests-and-hardening.md`): Testes E2E automatizados (`scripts/phase39/test-coupons-history-and-site-antifraud-e2e.ts`), auditoria de segurança (`run-security-scanner`), `npx tsc --noEmit`, `npm run lint`, `npm run build` e atualização de `PROGRESS.md` e `MEMORY.md`.
+
 

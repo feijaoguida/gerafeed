@@ -10,8 +10,11 @@ import {
   WebhookEventType,
   PaymentProviderType,
   PaymentProviderCapabilities,
+  UpdateSubscriptionParams,
+  UpdateSubscriptionResult,
 } from "./types";
 import { prisma } from "@/lib/prisma";
+import { logSystemError } from "@/lib/errors/service";
 
 export interface AsaasConfig {
   apiKey?: string;
@@ -471,6 +474,72 @@ export class AsaasGateway implements PaymentGateway {
     }
 
     return true;
+  }
+
+  /**
+   * Updates an active subscription in Asaas (PUT /v3/subscriptions/{id}) with updatePendingPayments: true.
+   */
+  async updateSubscription(params: UpdateSubscriptionParams): Promise<UpdateSubscriptionResult> {
+    if (params.subscriptionId.startsWith("sub_mock_")) {
+      return {
+        updated: true,
+        subscriptionId: params.subscriptionId,
+        value: params.value,
+        raw: { mock: true },
+      };
+    }
+
+    if (!this.apiKey) {
+      throw this.normalizeError("Asaas API Key não configurada.");
+    }
+
+    const payload: Record<string, unknown> = {
+      value: params.value,
+      updatePendingPayments: params.updatePendingPayments !== undefined ? params.updatePendingPayments : true,
+    };
+
+    if (params.cycle) payload.cycle = params.cycle;
+    if (params.billingType && params.billingType !== "UNDEFINED") payload.billingType = params.billingType;
+    if (params.description) payload.description = params.description;
+    if (params.nextDueDate) payload.nextDueDate = params.nextDueDate;
+
+    const res = await fetch(`${this.baseUrl}/subscriptions/${params.subscriptionId}`, {
+      method: "PUT",
+      headers: this.getHeaders(),
+      body: JSON.stringify(payload),
+    });
+
+    let data: Record<string, unknown> = {};
+    try {
+      const text = await res.text();
+      if (text && text.trim().length > 0) {
+        data = JSON.parse(text);
+      }
+    } catch {
+      data = {};
+    }
+
+    if (!res.ok) {
+      const errors = data?.errors as Array<{ description?: string }> | undefined;
+      const errorMsg = errors?.[0]?.description || `Erro HTTP ${res.status} ao atualizar assinatura no Asaas`;
+
+      await logSystemError({
+        path: `/v3/subscriptions/${params.subscriptionId}`,
+        module: "BILLING",
+        statusCode: res.status,
+        errorMessage: `[Asaas API] Falha no PUT /subscriptions/${params.subscriptionId}: ${errorMsg}`,
+        query: payload,
+      });
+
+      throw this.normalizeError(errorMsg);
+    }
+
+    return {
+      updated: true,
+      subscriptionId: params.subscriptionId,
+      value: params.value,
+      raw: data,
+    };
   }
 
   /**

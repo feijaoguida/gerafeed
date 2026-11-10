@@ -1,5 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { DEFAULT_WORKSPACE_ID } from "@/lib/workspace";
+import { PlanHistoryService } from "@/lib/plan-history";
+import { logSystemError } from "@/lib/errors/service";
 import {
   LimitResource,
   LimitCheckResult,
@@ -257,6 +259,19 @@ export class BillingService {
       include: { plan: true },
     });
 
+    await PlanHistoryService.recordEvent({
+      workspaceId,
+      newPlanId: sub.planId,
+      newPlanName: sub.plan.name,
+      eventType: "SUBSCRIPTION_CANCELED",
+      billingCycle: sub.billingCycle,
+      originalAmount: sub.originalPlanAmount || sub.amount || 0,
+      chargedAmount: sub.amount || 0,
+      couponId: sub.couponId,
+      asaasSubscriptionId: sub.asaasSubscriptionId,
+      notes: "Cancelamento de assinatura solicitado pelo usuário",
+    });
+
     return updated;
   }
 
@@ -286,6 +301,19 @@ export class BillingService {
         status: "ACTIVE",
       },
       include: { plan: true },
+    });
+
+    await PlanHistoryService.recordEvent({
+      workspaceId,
+      newPlanId: sub.planId,
+      newPlanName: sub.plan.name,
+      eventType: "SUBSCRIPTION_REACTIVATED",
+      billingCycle: sub.billingCycle,
+      originalAmount: sub.originalPlanAmount || sub.amount || 0,
+      chargedAmount: sub.amount || 0,
+      couponId: sub.couponId,
+      asaasSubscriptionId: sub.asaasSubscriptionId,
+      notes: "Assinatura reativada pelo usuário",
     });
 
     return updated;
@@ -442,6 +470,11 @@ export class BillingService {
             },
           });
         }
+
+        // Avalia ciclo de vida promocional de cupom temporário
+        await this.evaluateSubscriptionDiscountLifecycle(sub.id, {
+          eventType: "GATEWAY_SYNC",
+        });
 
         return { synced: true, activated: true, plan: updated.plan };
       }
@@ -711,6 +744,181 @@ export class BillingService {
     const check = await this.checkFeatureLimit(workspaceId, featureKey, currentCount);
     if (!check.allowed) {
       throw new Error(customMessage || check.message || `Limite excedido para a funcionalidade '${featureKey}'.`);
+    }
+  }
+
+  /**
+   * Avalia o ciclo de vida promocional de descontos temporários no Asaas.
+   * Quando uma assinatura com cupom temporário (ex: 3 meses a R$ 19,90) atinge os N ciclos pagos,
+   * atualiza automaticamente a assinatura no Asaas para o valor original (ex: R$ 89,90) via PUT /v3/subscriptions/{id}
+   * com updatePendingPayments: true, sem necessidade de cron jobs externos.
+   */
+  static async evaluateSubscriptionDiscountLifecycle(
+    subscriptionId: string,
+    context: { eventType: string; paymentId?: string; paymentValue?: number }
+  ): Promise<{ evaluated: boolean; transitionedToOriginalPrice: boolean; cyclesUsed: number }> {
+    try {
+      const subscription = await prisma.subscription.findUnique({
+        where: { id: subscriptionId },
+        include: {
+          plan: true,
+          coupon: true,
+        },
+      });
+
+      if (!subscription || !subscription.couponId) {
+        return { evaluated: false, transitionedToOriginalPrice: false, cyclesUsed: 0 };
+      }
+
+      // 0 = Para Sempre (permanente)
+      if (subscription.discountDurationMonths === 0) {
+        return { evaluated: true, transitionedToOriginalPrice: false, cyclesUsed: subscription.discountCyclesUsed };
+      }
+
+      const durationMonths = subscription.discountDurationMonths || 1;
+
+      // Conta quantas faturas confirmadas/recebidas existem para esta assinatura
+      const paidInvoicesCount = await prisma.invoice.count({
+        where: {
+          subscriptionId: subscription.id,
+          status: { in: ["CONFIRMED", "RECEIVED"] },
+        },
+      });
+
+      // Atualiza ciclos usados se for maior
+      const currentCyclesUsed = Math.max(subscription.discountCyclesUsed, paidInvoicesCount);
+      if (currentCyclesUsed !== subscription.discountCyclesUsed) {
+        await prisma.subscription.update({
+          where: { id: subscription.id },
+          data: { discountCyclesUsed: currentCyclesUsed },
+        });
+
+        await prisma.couponRedemption.updateMany({
+          where: {
+            workspaceId: subscription.workspaceId,
+            couponId: subscription.couponId,
+            status: "ACTIVE",
+          },
+          data: { cyclesUsed: currentCyclesUsed },
+        });
+      }
+
+      // Se já atingiu ou superou a duração em meses do desconto promocional
+      if (currentCyclesUsed >= durationMonths && subscription.originalPlanAmount) {
+        const originalAmountNum = Number(subscription.originalPlanAmount);
+        const currentAmountNum = subscription.amount ? Number(subscription.amount) : null;
+
+        // Se o valor local ainda não foi restaurado para o original
+        if (currentAmountNum !== originalAmountNum) {
+          console.log(
+            `[BillingService] Ciclo promocional de ${durationMonths} meses concluído para assinatura ${subscription.id} (${currentCyclesUsed}/${durationMonths}). Restaurando valor para R$ ${originalAmountNum.toFixed(2)}...`
+          );
+
+          // 1. Atualiza no Asaas se houver assinatura vinculada
+          if (subscription.asaasSubscriptionId) {
+            const { getPaymentGateway } = await import("@/lib/payments");
+            const gateway = getPaymentGateway("asaas");
+
+            try {
+              await gateway.updateSubscription({
+                subscriptionId: subscription.asaasSubscriptionId,
+                value: originalAmountNum,
+                updatePendingPayments: true,
+                description: `Assinatura News Curator - ${subscription.plan.name}`,
+              });
+              console.log(`[BillingService] Assinatura Asaas ${subscription.asaasSubscriptionId} atualizada para R$ ${originalAmountNum.toFixed(2)} com sucesso.`);
+            } catch (gatewayErr) {
+              await logSystemError({
+                path: "/lib/billing/evaluateSubscriptionDiscountLifecycle",
+                module: "BILLING",
+                statusCode: 502,
+                workspaceId: subscription.workspaceId,
+                errorMessage: `Falha ao atualizar valor no Asaas para R$ ${originalAmountNum} pós-promocional: ${gatewayErr instanceof Error ? gatewayErr.message : String(gatewayErr)}`,
+                error: gatewayErr,
+              });
+            }
+          }
+
+          // 2. Atualiza a assinatura localmente
+          await prisma.subscription.update({
+            where: { id: subscription.id },
+            data: {
+              amount: subscription.originalPlanAmount,
+              discountedAmount: null,
+            },
+          });
+
+          // 3. Atualiza o status do resgate do cupom
+          await prisma.couponRedemption.updateMany({
+            where: {
+              workspaceId: subscription.workspaceId,
+              couponId: subscription.couponId,
+              status: "ACTIVE",
+            },
+            data: {
+              status: "COMPLETED",
+              completedAt: new Date(),
+              cyclesUsed: currentCyclesUsed,
+            },
+          });
+
+          // 4. Registra evento no Histórico de Planos
+          await PlanHistoryService.recordPlanEvent({
+            workspaceId: subscription.workspaceId,
+            newPlanId: subscription.planId,
+            newPlanName: subscription.plan.name,
+            eventType: "DISCOUNT_ENDED",
+            originalAmount: subscription.originalPlanAmount,
+            chargedAmount: subscription.originalPlanAmount,
+            couponId: subscription.couponId,
+            couponCode: subscription.coupon?.code || null,
+            discountDurationMonths: durationMonths,
+            asaasSubscriptionId: subscription.asaasSubscriptionId,
+            notes: `Fim do período promocional de ${durationMonths} meses do cupom ${subscription.coupon?.code || ""}. Valor mensal restaurado para o preço integral do plano (R$ ${originalAmountNum.toFixed(2)}/mês).`,
+          });
+
+          return { evaluated: true, transitionedToOriginalPrice: true, cyclesUsed: currentCyclesUsed };
+        }
+      }
+
+      // Salvaguarda: se uma nova cobrança PAYMENT_CREATED foi disparada e a contagem total de faturas geradas (não canceladas)
+      // for maior que durationMonths (ex.: a 4ª cobrança), garante que ela assuma o valor cheio
+      if (context.eventType === "PAYMENT_CREATED" && subscription.originalPlanAmount && subscription.asaasSubscriptionId) {
+        const totalInvoicesCount = await prisma.invoice.count({
+          where: {
+            subscriptionId: subscription.id,
+            status: { notIn: ["CANCELED", "REFUNDED", "FAILED"] },
+          },
+        });
+
+        if (totalInvoicesCount > durationMonths) {
+          const originalAmountNum = Number(subscription.originalPlanAmount);
+          const { getPaymentGateway } = await import("@/lib/payments");
+          const gateway = getPaymentGateway("asaas");
+
+          try {
+            await gateway.updateSubscription({
+              subscriptionId: subscription.asaasSubscriptionId,
+              value: originalAmountNum,
+              updatePendingPayments: true,
+              description: `Assinatura News Curator - ${subscription.plan.name}`,
+            });
+          } catch {
+            // Log já tratado no gateway
+          }
+        }
+      }
+
+      return { evaluated: true, transitionedToOriginalPrice: false, cyclesUsed: currentCyclesUsed };
+    } catch (err) {
+      await logSystemError({
+        path: "/lib/billing/evaluateSubscriptionDiscountLifecycle",
+        module: "BILLING",
+        statusCode: 500,
+        errorMessage: `Erro ao avaliar ciclo de desconto da assinatura ${subscriptionId}: ${err instanceof Error ? err.message : String(err)}`,
+        error: err,
+      });
+      return { evaluated: false, transitionedToOriginalPrice: false, cyclesUsed: 0 };
     }
   }
 }

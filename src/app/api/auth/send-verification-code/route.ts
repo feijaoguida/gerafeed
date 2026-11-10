@@ -3,6 +3,8 @@ import { prisma } from "@/lib/prisma";
 import { generateOtpCode } from "@/lib/security/otp";
 import { renderVerificationCodeEmail } from "@/lib/mail/templates/verification-code";
 import { sendEmail } from "@/lib/mail";
+import { SiteAntifraudService } from "@/lib/site-antifraud";
+import { logSystemError } from "@/lib/errors/service";
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const TOKEN_LIFETIME_MS = 15 * 60 * 1000; // 15 minutos
@@ -32,6 +34,29 @@ export async function POST(request: Request) {
         { error: "Este e-mail já está cadastrado. Por favor, faça login." },
         { status: 409 }
       );
+    }
+
+    // Validação preventiva de anti-fraude de site no envio do código
+    const rawWebsite = typeof body.website === "string" ? body.website.trim() : "";
+    if (rawWebsite) {
+      const antifraudCheck = await SiteAntifraudService.validateAndRecordSiteRegistration({
+        rawUrl: rawWebsite,
+        userEmail: cleanEmail,
+        sourceContext: "REGISTER",
+        reqPath: "/api/auth/send-verification-code",
+      });
+
+      if (!antifraudCheck.allowed) {
+        return NextResponse.json(
+          {
+            error: antifraudCheck.blockedMessage || "Cadastro deste site bloqueado por segurança.",
+            siteBlockedByAntifraud: true,
+            attemptNumber: antifraudCheck.attemptNumber,
+            supportRequired: true,
+          },
+          { status: 403 }
+        );
+      }
     }
 
     // 2. Proteção Anti-flood: verificar se existe envio recente para este e-mail
@@ -95,6 +120,15 @@ export async function POST(request: Request) {
   } catch (error) {
     console.error("POST /api/auth/send-verification-code error:", error);
     const message = error instanceof Error ? error.message : "Erro ao enviar código de confirmação.";
+
+    await logSystemError({
+      path: "/api/auth/send-verification-code",
+      module: "AUTH",
+      statusCode: 500,
+      errorMessage: `Falha ao processar envio de código OTP: ${message}`,
+      error,
+    });
+
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
