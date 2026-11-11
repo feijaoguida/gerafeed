@@ -93,23 +93,22 @@ export class PublicationSyncService {
 
     const articleIds = new Set<string>(linkedRelations.map((r: { articleId: string }) => r.articleId));
 
-    // 2. Also find published articles with canonicalContent referencing the productId
+    // 2. Also find published articles referencing the productId in canonicalContent or content via database query
     const candidateArticles = await prisma.article.findMany({
       where: {
         workspaceId,
         status: "PUBLISHED",
-        canonicalContent: { not: null as unknown as undefined },
+        OR: [
+          { canonicalContent: { string_contains: productId } },
+          { content: { contains: productId } },
+        ],
       },
-      select: { id: true, canonicalContent: true },
+      select: { id: true },
+      take: 500,
     });
 
     for (const art of candidateArticles) {
-      if (art.canonicalContent) {
-        const contentStr = JSON.stringify(art.canonicalContent);
-        if (contentStr.includes(productId)) {
-          articleIds.add(art.id);
-        }
-      }
+      articleIds.add(art.id);
     }
 
     if (articleIds.size === 0) {

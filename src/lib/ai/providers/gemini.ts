@@ -41,6 +41,7 @@ export class GeminiProvider implements AIProvider {
           responseMimeType: "application/json",
         }
       }),
+      signal: AbortSignal.timeout(45000),
     });
 
     if (!res.ok) {
@@ -89,6 +90,7 @@ export class GeminiProvider implements AIProvider {
           contents: [{ parts: [{ text: "Responda apenas: {\"status\":\"ok\"}" }] }],
           generationConfig: { responseMimeType: "application/json" }
         }),
+        signal: AbortSignal.timeout(10000),
       });
 
       if (!res.ok) {

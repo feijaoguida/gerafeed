@@ -3582,7 +3582,7 @@ Sequência detalhada em `news-curator-harness/PLAN-phase39-coupons-plan-history-
 
 ## 1. Estado e autorização
 Planejada em 2026-11-10 a partir da Auditoria Completa de Segurança e Confiabilidade de 20 Pontos.
-Em andamento: Task 297 TODO.
+Concluída: Tasks 297 a 302 DONE.
 
 ## 2. Objetivo e escopo
 Remediar integralmente os itens classificados como `[VULNERÁVEL]` ou `[ALERTA]` na auditoria pré-publicação, elevando todos os 20 pontos de verificação ao status `[CONFORME]`:
@@ -3616,12 +3616,63 @@ Remediar integralmente os itens classificados como `[VULNERÁVEL]` ou `[ALERTA]`
 ## 3. Plano de Tasks e Definition of Done Phase 40
 Sequência detalhada em `news-curator-harness/PLAN-phase40-security-hardening-and-pre-production-audit.md` e `news-curator-harness/tasks/297-*.md` a `302-*.md`:
 
-- [ ] **Task 297** (`tasks/297-auth-hardening-and-proxy-route-guard.md`): Autenticação Robusta (`src/auth.ts`), Bloqueio de Senha Nula, Comparação Constant-Time, Proxy Guard (`src/proxy.ts`) e Proteção do Layout Autenticado (`src/app/(app)/layout.tsx`).
-- [ ] **Task 298** (`tasks/298-multi-tenant-workspace-isolation-and-idor-guard.md`): Blindagem de Isolamento Multi-Tenant (`src/lib/workspace.ts`), Remoção de Fallback Anônimo para `DEFAULT_WORKSPACE_ID` e Prevenção a IDOR.
-- [ ] **Task 299** (`tasks/299-rate-limiting-brute-force-and-webhook-fail-closed.md`): Rate Limiting e Anti-Brute Force de OTP/Login (`src/lib/security/rate-limit.ts`) e Política *Fail-Closed* no Webhook Asaas (`src/lib/payments/asaas.ts`).
-- [ ] **Task 300** (`tasks/300-xss-html-sanitization-and-ssrf-rss-scraper-guard.md`): Sanitização HTML contra Stored XSS (`src/lib/security/sanitize-html.ts`) e Proteção contra SSRF na Coleta RSS (`src/lib/rss.ts`) e Scraper (`src/lib/scraper.ts`).
-- [ ] **Task 301** (`tasks/301-security-headers-error-masking-and-log-hygiene.md`): Security Headers no `next.config.ts`, Mascaramento Seguro de Erros Internos nas APIs e Higienização de PII em Logs de Console.
-- [ ] **Task 302** (`tasks/302-phase40-security-audit-e2e-and-hardening.md`): Suíte E2E de Testes de Segurança (20 Pontos & Abuse Cases), Validação TypeScript, ESLint, Build de Produção e Registro de Evidências.
+- [x] **Task 297** (`tasks/297-auth-hardening-and-proxy-route-guard.md`): Autenticação Robusta (`src/auth.ts`), Bloqueio de Senha Nula, Comparação Constant-Time, Proxy Guard (`src/proxy.ts`) e Proteção do Layout Autenticado (`src/app/(app)/layout.tsx`).
+- [x] **Task 298** (`tasks/298-multi-tenant-workspace-isolation-and-idor-guard.md`): Blindagem de Isolamento Multi-Tenant (`src/lib/workspace.ts`), Remoção de Fallback Anônimo para `DEFAULT_WORKSPACE_ID` e Prevenção a IDOR.
+- [x] **Task 299** (`tasks/299-rate-limiting-brute-force-and-webhook-fail-closed.md`): Rate Limiting e Anti-Brute Force de OTP/Login (`src/lib/security/rate-limit.ts`) e Política *Fail-Closed* no Webhook Asaas (`src/lib/payments/asaas.ts`).
+- [x] **Task 300** (`tasks/300-xss-html-sanitization-and-ssrf-rss-scraper-guard.md`): Sanitização HTML contra Stored XSS (`src/lib/security/sanitize-html.ts`) e Proteção contra SSRF na Coleta RSS (`src/lib/rss.ts`) e Scraper (`src/lib/scraper.ts`).
+- [x] **Task 301** (`tasks/301-security-headers-error-masking-and-log-hygiene.md`): Security Headers no `next.config.ts`, Mascaramento Seguro de Erros Internos nas APIs e Higienização de PII em Logs de Console.
+- [x] **Task 302** (`tasks/302-phase40-security-audit-e2e-and-hardening.md`): Suíte E2E de Testes de Segurança (20 Pontos & Abuse Cases), Validação TypeScript, ESLint, Build de Produção e Registro de Evidências.
+
+---
+
+# Phase 41. Performance e Escalabilidade SaaS Multi-Tenant (Auditoria dos 8 Pilares)
+
+## 1. Estado e autorização
+Planejada e executada em 2026-11-11 a partir do Diagnóstico Técnico One-Shot dos 8 Pilares de Performance e Escalabilidade de Sistemas SaaS Multi-Tenant.
+Concluída: Tasks 303 a 308 DONE com 100% de conformidade validada em suíte E2E.
+
+## 2. Objetivo e escopo
+Elevar todos os **8 Pilares de Performance de Arquitetura SaaS** ao status `[CONFORME]` dentro da stack existente (Next.js 16 App Router + React 19 + Prisma 7 `@prisma/adapter-pg` + PostgreSQL), sem introduzir infraestrutura proibida pelo `AGENTS.md`:
+
+1. **Pilar 1 — Banco de Dados (Índices Compostos Multi-Tenant + Pool de Conexões)**:
+   - Adicionar 14 índices compostos multi-tenant em `prisma/schema.prisma`:
+     - `Source`: `@@index([workspaceId, active])`, `@@index([workspaceId, createdAt(sort: Desc)])`
+     - `Article`: `@@index([workspaceId, status, createdAt(sort: Desc)])`, `@@index([workspaceId, processedAt])`, `@@index([workspaceId, sourceId, status])`, `@@index([workspaceId, wordpressSiteId, status])`, `@@index([workspaceId, originalPublishedAt])`
+     - `Product`: `@@index([workspaceId, status, updatedAt(sort: Desc)])`, `@@index([workspaceId, categoryId, status])`
+     - `ProductOffer`: `@@index([workspaceId, status, price])`, `@@index([productId, status, price])`
+     - `Invoice`: `@@index([workspaceId, createdAt(sort: Desc)])`, `@@index([subscriptionId, status])`
+     - `SystemErrorLog`: `@@index([workspaceId, module, createdAt(sort: Desc)])`
+     - `PlanHistory`: `@@index([workspaceId, createdAt(sort: Desc)])`
+   - Ajustar `idleTimeoutMillis: 15000` no Singleton `pg.Pool` em `src/lib/prisma.ts`.
+2. **Pilar 2 — Queries (Paginação Obrigatória + Seleção Explícita + Zero N+1)**:
+   - Em `GET /api/articles` (`src/app/api/articles/route.ts`): adicionar `take` (default `50`, máximo travado em `100`), `skip` paginado e `select` explícito (omitindo `originalContent`, `content`, `canonicalContent` na listagem geral a menos que `?includeContent=true`).
+   - Em `GET /api/billing/invoices` (`src/app/api/billing/invoices/route.ts`): adicionar `take` máximo travado em `100` (default `50`).
+   - Em `GET /api/backoffice/companies` (`src/app/api/backoffice/companies/route.ts`): travar `pageSize <= 50` e substituir o N+1 de `article.count` e `source.count` por 2 queries agregadas `groupBy`.
+   - Em `processRssSources` (`src/lib/rss.ts`): incluir `wordpressSiteSources` no `findMany` inicial e filtrar `existingArticles` por `workspaceId`.
+   - Em `syncWordPressCategories` (`src/lib/wordpress.ts` e `/api/wordpress/sites/[id]/categories/sync`): substituir `upsert` sequencial em loop por `prisma.$transaction`.
+   - Em `AffiliateAnalyticsService.getDashboardStats` (`src/lib/affiliate/analytics-service.ts`) e `markDependentArticlesForRepublish` (`src/lib/publisher/publication-sync.ts`): limitar leitura em memória e filtrar previamente no banco.
+3. **Pilares 3 e 4 — Assincronismo, Timeouts Estritos e Paralelismo (`Promise.all`)**:
+   - Configurar `AbortSignal.timeout(...)` em todas as chamadas HTTP externas: `src/lib/payments/asaas.ts`, `src/lib/wordpress.ts`, `src/lib/affiliate/woocommerce-publisher.ts`, `src/lib/ai/providers/openai.ts`, `gemini.ts`, `anthropic.ts`, `openai-compatible.ts` e `src/lib/images/adapters/openai-dalle.ts`.
+   - Configurar `connectionTimeout`, `greetingTimeout` e `socketTimeout` em `src/lib/mail/adapters/smtp-adapter.ts`.
+   - Paralelizar chamadas independentes com `Promise.all` / `Promise.allSettled` em `src/app/api/articles/[id]/process-ai/route.ts`, `src/lib/ai.ts`, `src/lib/wordpress.ts`, `src/lib/affiliate/woocommerce-publisher.ts` e `src/lib/affiliate/refresh-service.ts`.
+   - Desacoplar `markDependentArticlesForRepublish` em `src/lib/affiliate/offer-service.ts` usando `after()` do `next/server` (com fallback seguro).
+4. **Pilar 5 — IA (Streaming de Progresso SSE)**:
+   - Adicionar callback `onProgress` em `processArticleWithAi` (`src/lib/ai.ts`) e suporte a `ReadableStream` (`text/event-stream` via `?stream=1` ou header `Accept: text/event-stream`) em `POST /api/articles/[id]/process-ai`, mantendo retorno JSON padrão para compatibilidade retroativa.
+5. **Pilares 6, 7 e 8 — Frontend State, Debounce em Buscas e Infraestrutura Next.js**:
+   - Criar `src/hooks/use-debounce.ts` (`useDebounce<T>(value, delay = 400)`) e aplicar em `product-list.tsx`, `company-list.tsx`, `error-logs-viewer.tsx` e `rss-publishing-queue.tsx`.
+   - Eliminar o loop de re-fetch a cada tecla em `src/components/affiliate/affiliate-block-manager.tsx` via `useRef<Set<string>>` e aplicar *Optimistic UI* em `src/components/affiliate/offer-list.tsx`.
+   - Configurar `compress: true`, `poweredByHeader: false`, `experimental.optimizePackageImports` (`lucide-react`, `framer-motion`) e `Cache-Control: public, max-age=31536000, immutable` para `/modified-images/:path*` em `next.config.ts`.
+
+## 3. Plano de Tasks e Definition of Done Phase 41
+Sequência detalhada em `news-curator-harness/PLAN-phase41-performance-and-scalability-8-pillars.md` e `news-curator-harness/tasks/303-*.md` a `308-*.md`:
+
+- [x] **Task 303** (`tasks/303-multi-tenant-composite-indexes-and-pool.md`): Índices Compostos Multi-Tenant (`prisma/schema.prisma`), sincronização com o PostgreSQL (`npx prisma db push`) e otimização do Pool de Conexões (`src/lib/prisma.ts`).
+- [x] **Task 304** (`tasks/304-queries-pagination-select-and-n-plus-1.md`): Paginação Obrigatória, Seleção Explícita (`select`) e Eliminação de Queries N+1 (`groupBy` em `/api/backoffice/companies`, `$transaction` em categorias WordPress, `include` em `rss.ts` e filtros em `publication-sync.ts`).
+- [x] **Task 305** (`tasks/305-integrations-timeouts-parallelism-and-async.md`): Timeouts Estritos (`AbortSignal.timeout` e SMTP), Paralelismo com `Promise.all` / `Promise.allSettled` e Desacoplamento Assíncrono pós-resposta.
+- [x] **Task 306** (`tasks/306-ai-streaming-progress-sse.md`): Streaming SSE (`ReadableStream` / `text/event-stream`) de progresso em tempo real no processamento de artigos com IA (`POST /api/articles/[id]/process-ai` e `src/lib/ai.ts`).
+- [x] **Task 307** (`tasks/307-frontend-debounce-optimistic-ui-and-next-config.md`): Hook `useDebounce` aplicado em buscas/filtros (`ProductList`, `CompanyList`, `ErrorLogsViewer`, `RssPublishingQueue`), Deduplicação no `AffiliateBlockManager`, *Optimistic UI* em `OfferList` e Otimizações de Rede/Cache no `next.config.ts`.
+- [x] **Task 308** (`tasks/308-phase41-performance-8-pillars-e2e-and-hardening.md`): Suíte E2E de Auditoria dos 8 Pilares de Performance SaaS (`scripts/phase41/test-performance-8-pillars-e2e.ts`), Validação TypeScript, ESLint, Build de Produção e Registro de Evidências.
+
 
 
 

@@ -21,6 +21,7 @@ import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useDebounce } from "@/hooks/use-debounce";
 
 interface ProductCategory {
   id: string;
@@ -71,10 +72,12 @@ export function ProductList() {
   const [page, setPage] = useState(1);
   const [limit] = useState(12);
 
+  const debouncedSearch = useDebounce(search, 400);
+
   const fetchProducts = useCallback(async () => {
     try {
       const params = new URLSearchParams();
-      if (search.trim()) params.set("search", search.trim());
+      if (debouncedSearch.trim()) params.set("search", debouncedSearch.trim());
       if (selectedCategory) params.set("categoryId", selectedCategory);
       if (selectedStatus) params.set("status", selectedStatus);
       params.set("page", page.toString());
@@ -91,7 +94,7 @@ export function ProductList() {
     } finally {
       setLoading(false);
     }
-  }, [search, selectedCategory, selectedStatus, page, limit]);
+  }, [debouncedSearch, selectedCategory, selectedStatus, page, limit]);
 
   useEffect(() => {
     let ignore = false;
@@ -121,7 +124,7 @@ export function ProductList() {
     async function load() {
       try {
         const params = new URLSearchParams();
-        if (search.trim()) params.set("search", search.trim());
+        if (debouncedSearch.trim()) params.set("search", debouncedSearch.trim());
         if (selectedCategory) params.set("categoryId", selectedCategory);
         if (selectedStatus) params.set("status", selectedStatus);
         params.set("page", page.toString());
@@ -143,7 +146,7 @@ export function ProductList() {
     return () => {
       ignore = true;
     };
-  }, [search, selectedCategory, selectedStatus, page, limit]);
+  }, [debouncedSearch, selectedCategory, selectedStatus, page, limit]);
 
   const handleRefreshProduct = async (productId: string, e: React.MouseEvent) => {
     e.preventDefault();
@@ -154,7 +157,14 @@ export function ProductList() {
         method: "POST",
       });
       if (res.ok) {
-        fetchProducts();
+        const data = await res.json().catch(() => null);
+        if (data?.product) {
+          setProducts((prev) =>
+            prev.map((p) => (p.id === productId ? { ...p, ...data.product } : p))
+          );
+        } else {
+          fetchProducts();
+        }
       }
     } catch {
       // ignore

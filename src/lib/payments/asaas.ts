@@ -68,6 +68,7 @@ export class AsaasGateway implements PaymentGateway {
       const res = await fetch(`${this.baseUrl}/customers/${customerId}`, {
         method: "GET",
         headers: this.getHeaders(),
+        signal: AbortSignal.timeout(15000),
       });
 
       if (!res.ok) return null;
@@ -121,6 +122,7 @@ export class AsaasGateway implements PaymentGateway {
       method: "POST",
       headers: this.getHeaders(),
       body: JSON.stringify(payload),
+      signal: AbortSignal.timeout(15000),
     });
 
     let data: Record<string, unknown> = {};
@@ -239,6 +241,7 @@ export class AsaasGateway implements PaymentGateway {
       const res = await fetch(`${this.baseUrl}/customers?${params.toString()}`, {
         method: "GET",
         headers: this.getHeaders(),
+        signal: AbortSignal.timeout(15000),
       });
 
       if (!res.ok) return [];
@@ -274,6 +277,7 @@ export class AsaasGateway implements PaymentGateway {
         method: "POST",
         headers: this.getHeaders(),
         body: JSON.stringify(payload),
+        signal: AbortSignal.timeout(15000),
       });
     } catch {
       // Non-fatal update error
@@ -334,6 +338,7 @@ export class AsaasGateway implements PaymentGateway {
       method: "POST",
       headers: this.getHeaders(),
       body: JSON.stringify(payload),
+      signal: AbortSignal.timeout(15000),
     });
 
     let data: Record<string, unknown> = {};
@@ -357,6 +362,7 @@ export class AsaasGateway implements PaymentGateway {
           method: "POST",
           headers: this.getHeaders(),
           body: JSON.stringify(payload),
+          signal: AbortSignal.timeout(15000),
         });
         if (contentType && contentType.includes("application/json")) {
           data = await res.json();
@@ -379,6 +385,7 @@ export class AsaasGateway implements PaymentGateway {
         const paymentsRes = await fetch(`${this.baseUrl}/subscriptions/${subId}/payments?limit=1`, {
           method: "GET",
           headers: this.getHeaders(),
+          signal: AbortSignal.timeout(15000),
         });
         if (paymentsRes.ok) {
           const paymentsData = await paymentsRes.json();
@@ -465,6 +472,7 @@ export class AsaasGateway implements PaymentGateway {
     const res = await fetch(`${this.baseUrl}/subscriptions/${subscriptionId}`, {
       method: "DELETE",
       headers: this.getHeaders(),
+      signal: AbortSignal.timeout(15000),
     });
 
     if (!res.ok) {
@@ -512,6 +520,7 @@ export class AsaasGateway implements PaymentGateway {
       method: "PUT",
       headers: this.getHeaders(),
       body: JSON.stringify(payload),
+      signal: AbortSignal.timeout(15000),
     });
 
     let data: Record<string, unknown> = {};
@@ -558,6 +567,7 @@ export class AsaasGateway implements PaymentGateway {
     const res = await fetch(`${this.baseUrl}/subscriptions/${subscriptionId}`, {
       method: "GET",
       headers: this.getHeaders(),
+      signal: AbortSignal.timeout(15000),
     });
 
     if (!res.ok) {
@@ -579,6 +589,7 @@ export class AsaasGateway implements PaymentGateway {
     const res = await fetch(`${this.baseUrl}/subscriptions/${subscriptionId}/payments?limit=50`, {
       method: "GET",
       headers: this.getHeaders(),
+      signal: AbortSignal.timeout(15000),
     });
 
     if (!res.ok) {

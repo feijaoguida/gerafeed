@@ -38,6 +38,7 @@ export class AnthropicProvider implements AIProvider {
         system: `${systemPrompt}\n\nResponda APENAS em JSON válido sem marcações markdown extra.`,
         messages: [{ role: "user", content: userPrompt }],
       }),
+      signal: AbortSignal.timeout(45000),
     });
 
     if (!res.ok) {
@@ -92,6 +93,7 @@ export class AnthropicProvider implements AIProvider {
           max_tokens: 20,
           messages: [{ role: "user", content: "Responda: {\"status\":\"ok\"}" }],
         }),
+        signal: AbortSignal.timeout(10000),
       });
 
       if (!res.ok) {

@@ -69,30 +69,32 @@ export async function POST(
       page++;
     } while (page <= totalPages);
 
-    const synced = [];
-    for (const cat of allCategories) {
-      const upserted = await prisma.wordPressCategory.upsert({
-        where: {
-          workspaceId_wordpressId: {
-            workspaceId,
-            wordpressId: cat.id,
-          },
-        },
-        update: {
-          name: cat.name,
-          slug: cat.slug,
-          wordpressSiteId: id,
-        },
-        create: {
-          workspaceId,
-          wordpressSiteId: id,
-          wordpressId: cat.id,
-          name: cat.name,
-          slug: cat.slug,
-        },
-      });
-      synced.push(upserted);
-    }
+    const synced = allCategories.length > 0
+      ? await prisma.$transaction(
+          allCategories.map((cat) =>
+            prisma.wordPressCategory.upsert({
+              where: {
+                workspaceId_wordpressId: {
+                  workspaceId,
+                  wordpressId: cat.id,
+                },
+              },
+              update: {
+                name: cat.name,
+                slug: cat.slug,
+                wordpressSiteId: id,
+              },
+              create: {
+                workspaceId,
+                wordpressSiteId: id,
+                wordpressId: cat.id,
+                name: cat.name,
+                slug: cat.slug,
+              },
+            })
+          )
+        )
+      : [];
 
     return NextResponse.json({
       success: true,

@@ -19,6 +19,7 @@ export class OpenAIProvider implements AIProvider {
     this.client = new OpenAI({
       apiKey: config.apiKey,
       baseURL: config.baseUrl || undefined,
+      timeout: 45000,
     });
   }
 
@@ -67,12 +68,15 @@ export class OpenAIProvider implements AIProvider {
 
   async testConnection(): Promise<AIConnectionResult> {
     try {
-      const response = await this.client.chat.completions.create({
-        model: this.model,
-        messages: [{ role: "user", content: "Responda 'ok' em JSON: {\"status\": \"ok\"}" }],
-        response_format: { type: "json_object" },
-        max_tokens: 15,
-      });
+      const response = await this.client.chat.completions.create(
+        {
+          model: this.model,
+          messages: [{ role: "user", content: "Responda 'ok' em JSON: {\"status\": \"ok\"}" }],
+          response_format: { type: "json_object" },
+          max_tokens: 15,
+        },
+        { timeout: 10000 }
+      );
 
       if (response.choices[0]?.message?.content) {
         return {

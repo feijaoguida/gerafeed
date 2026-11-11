@@ -41,8 +41,12 @@ export async function POST(
       }
     }
 
-    // Check daily article limit first (stricter)
-    const dailyCheck = await BillingService.checkLimit(workspaceId, "ARTICLES_DAILY");
+    // Check daily and monthly article limits in parallel
+    const [dailyCheck, monthlyCheck] = await Promise.all([
+      BillingService.checkLimit(workspaceId, "ARTICLES_DAILY"),
+      BillingService.checkLimit(workspaceId, "ARTICLES"),
+    ]);
+
     if (!dailyCheck.allowed) {
       return NextResponse.json(
         { error: dailyCheck.message, limitReached: true, resource: "ARTICLES_DAILY" },
@@ -50,13 +54,78 @@ export async function POST(
       );
     }
 
-    // Check monthly article limit
-    const monthlyCheck = await BillingService.checkLimit(workspaceId, "ARTICLES");
     if (!monthlyCheck.allowed) {
       return NextResponse.json(
         { error: monthlyCheck.message, limitReached: true, resource: "ARTICLES" },
         { status: 403 }
       );
+    }
+
+    const { searchParams } = new URL(request.url);
+    const wantsStream =
+      searchParams.get("stream") === "1" ||
+      searchParams.get("stream") === "true" ||
+      request.headers.get("accept")?.includes("text/event-stream");
+
+    if (wantsStream) {
+      const encoder = new TextEncoder();
+      const stream = new ReadableStream({
+        async start(controller) {
+          const sendEvent = (event: {
+            step: string;
+            progress: number;
+            message: string;
+            article?: unknown;
+            score?: number;
+          }) => {
+            try {
+              controller.enqueue(encoder.encode(`data: ${JSON.stringify(event)}\n\n`));
+            } catch {
+              // Client disconnected
+            }
+          };
+
+          try {
+            sendEvent({
+              step: "loading",
+              progress: 5,
+              message: "Permissões validadas. Iniciando processamento...",
+            });
+
+            const result = await processArticleWithAi(id, workspaceId, {
+              force: force || Boolean(completionLevel),
+              completionLevel,
+              onProgress: sendEvent,
+            });
+
+            if (!result.success && result.notRelevant) {
+              sendEvent({
+                step: "done",
+                progress: 100,
+                message: result.message || "Notícia com relevância abaixo da média.",
+                score: result.score,
+                article: result.article,
+              });
+            }
+            controller.close();
+          } catch (streamErr) {
+            sendEvent({
+              step: "error",
+              progress: 100,
+              message: streamErr instanceof Error ? streamErr.message : "Erro no processamento da notícia com IA",
+            });
+            controller.close();
+          }
+        },
+      });
+
+      return new Response(stream, {
+        headers: {
+          "Content-Type": "text/event-stream; charset=utf-8",
+          "Cache-Control": "no-cache, no-transform",
+          Connection: "keep-alive",
+        },
+      });
     }
 
     const result = await processArticleWithAi(id, workspaceId, {

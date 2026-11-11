@@ -566,4 +566,36 @@ A contratação de planos no Asaas deve ser feita gerando a assinatura (`POST /v
   - Logs de console com PII de clientes (nomes, e-mails) e códigos OTP são suprimidos em ambiente de produção.
 
 
+# Phase 41 — Performance e Escalabilidade SaaS Multi-Tenant (Auditoria dos 8 Pilares)
+
+- **Pilar 1: Banco de Dados (Índices Compostos Multi-Tenant + Pool)**:
+  - 14 índices compostos multi-tenant foram adicionados no `prisma/schema.prisma` cobrindo `Source`, `Article`, `Product`, `ProductOffer`, `Invoice`, `SystemErrorLog` e `PlanHistory`, iniciando sempre pela chave de isolamento (`workspaceId`) combinada com as colunas de filtragem e ordenação frequentes (`status`, `createdAt DESC`, `processedAt`, `categoryId`, etc.).
+  - Pool de conexões do PostgreSQL (`src/lib/prisma.ts`) configurado com `idleTimeoutMillis: 15000` (15s) e `max: 2` conexões por container serverless, evitando reconexões TCP/TLS excessivas e prevenindo exaustão de conexões no banco.
+- **Pilar 2: Queries (Paginação Obrigatória, Seleção Explícita e Zero N+1)**:
+  - Rotas de listagem (`/api/articles`, `/api/billing/invoices`) possuem limites máximos travados no backend (`take <= 100`) e projeções `select` explícitas omitindo texto e HTML pesado (`content`, `originalContent`, `canonicalContent`) por padrão.
+  - Eliminação de queries N+1:
+    - `/api/backoffice/companies`: contagens de artigos e fontes no mês calculadas via `prisma.article.groupBy` e `prisma.source.groupBy` (2 queries no total em vez de $2N$).
+    - `src/lib/rss.ts`: inclusão prévia de `wordpressSiteSources` no `findMany` de fontes e filtragem de `existingArticles` por `workspaceId`.
+    - `src/lib/wordpress.ts` e `/api/wordpress/sites/[id]/categories/sync`: sincronização de categorias em lote único com `prisma.$transaction`.
+    - `src/lib/affiliate/analytics-service.ts`: trava de segurança `take: 5000` em cliques para proteção do heap do Node.js.
+    - `src/lib/publisher/publication-sync.ts`: busca por produtos dependentes via filtro SQL no banco (`OR: [{ canonicalContent: { string_contains: productId } }, { content: { contains: productId } }]`) em vez de carregar todos os JSONs em memória.
+- **Pilar 3: Assincronismo (Desacoplamento Pós-Resposta)**:
+  - Tarefas secundárias lentas como varredura de dependências para republicação em `src/lib/affiliate/offer-service.ts` são agendadas de forma não-bloqueante utilizando `after()` do `next/server` com fallback assíncrono seguro fora do ciclo da requisição HTTP.
+- **Pilar 4: Integrações (Timeouts Estritos + Paralelismo com `Promise.all`)**:
+  - `AbortSignal.timeout(...)` configurado em todas as integrações externas: Asaas (15s), WordPress REST/Mídia (15s/20s/25s), WooCommerce REST (20s), OpenAI (45s/10s), Gemini (45s/10s), Anthropic (45s/10s), OpenAI-Compatible (45s/10s), DALL-E (45s/20s) e ViaCEP.
+  - SmtpAdapter configurado com `connectionTimeout: 10000`, `greetingTimeout: 10000` e `socketTimeout: 15000`.
+  - Operações concorrentes independentes paralelizadas com `Promise.all` e `Promise.allSettled`: checagens de limites diários e mensais em `/api/articles/[id]/process-ai`, geração de artigo LLM + processamento de imagem Sharp em `src/lib/ai.ts`, resolução de tags WordPress, e refresh de múltiplas ofertas em `ProductRefreshService`.
+- **Pilar 5: IA (Streaming de Respostas e Progresso SSE)**:
+  - `POST /api/articles/[id]/process-ai` suporta Server-Sent Events (`ReadableStream` / `text/event-stream`) via query param `?stream=1` ou header `Accept: text/event-stream`, emitindo eventos tipados (`AiProgressEvent`) em tempo real (`loading`, `scraping`, `generating`, `saving`, `done`) sem quebrar a compatibilidade de retorno JSON tradicional.
+- **Pilar 6: Frontend State (Deduplicação e Optimistic UI)**:
+  - `src/components/affiliate/affiliate-block-manager.tsx` utiliza `attemptedProductIdsRef = useRef<Set<string>>` para rastrear IDs inexistentes e suprimir chamadas repetidas a cada tecla digitada no editor de artigos.
+  - `src/components/affiliate/offer-list.tsx` implementa *Optimistic UI* na exclusão de ofertas, removendo o card imediatamente da interface e realizando rollback visual caso a API retorne erro.
+- **Pilar 7: Inputs (Debounce em Buscas e Filtros)**:
+  - Hook reutilizável `src/hooks/use-debounce.ts` (`useDebounce<T>(value, delay = 400)`).
+  - Aplicado em todos os campos de busca e filtros digitáveis do frontend (`ProductList`, `CompanyList`, `ErrorLogsViewer`, `RssPublishingQueue`), eliminando rajadas de requisições por digitação.
+- **Pilar 8: Infraestrutura e Rede (`next.config.ts`)**:
+  - Configurados `compress: true`, `poweredByHeader: false` e `experimental.optimizePackageImports` (`lucide-react`, `framer-motion`).
+  - Cache imutável `Cache-Control: public, max-age=31536000, immutable` aplicado para assets dinâmicos em `/modified-images/:path*`.
+
+
 

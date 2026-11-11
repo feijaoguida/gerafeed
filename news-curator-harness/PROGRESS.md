@@ -1,13 +1,112 @@
 # PROGRESS.md
 
 ## Current Phase
-Phase 40. Hardening de Segurança Pré-Produção (Auditoria de 20 Pontos)
+Phase 41. Performance e Escalabilidade SaaS Multi-Tenant (Auditoria dos 8 Pilares)
 
 ## Current Task
 None
 
 ## Status
-DONE — Todas as tasks da Phase 40 (297 a 302) foram concluídas, testadas e auditadas com 100% de sucesso. A aplicação News Curator / GeraFeed está auditada e protegida conforme todos os 20 pontos de verificação de segurança pré-produção.
+DONE — Todas as tasks da Phase 41 (303 a 308) foram concluídas, testadas e auditadas com 100% de sucesso. A aplicação News Curator / GeraFeed cumpre integralmente os 8 Pilares de Performance de Arquitetura SaaS.
+
+## Phase 41 (DONE)
+
+Performance e Escalabilidade SaaS Multi-Tenant cobrindo Índices Compostos Multi-Tenant e Pool de Conexões (Pilar 1), Paginação Obrigatória, `select` Explícito e Eliminação de N+1 (Pilar 2), Desacoplamento Assíncrono Pós-Resposta (Pilar 3), Timeouts Estritos e Paralelismo `Promise.all` (Pilar 4), Streaming SSE de Progresso na IA (Pilar 5), Deduplicação e Optimistic UI no Frontend (Pilar 6), Debounce em Buscas e Filtros (Pilar 7) e Compressão/Cache no `next.config.ts` (Pilar 8).
+
+Plano: [PLAN-phase41-performance-and-scalability-8-pillars.md](PLAN-phase41-performance-and-scalability-8-pillars.md).
+Spec: [Phase 41](SPEC.md#phase-41-performance-e-escalabilidade-saas-multi-tenant-auditoria-dos-8-pilares).
+
+| Task | Status | Entrega |
+|---|---|---|
+| [303](tasks/303-multi-tenant-composite-indexes-and-pool.md) | DONE | Índices Compostos Multi-Tenant (`prisma/schema.prisma`), sincronização com o PostgreSQL (`npx prisma db push`) e ajuste de `idleTimeoutMillis: 15000` em `src/lib/prisma.ts` |
+| [304](tasks/304-queries-pagination-select-and-n-plus-1.md) | DONE | Paginação obrigatória e `select` explícito em `/api/articles` e `/api/billing/invoices`, eliminação de N+1 com `groupBy` em `/api/backoffice/companies`, `$transaction` em categorias WordPress e otimização em `rss.ts`, `analytics-service.ts` e `publication-sync.ts` |
+| [305](tasks/305-integrations-timeouts-parallelism-and-async.md) | DONE | Timeouts estritos (`AbortSignal.timeout` e SMTP) em Asaas, WordPress, WooCommerce, IA e DALL-E, paralelismo com `Promise.all` / `Promise.allSettled` e desacoplamento assíncrono em `offer-service.ts` |
+| [306](tasks/306-ai-streaming-progress-sse.md) | DONE | Streaming SSE (`ReadableStream` / `text/event-stream`) de progresso em tempo real em `POST /api/articles/[id]/process-ai` e `src/lib/ai.ts` mantendo compatibilidade JSON |
+| [307](tasks/307-frontend-debounce-optimistic-ui-and-next-config.md) | DONE | Hook `useDebounce` em buscas/filtros (`ProductList`, `CompanyList`, `ErrorLogsViewer`, `RssPublishingQueue`), deduplicação `useRef` em `AffiliateBlockManager`, *Optimistic UI* em `OfferList` e otimizações em `next.config.ts` |
+| [308](tasks/308-phase41-performance-8-pillars-e2e-and-hardening.md) | DONE | Suíte E2E de Auditoria dos 8 Pilares (`scripts/phase41/test-performance-8-pillars-e2e.ts`), TypeScript, ESLint, Build de Produção e Evidências |
+
+## Last Evidence
+Phase 41 concluída com sucesso:
+- `scripts/phase41/test-performance-8-pillars-e2e.ts`: PASS (52/52 verificações aprovadas nos 8 Pilares de Performance de Arquitetura SaaS).
+- `npx tsc --noEmit`: PASS (0 erros de tipagem estrita).
+- `npm run lint`: PASS (0 erros de ESLint).
+- `npm run build`: PASS (107/107 rotas estáticas e dinâmicas geradas com Turbopack em 13.7s).
+- **Pilar 1 (Banco de Dados)**: 14 novos índices compostos multi-tenant aplicados no PostgreSQL (`pg_indexes`) e `idleTimeoutMillis: 15000` configurado no pool.
+- **Pilar 2 (Queries)**: Paginação com limite travado em 100 e `select` explícito em `/api/articles` e `/api/billing/invoices`, eliminação de N+1 com `groupBy` em `/api/backoffice/companies`, `$transaction` em WordPress categories sync, otimização de `rss.ts`, `analytics-service.ts` e `publication-sync.ts`.
+- **Pilar 3 (Assincronismo)**: Desacoplamento não-bloqueante pós-resposta em `offer-service.ts` com `after()` / fallback seguro.
+- **Pilar 4 (Integrações & Paralelismo)**: `AbortSignal.timeout` em Asaas (15s), WordPress (15s/20s/25s), WooCommerce (20s), IA (45s/10s), DALL-E (45s/20s) e SMTP; paralelismo `Promise.all` em checagem de limites, carregamento de prompts/categorias/provedor, LLM + imagem Sharp e upload de galeria WooCommerce; `Promise.allSettled` em refresh de ofertas.
+- **Pilar 5 (IA Streaming)**: Callback `onProgress` e suporte a `ReadableStream` (`text/event-stream`) via `?stream=1` ou `Accept: text/event-stream` em `POST /api/articles/[id]/process-ai`.
+- **Pilar 6 (Frontend State)**: Deduplicação com `attemptedProductIdsRef` em `AffiliateBlockManager` e *Optimistic UI* no delete de `OfferList`.
+- **Pilar 7 (Inputs & Debounce)**: Hook `useDebounce` aplicado em `ProductList`, `CompanyList`, `ErrorLogsViewer` e `RssPublishingQueue`.
+- **Pilar 8 (Infraestrutura)**: `compress: true`, `poweredByHeader: false`, `optimizePackageImports` (`lucide-react`, `framer-motion`) e `Cache-Control: public, max-age=31536000, immutable` para `/modified-images/:path*` em `next.config.ts`.
+
+## Last Evidence
+Task 307 concluída com sucesso:
+- `src/hooks/use-debounce.ts`: Hook criado e documentado com debounce configurável (default 400ms).
+- `src/components/affiliate/product-list.tsx`: Debounce aplicado no campo de busca de produtos e atualização localizada no refresh de produto.
+- `src/components/backoffice/company-list.tsx`: Debounce aplicado na busca de empresas sem re-renderizar o formulário a cada tecla.
+- `src/components/backoffice/error-logs-viewer.tsx`: Debounce aplicado na busca textual de logs.
+- `src/components/publishing/rss-publishing-queue.tsx`: Componente `DebouncedDateInput` com debounce de 400ms aplicado nos seletores de data.
+- `src/components/affiliate/affiliate-block-manager.tsx`: Adicionado `attemptedProductIdsRef` (`useRef<Set<string>>`) prevenindo chamadas repetidas à API a cada digitação no editor.
+- `src/components/affiliate/offer-list.tsx`: *Optimistic UI* implementado na exclusão de ofertas com remoção imediata e rollback em caso de falha.
+- `next.config.ts`: Ativados `compress: true`, `poweredByHeader: false`, `experimental.optimizePackageImports` (`lucide-react`, `framer-motion`) e header de cache imutável `Cache-Control: public, max-age=31536000, immutable` para `/modified-images/:path*`.
+- `npx tsc --noEmit`: PASS (0 erros).
+- `npx eslint`: PASS (0 erros).
+| [308](tasks/308-phase41-performance-8-pillars-e2e-and-hardening.md) | TODO | Suíte E2E de Auditoria dos 8 Pilares (`scripts/phase41/test-performance-8-pillars-e2e.ts`), TypeScript, ESLint, Build de Produção e Evidências |
+
+## Last Evidence
+Task 306 concluída com sucesso:
+- `src/lib/ai.ts`: Implementada a tipagem `AiProgressEvent` e suporte a callback `onProgress` em `processArticleWithAi` emitindo eventos em tempo real (`loading`, `scraping`, `generating`, `saving`, `done`).
+- `src/app/api/articles/[id]/process-ai/route.ts`: Adicionado suporte a Streaming SSE (`ReadableStream`, `Content-Type: text/event-stream`) via query param `?stream=1` ou header `Accept: text/event-stream`, preservando o formato JSON tradicional quando chamado por clientes regulares.
+- `npx tsc --noEmit`: PASS (0 erros).
+- `npx eslint`: PASS (0 erros).
+| [307](tasks/307-frontend-debounce-optimistic-ui-and-next-config.md) | TODO | Hook `useDebounce` em buscas/filtros (`ProductList`, `CompanyList`, `ErrorLogsViewer`, `RssPublishingQueue`), deduplicação `useRef` em `AffiliateBlockManager`, *Optimistic UI* em `OfferList` e otimizações em `next.config.ts` |
+| [308](tasks/308-phase41-performance-8-pillars-e2e-and-hardening.md) | TODO | Suíte E2E de Auditoria dos 8 Pilares (`scripts/phase41/test-performance-8-pillars-e2e.ts`), TypeScript, ESLint, Build de Produção e Evidências |
+
+## Last Evidence
+Task 305 concluída com sucesso:
+- `src/lib/payments/asaas.ts`: Adicionado `signal: AbortSignal.timeout(15000)` em todos os 9 métodos com chamadas `fetch` à API do Asaas.
+- `src/lib/wordpress.ts`: Adicionados timeouts em todas as chamadas HTTP (15s para REST básico, 20s para post e 25s para upload binário de mídia) e paralelismo com `Promise.all` em `getOrCreateWordPressTagIds` e na publicação de artigos (mídia de capa + tags em paralelo).
+- `src/lib/affiliate/woocommerce-publisher.ts`: Adicionado `signal: AbortSignal.timeout(20000)` e upload de galeria de imagens paralelizado com `Promise.all`.
+- Provedores de IA (`OpenAIProvider`, `GeminiProvider`, `AnthropicProvider`, `OpenAICompatibleProvider`) e `OpenAiDalleAdapter`: Timeouts estritos configurados (45s para geração, 10s para teste de conexão, 20s para download DALL-E).
+- `src/lib/mail/adapters/smtp-adapter.ts`: Configurados `connectionTimeout: 10000`, `greetingTimeout: 10000`, `socketTimeout: 15000`.
+- `src/app/api/articles/[id]/process-ai/route.ts` & `src/lib/ai.ts`: Validações de limites diários e mensais em `Promise.all`; carregamento de configurações e paralelização de geração textual do LLM com processamento de imagem Sharp.
+- `src/lib/affiliate/refresh-service.ts`: Paralelização do refresh de ofertas com `Promise.allSettled`.
+- `src/lib/affiliate/offer-service.ts`: Desacoplamento não-bloqueante de `markDependentArticlesForRepublish` com `after()` / `Promise.resolve().then(...)`.
+- `npx tsc --noEmit`: PASS (0 erros).
+- `npx eslint`: PASS (0 erros).
+| [306](tasks/306-ai-streaming-progress-sse.md) | TODO | Streaming SSE (`ReadableStream` / `text/event-stream`) de progresso em tempo real em `POST /api/articles/[id]/process-ai` e `src/lib/ai.ts` mantendo compatibilidade JSON |
+| [307](tasks/307-frontend-debounce-optimistic-ui-and-next-config.md) | TODO | Hook `useDebounce` em buscas/filtros (`ProductList`, `CompanyList`, `ErrorLogsViewer`, `RssPublishingQueue`), deduplicação `useRef` em `AffiliateBlockManager`, *Optimistic UI* em `OfferList` e otimizações em `next.config.ts` |
+| [308](tasks/308-phase41-performance-8-pillars-e2e-and-hardening.md) | TODO | Suíte E2E de Auditoria dos 8 Pilares (`scripts/phase41/test-performance-8-pillars-e2e.ts`), TypeScript, ESLint, Build de Produção e Evidências |
+
+## Last Evidence
+Task 304 concluída com sucesso:
+- `src/app/api/articles/route.ts`: Paginação obrigatória com `limit` (default 50, max 100), `skip`, e `select` explícito de metadados excluindo colunas pesadas (`content`, `originalContent`, `canonicalContent`) a menos que `?includeContent=true`. Suporte a `?paginated=true` mantendo compatibilidade de array por padrão.
+- `src/app/api/billing/invoices/route.ts`: Limite seguro `take: limit` (max 100).
+- `src/app/api/backoffice/companies/route.ts`: Trava de `pageSize <= 50` e substituição completa do N+1 de contagens de artigos e fontes em loop por `prisma.article.groupBy` e `prisma.source.groupBy`.
+- `src/lib/rss.ts`: Pre-fetch da relação `wordpressSiteSources` no `findMany` inicial eliminando busca no loop, e filtragem de `existingArticles` por `workspaceId`.
+- `src/lib/wordpress.ts` & `src/app/api/wordpress/sites/[id]/categories/sync/route.ts`: Substituição de loops de upsert individuais por lote único com `prisma.$transaction`.
+- `src/lib/affiliate/analytics-service.ts`: `take: 5000` em `clicksInPeriod` prevenindo estouro de heap.
+- `src/lib/publisher/publication-sync.ts`: Filtro em banco via SQL com `OR: [{ canonicalContent: { string_contains: productId } }, { content: { contains: productId } }]` e `select: { id: true }`.
+- `npx tsc --noEmit`: PASS (0 erros).
+- `npx eslint`: PASS (0 erros).
+| [305](tasks/305-integrations-timeouts-parallelism-and-async.md) | TODO | Timeouts estritos (`AbortSignal.timeout` e SMTP) em Asaas, WordPress, WooCommerce, IA e DALL-E, paralelismo com `Promise.all` / `Promise.allSettled` e desacoplamento assíncrono em `offer-service.ts` |
+| [306](tasks/306-ai-streaming-progress-sse.md) | TODO | Streaming SSE (`ReadableStream` / `text/event-stream`) de progresso em tempo real em `POST /api/articles/[id]/process-ai` e `src/lib/ai.ts` mantendo compatibilidade JSON |
+| [307](tasks/307-frontend-debounce-optimistic-ui-and-next-config.md) | TODO | Hook `useDebounce` em buscas/filtros (`ProductList`, `CompanyList`, `ErrorLogsViewer`, `RssPublishingQueue`), deduplicação `useRef` em `AffiliateBlockManager`, *Optimistic UI* em `OfferList` e otimizações em `next.config.ts` |
+| [308](tasks/308-phase41-performance-8-pillars-e2e-and-hardening.md) | TODO | Suíte E2E de Auditoria dos 8 Pilares (`scripts/phase41/test-performance-8-pillars-e2e.ts`), TypeScript, ESLint, Build de Produção e Evidências |
+
+## Last Evidence
+Task 303 concluída com sucesso:
+- `prisma/schema.prisma`: Adicionados 14 novos índices compostos multi-tenant iniciando pela chave de tenant/relação (`Source`, `Article`, `Product`, `ProductOffer`, `Invoice`, `SystemErrorLog`, `PlanHistory`).
+- `npx prisma db push` & `npx prisma generate`: Sincronizados no banco PostgreSQL e validados via consulta ao catálogo `pg_indexes` (145 índices públicos ativos).
+- `src/lib/prisma.ts`: `idleTimeoutMillis` configurado para `15000` (15s) evitando reconexões TCP/TLS excessivas sem violar os limites por container serverless.
+- `npx tsc --noEmit`: PASS (0 erros).
+- `npm run lint`: PASS (0 erros, 5 warnings legados).
+| [304](tasks/304-queries-pagination-select-and-n-plus-1.md) | TODO | Paginação obrigatória e `select` explícito em `/api/articles` e `/api/billing/invoices`, eliminação de N+1 com `groupBy` em `/api/backoffice/companies`, `$transaction` em categorias WordPress e otimização em `rss.ts`, `analytics-service.ts` e `publication-sync.ts` |
+| [305](tasks/305-integrations-timeouts-parallelism-and-async.md) | TODO | Timeouts estritos (`AbortSignal.timeout` e SMTP) em Asaas, WordPress, WooCommerce, IA e DALL-E, paralelismo com `Promise.all` / `Promise.allSettled` e desacoplamento assíncrono em `offer-service.ts` |
+| [306](tasks/306-ai-streaming-progress-sse.md) | TODO | Streaming SSE (`ReadableStream` / `text/event-stream`) de progresso em tempo real em `POST /api/articles/[id]/process-ai` e `src/lib/ai.ts` mantendo compatibilidade JSON |
+| [307](tasks/307-frontend-debounce-optimistic-ui-and-next-config.md) | TODO | Hook `useDebounce` em buscas/filtros (`ProductList`, `CompanyList`, `ErrorLogsViewer`, `RssPublishingQueue`), deduplicação `useRef` em `AffiliateBlockManager`, *Optimistic UI* em `OfferList` e otimizações em `next.config.ts` |
+| [308](tasks/308-phase41-performance-8-pillars-e2e-and-hardening.md) | TODO | Suíte E2E de Auditoria dos 8 Pilares (`scripts/phase41/test-performance-8-pillars-e2e.ts`), TypeScript, ESLint, Build de Produção e Evidências |
 
 ## Phase 40 (DONE)
 

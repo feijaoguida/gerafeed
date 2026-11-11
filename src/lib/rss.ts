@@ -129,11 +129,19 @@ export async function processRssSources(
   limitPerFeed: number = 5,
   workspaceId: string = "default-workspace"
 ) {
-  // 1. Find all active sources for this workspace
+  // 1. Find all active sources for this workspace with their default WP site
   const activeSources = await prisma.source.findMany({
     where: {
       workspaceId,
       active: true,
+    },
+    include: {
+      wordpressSiteSources: {
+        where: { workspaceId },
+        orderBy: { createdAt: "asc" },
+        take: 1,
+        select: { wordpressSiteId: true },
+      },
     },
   });
 
@@ -163,10 +171,11 @@ export async function processRssSources(
     }
     const uniqueItems = Array.from(uniqueMap.values());
 
-    // Check which URLs already exist in DB
+    // Check which URLs already exist in DB for this workspace
     const candidateUrls = uniqueItems.map((c) => c.originalUrl);
     const existingArticles = await prisma.article.findMany({
       where: {
+        workspaceId,
         originalUrl: { in: candidateUrls },
       },
       select: { originalUrl: true },
@@ -178,12 +187,8 @@ export async function processRssSources(
     // Apply limit per feed
     const selectedItems = newItems.slice(0, limitPerFeed);
 
-    // Check if source has an associated WordPress site
-    const siteAssignment = await prisma.wordPressSiteSource.findFirst({
-      where: { sourceId: source.id, workspaceId },
-      select: { wordpressSiteId: true },
-    });
-    const defaultWpSiteId = siteAssignment?.wordpressSiteId || null;
+    // Retrieve default WordPress site from pre-fetched relation
+    const defaultWpSiteId = source.wordpressSiteSources?.[0]?.wordpressSiteId || null;
 
     // Persist selected articles with status PENDING and extract full content
     for (const item of selectedItems) {

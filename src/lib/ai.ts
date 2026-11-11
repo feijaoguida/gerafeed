@@ -12,6 +12,14 @@ import {
 
 export * from "./ai/index";
 
+export type AiProgressEvent = {
+  step: "loading" | "scraping" | "generating" | "saving" | "done" | "error";
+  progress: number;
+  message: string;
+  article?: unknown;
+  score?: number;
+};
+
 export interface AiProcessResult {
   relevant: boolean;
   score: number;
@@ -32,8 +40,17 @@ export interface AiProcessResult {
 export async function processArticleWithAi(
   articleId: string,
   workspaceId?: string,
-  options?: { force?: boolean; completionLevel?: CompletionLevel }
+  options?: {
+    force?: boolean;
+    completionLevel?: CompletionLevel;
+    onProgress?: (event: AiProgressEvent) => void;
+  }
 ) {
+  options?.onProgress?.({
+    step: "loading",
+    progress: 10,
+    message: "Carregando configurações e dados do artigo...",
+  });
   const article = await prisma.article.findUnique({
     where: {
       id: articleId,
@@ -51,6 +68,11 @@ export async function processArticleWithAi(
   let originalContent = article.originalContent;
   if (!originalContent && article.originalUrl) {
     try {
+      options?.onProgress?.({
+        step: "scraping",
+        progress: 30,
+        message: "Extraindo texto completo da matéria original...",
+      });
       const scraped = await scrapeArticleContent(article.originalUrl);
       if (scraped) {
         originalContent = scraped;
@@ -64,26 +86,49 @@ export async function processArticleWithAi(
     }
   }
 
-  const categories = await prisma.wordPressCategory.findMany({
-    where: { workspaceId: effectiveWorkspaceId },
-    select: { id: true, name: true, slug: true },
+  // Fetch categories, prompt settings, image settings, and AI provider in parallel
+  options?.onProgress?.({
+    step: "loading",
+    progress: 45,
+    message: "Inicializando modelos e configurações de prompt...",
   });
 
-  const promptConfig = await getConfig<PromptSettings>(
-    "aiPromptSettings",
-    effectiveWorkspaceId
-  );
+  const [categories, promptConfig, imageConfig, provider] = await Promise.all([
+    prisma.wordPressCategory.findMany({
+      where: { workspaceId: effectiveWorkspaceId },
+      select: { id: true, name: true, slug: true },
+    }),
+    getConfig<PromptSettings>("aiPromptSettings", effectiveWorkspaceId),
+    getConfig<ImageSettingsStored>("imageSettings", effectiveWorkspaceId),
+    getActiveAIProvider(undefined, effectiveWorkspaceId),
+  ]);
+
   const promptSettings = promptConfig || undefined;
+  const defaultStrategy = imageConfig?.defaultStrategy || "ORIGINAL";
 
-  const provider = await getActiveAIProvider(undefined, effectiveWorkspaceId);
-  const aiResult = await provider.generateArticle({
-    originalTitle: article.originalTitle || article.title || "",
-    originalDescription: article.originalDescription,
-    originalContent,
-    categories,
-    promptSettings,
-    completionLevel: options?.completionLevel,
+  // Generate article text and process cover image in parallel
+  options?.onProgress?.({
+    step: "generating",
+    progress: 65,
+    message: "Reescrevendo matéria com IA e processando imagem...",
   });
+
+  const [aiResult, processedImageUrl] = await Promise.all([
+    provider.generateArticle({
+      originalTitle: article.originalTitle || article.title || "",
+      originalDescription: article.originalDescription,
+      originalContent,
+      categories,
+      promptSettings,
+      completionLevel: options?.completionLevel,
+    }),
+    article.originalImageUrl
+      ? processAndStoreImage(article.originalImageUrl, articleId).catch((imgErr) => {
+          console.warn(`[AI Process] Falha ao processar imagem de capa:`, imgErr);
+          return null;
+        })
+      : Promise.resolve(null),
+  ]);
 
   // Validate suggested category exists in available list
   let validCategoryId: string | null = null;
@@ -91,20 +136,9 @@ export async function processArticleWithAi(
     validCategoryId = aiResult.suggestedCategoryId;
   }
 
-  // Process image if originalImageUrl is present
-  const imageConfig = await getConfig<ImageSettingsStored>(
-    "imageSettings",
-    effectiveWorkspaceId
-  );
-
-  const defaultStrategy = imageConfig?.defaultStrategy || "ORIGINAL";
-
   let modifiedImageUrl: string | null = article.modifiedImageUrl;
-  if (article.originalImageUrl) {
-    const processedUrl = await processAndStoreImage(article.originalImageUrl, articleId);
-    if (processedUrl) {
-      modifiedImageUrl = processedUrl;
-    }
+  if (processedImageUrl) {
+    modifiedImageUrl = processedImageUrl;
   }
 
   const isLowScore = !aiResult.relevant || aiResult.score < 6;
@@ -175,6 +209,12 @@ export async function processArticleWithAi(
     }
   }
 
+  options?.onProgress?.({
+    step: "saving",
+    progress: 90,
+    message: "Persistindo matéria processada no banco de dados...",
+  });
+
   const updatedArticle = await prisma.article.update({
     where: { id: articleId },
     data: {
@@ -193,6 +233,14 @@ export async function processArticleWithAi(
       selectedImage: defaultStrategy,
       processedAt: new Date(),
     },
+  });
+
+  options?.onProgress?.({
+    step: "done",
+    progress: 100,
+    message: "Artigo processado com sucesso!",
+    article: updatedArticle,
+    score: aiResult.score,
   });
 
   return {

@@ -174,15 +174,24 @@ export class ProductRefreshService {
     const refreshResults: RefreshOfferResult[] = [];
     const allDiffs: Record<string, RefreshDiff[]> = {};
 
-    for (const offer of product.offers) {
-      try {
-        const res = await this.refreshOffer(workspaceId, offer.id);
+    const settledResults = await Promise.allSettled(
+      product.offers.map((offer) => this.refreshOffer(workspaceId, offer.id))
+    );
+
+    for (let i = 0; i < product.offers.length; i++) {
+      const settled = settledResults[i];
+      const offer = product.offers[i];
+      if (settled.status === "fulfilled") {
+        const res = settled.value;
         refreshResults.push(res);
         if (res.diffs.length > 0) {
           allDiffs[offer.id] = res.diffs;
         }
-      } catch (err) {
-        console.warn(`[ProductRefreshService] Erro ao atualizar oferta ${offer.id}: ${(err as Error).message}`);
+      } else {
+        console.warn(
+          `[ProductRefreshService] Erro ao atualizar oferta ${offer.id}:`,
+          settled.reason instanceof Error ? settled.reason.message : settled.reason
+        );
       }
     }
 

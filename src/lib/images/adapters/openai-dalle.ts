@@ -10,6 +10,7 @@ export class OpenAiDalleAdapter implements ImageGeneratorProvider {
     this.client = new OpenAI({
       apiKey,
       baseURL: baseUrl || undefined,
+      timeout: 45000,
     });
   }
 
@@ -39,7 +40,7 @@ export class OpenAiDalleAdapter implements ImageGeneratorProvider {
     const url = response.data?.[0]?.url;
     if (url) {
       // Download and convert to Data URI
-      const res = await fetch(url);
+      const res = await fetch(url, { signal: AbortSignal.timeout(20000) });
       if (!res.ok) {
         throw new Error(`Falha ao baixar imagem gerada pelo DALL-E: HTTP ${res.status}`);
       }

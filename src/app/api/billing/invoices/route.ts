@@ -2,16 +2,20 @@ import { NextResponse } from "next/server";
 import { getSessionWorkspaceId } from "@/lib/workspace";
 import { prisma } from "@/lib/prisma";
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
     const workspaceId = await getSessionWorkspaceId();
     if (!workspaceId) {
       return NextResponse.json({ error: "Não autenticado ou workspace não selecionado." }, { status: 401 });
     }
 
+    const { searchParams } = new URL(request.url);
+    const limit = Math.min(100, Math.max(1, parseInt(searchParams.get("limit") || "50", 10)));
+
     const invoices = await prisma.invoice.findMany({
       where: { workspaceId },
       orderBy: { createdAt: "desc" },
+      take: limit,
       select: {
         id: true,
         provider: true,

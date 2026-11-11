@@ -23,6 +23,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { Alert } from "@/components/ui/alert";
+import { useDebounce } from "@/hooks/use-debounce";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Skeleton } from "@/components/ui/skeleton";
 import { FormField } from "@/components/design-system/form-field";
@@ -54,6 +55,38 @@ interface SourceOption {
 interface WordPressSiteOption {
   id: string;
   name: string;
+}
+
+function DebouncedDateInput({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (val: string) => void;
+}) {
+  const [localVal, setLocalVal] = useState(value);
+  const debouncedVal = useDebounce(localVal, 400);
+
+  // Sync when prop value changes from outside (e.g. reset filters)
+  const [prevValue, setPrevValue] = useState(value);
+  if (value !== prevValue) {
+    setPrevValue(value);
+    setLocalVal(value);
+  }
+
+  useEffect(() => {
+    if (debouncedVal !== value) {
+      onChange(debouncedVal);
+    }
+  }, [debouncedVal, onChange, value]);
+
+  return (
+    <Input
+      type="date"
+      value={localVal}
+      onChange={(e) => setLocalVal(e.target.value)}
+    />
+  );
 }
 
 export function RssPublishingQueue() {
@@ -519,19 +552,17 @@ function RssPublishingQueueContent() {
 
           {/* Start Date */}
           <FormField label="Data Inicial">
-            <Input
-              type="date"
+            <DebouncedDateInput
               value={startDate}
-              onChange={(e) => updateFilters({ startDate: e.target.value })}
+              onChange={(val) => updateFilters({ startDate: val })}
             />
           </FormField>
 
           {/* End Date */}
           <FormField label="Data Final">
-            <Input
-              type="date"
+            <DebouncedDateInput
               value={endDate}
-              onChange={(e) => updateFilters({ endDate: e.target.value })}
+              onChange={(val) => updateFilters({ endDate: val })}
             />
           </FormField>
         </div>

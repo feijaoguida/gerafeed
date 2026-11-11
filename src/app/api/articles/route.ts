@@ -73,24 +73,84 @@ export async function GET(request: Request) {
       }
     }
 
-    const articles = await prisma.article.findMany({
-      where: whereClause,
-      orderBy: { createdAt: "desc" },
-      include: {
-        source: {
-          select: { id: true, name: true, rssUrl: true, creditName: true },
-        },
-        wordpressSite: {
-          select: { id: true, name: true, url: true },
-        },
-        suggestedCategory: {
-          select: { id: true, name: true, slug: true },
-        },
-        category: {
-          select: { id: true, name: true, slug: true },
-        },
+    const page = Math.max(1, parseInt(searchParams.get("page") || "1", 10));
+    const limit = Math.min(100, Math.max(1, parseInt(searchParams.get("limit") || "50", 10)));
+    const skip = (page - 1) * limit;
+    const includeContent = searchParams.get("includeContent") === "true";
+    const isPaginatedResponse = searchParams.get("paginated") === "true";
+
+    const selectFields: Prisma.ArticleSelect = {
+      id: true,
+      workspaceId: true,
+      sourceId: true,
+      wordpressSiteId: true,
+      title: true,
+      originalTitle: true,
+      originalUrl: true,
+      originalDescription: true,
+      originalImageUrl: true,
+      originalPublishedAt: true,
+      summary: true,
+      commercialType: true,
+      seoFocusKeyword: true,
+      seoTitle: true,
+      seoDescription: true,
+      aiScore: true,
+      status: true,
+      wordpressPostId: true,
+      modifiedImageUrl: true,
+      generatedImageUrl: true,
+      imagePrompt: true,
+      selectedImage: true,
+      processedAt: true,
+      needsRepublish: true,
+      lastPublishedAt: true,
+      tags: true,
+      createdAt: true,
+      updatedAt: true,
+      source: {
+        select: { id: true, name: true, rssUrl: true, creditName: true },
       },
-    });
+      wordpressSite: {
+        select: { id: true, name: true, url: true },
+      },
+      suggestedCategory: {
+        select: { id: true, name: true, slug: true },
+      },
+      category: {
+        select: { id: true, name: true, slug: true },
+      },
+      ...(includeContent
+        ? {
+            content: true,
+            originalContent: true,
+            canonicalContent: true,
+          }
+        : {}),
+    };
+
+    const [articles, totalCount] = await Promise.all([
+      prisma.article.findMany({
+        where: whereClause,
+        orderBy: { createdAt: "desc" },
+        take: limit,
+        skip,
+        select: selectFields,
+      }),
+      isPaginatedResponse ? prisma.article.count({ where: whereClause }) : Promise.resolve(0),
+    ]);
+
+    if (isPaginatedResponse) {
+      return NextResponse.json({
+        articles,
+        pagination: {
+          page,
+          limit,
+          total: totalCount,
+          totalPages: Math.ceil(totalCount / limit) || 1,
+        },
+      });
+    }
 
     return NextResponse.json(articles);
   } catch (error) {

@@ -19,7 +19,7 @@ const pool =
   new Pool({
     connectionString,
     max: process.env.DB_POOL_MAX ? parseInt(process.env.DB_POOL_MAX, 10) : 2,
-    idleTimeoutMillis: 1000,
+    idleTimeoutMillis: 15000,
     connectionTimeoutMillis: 5000,
   });
 

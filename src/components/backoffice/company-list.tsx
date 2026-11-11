@@ -22,6 +22,7 @@ import { FormField } from "@/components/design-system/form-field";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Alert } from "@/components/ui/alert";
+import { useDebounce } from "@/hooks/use-debounce";
 
 export interface CompanyStats {
   membersCount: number;
@@ -76,6 +77,8 @@ export function CompanyList({
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [planFilter, setPlanFilter] = useState<string>("all");
 
+  const debouncedSearch = useDebounce(search, 400);
+
   // Modal create
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [newName, setNewName] = useState("");
@@ -94,7 +97,7 @@ export function CompanyList({
     const params = new URLSearchParams();
     params.set("page", String(page));
     params.set("pageSize", String(pageSize));
-    if (search) params.set("search", search);
+    if (debouncedSearch.trim()) params.set("search", debouncedSearch.trim());
     if (statusFilter !== "all") params.set("status", statusFilter);
     if (planFilter !== "all") params.set("plan", planFilter);
 
@@ -114,7 +117,7 @@ export function CompanyList({
     return () => {
       active = false;
     };
-  }, [page, pageSize, search, statusFilter, planFilter, refreshKey]);
+  }, [page, pageSize, debouncedSearch, statusFilter, planFilter, refreshKey]);
 
   const handleToggleActive = async (company: Company) => {
     const nextActive = !company.active;

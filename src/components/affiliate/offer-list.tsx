@@ -105,15 +105,25 @@ export function OfferList() {
 
   const handleDelete = async (offerId: string) => {
     if (!confirm("Deseja realmente remover esta oferta?")) return;
+
+    // Optimistic UI: remove immediately from local state
+    const previousOffers = offers;
+    setOffers((prev) => prev.filter((o) => o.id !== offerId));
+
     try {
       const res = await fetch(`/api/affiliate/offers/${offerId}`, {
         method: "DELETE",
       });
-      if (res.ok) {
-        fetchOffers();
+      if (!res.ok) {
+        // Rollback on failure
+        setOffers(previousOffers);
+        alert("Falha ao remover a oferta. Tente novamente.");
       }
     } catch (err) {
       console.error(err);
+      // Rollback on network failure
+      setOffers(previousOffers);
+      alert("Erro de conexão ao remover a oferta.");
     }
   };
 

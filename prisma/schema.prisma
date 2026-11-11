@@ -251,6 +251,10 @@ model Source {
   updatedAt            DateTime              @updatedAt
   articles             Article[]
   wordpressSiteSources WordPressSiteSource[]
+
+  @@index([workspaceId])
+  @@index([workspaceId, active])
+  @@index([workspaceId, createdAt(sort: Desc)])
 }
 
 model WordPressCategory {
@@ -330,6 +334,11 @@ model Article {
   affiliatePlacements ArticleAffiliatePlacement[]
 
   @@index([workspaceId])
+  @@index([workspaceId, status, createdAt(sort: Desc)])
+  @@index([workspaceId, processedAt])
+  @@index([workspaceId, sourceId, status])
+  @@index([workspaceId, wordpressSiteId, status])
+  @@index([workspaceId, originalPublishedAt])
   @@index([workspaceId, commercialType])
   @@index([workspaceId, needsRepublish])
   @@index([promptTemplateId])
@@ -475,6 +484,8 @@ model Product {
 
   @@unique([workspaceId, slug])
   @@index([workspaceId])
+  @@index([workspaceId, status, updatedAt(sort: Desc)])
+  @@index([workspaceId, categoryId, status])
   @@index([categoryId])
   @@index([wordpressSiteId])
   @@index([woocommerceProductId])
@@ -514,7 +525,9 @@ model ProductOffer {
   affiliatePlacements   ArticleAffiliatePlacement[]
 
   @@index([workspaceId])
+  @@index([workspaceId, status, price])
   @@index([productId])
+  @@index([productId, status, price])
   @@index([affiliateProgramId])
   @@index([workspaceId, affiliateProgramId, externalProductId])
 }
@@ -782,7 +795,9 @@ model Invoice {
 
   @@unique([provider, providerPaymentId])
   @@index([workspaceId])
+  @@index([workspaceId, createdAt(sort: Desc)])
   @@index([subscriptionId])
+  @@index([subscriptionId, status])
   @@index([status])
 }
 
@@ -810,6 +825,7 @@ model SystemErrorLog {
   createdAt    DateTime   @default(now())
 
   @@index([workspaceId])
+  @@index([workspaceId, module, createdAt(sort: Desc)])
   @@index([module])
   @@index([createdAt])
   @@index([userId])
@@ -926,6 +942,7 @@ model PlanHistory {
   createdAt              DateTime  @default(now())
 
   @@index([workspaceId])
+  @@index([workspaceId, createdAt(sort: Desc)])
   @@index([eventType])
   @@index([createdAt])
 }

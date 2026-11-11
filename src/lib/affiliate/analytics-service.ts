@@ -149,6 +149,7 @@ export class AffiliateAnalyticsService {
           },
         },
         orderBy: { createdAt: "asc" },
+        take: 5000,
       }),
     ]);
 

@@ -113,23 +113,23 @@ export class WooCommercePublisherService {
     ].filter((img): img is string => typeof img === "string" && img.trim().length > 0);
 
     const uniqueImages = Array.from(new Set(candidateImages)).slice(0, 4);
-    const mediaIds: number[] = [];
-
-    for (let i = 0; i < uniqueImages.length; i++) {
-      try {
-        const uploaded = await uploadMediaToWordPressWithUrl(
-          config,
-          uniqueImages[i],
-          product.id,
-          `wc-${i + 1}`
-        );
-        if (uploaded?.id && !mediaIds.includes(uploaded.id)) {
-          mediaIds.push(uploaded.id);
+    const mediaIdResults = await Promise.all(
+      uniqueImages.map(async (imageUrl, i) => {
+        try {
+          const uploaded = await uploadMediaToWordPressWithUrl(
+            config,
+            imageUrl,
+            product.id,
+            `wc-${i + 1}`
+          );
+          return uploaded?.id || null;
+        } catch (imgErr) {
+          console.warn(`Aviso ao enviar imagem ${i + 1} para WooCommerce:`, imgErr);
+          return null;
         }
-      } catch (imgErr) {
-        console.warn(`Aviso ao enviar imagem ${i + 1} para WooCommerce:`, imgErr);
-      }
-    }
+      })
+    );
+    const mediaIds: number[] = Array.from(new Set(mediaIdResults.filter((id): id is number => typeof id === "number")));
 
     // 2. Format Pricing (regular_price and sale_price)
     let regularPriceStr: string | undefined;
@@ -259,6 +259,7 @@ export class WooCommercePublisherService {
         method,
         headers: wcHeaders,
         body: JSON.stringify(wcPayload),
+        signal: AbortSignal.timeout(20000),
       });
 
       if (res.ok) {
@@ -276,6 +277,7 @@ export class WooCommercePublisherService {
           method: "POST",
           headers: wcHeaders,
           body: JSON.stringify(wcPayload),
+          signal: AbortSignal.timeout(20000),
         });
         if (retryCreateRes.ok) {
           const data = await retryCreateRes.json();
@@ -324,6 +326,7 @@ export class WooCommercePublisherService {
           method: wpMethod,
           headers: wpHeaders,
           body: JSON.stringify(wpPayload),
+          signal: AbortSignal.timeout(20000),
         });
 
         if (!wpRes.ok) {

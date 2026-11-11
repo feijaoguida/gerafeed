@@ -161,6 +161,7 @@ export async function uploadMediaToWordPressWithUrl(
         "Content-Disposition": `attachment; filename="${filename}"`,
       },
       body: new Uint8Array(imageBuffer),
+      signal: AbortSignal.timeout(25000),
     });
 
     if (!wpMediaRes.ok) {
@@ -252,49 +253,51 @@ export async function getOrCreateWordPressTagIds(
 ): Promise<number[]> {
   if (!tagNames || tagNames.length === 0) return [];
 
-  const tagIds: number[] = [];
+  const uniqueCleanNames = Array.from(
+    new Set(tagNames.map((n) => n.trim()).filter((n) => n.length > 0))
+  );
 
-  for (const name of tagNames) {
-    const cleanName = name.trim();
-    if (!cleanName) continue;
-
-    try {
-      // Search for existing tag
-      const searchRes = await fetch(
-        `${config.url}/wp-json/wp/v2/tags?search=${encodeURIComponent(cleanName)}`,
-        { method: "GET", headers, cache: "no-store" }
-      );
-
-      if (searchRes.ok) {
-        const found = (await searchRes.json()) as Array<{ id: number; name: string }>;
-        const exactMatch = found.find(
-          (t) => t.name.toLowerCase() === cleanName.toLowerCase()
+  const tagIdResults = await Promise.all(
+    uniqueCleanNames.map(async (cleanName) => {
+      try {
+        // Search for existing tag
+        const searchRes = await fetch(
+          `${config.url}/wp-json/wp/v2/tags?search=${encodeURIComponent(cleanName)}`,
+          { method: "GET", headers, cache: "no-store", signal: AbortSignal.timeout(15000) }
         );
-        if (exactMatch) {
-          tagIds.push(exactMatch.id);
-          continue;
+
+        if (searchRes.ok) {
+          const found = (await searchRes.json()) as Array<{ id: number; name: string }>;
+          const exactMatch = found.find(
+            (t) => t.name.toLowerCase() === cleanName.toLowerCase()
+          );
+          if (exactMatch) {
+            return exactMatch.id;
+          }
         }
-      }
 
-      // Create tag if not found
-      const createRes = await fetch(`${config.url}/wp-json/wp/v2/tags`, {
-        method: "POST",
-        headers,
-        body: JSON.stringify({ name: cleanName }),
-      });
+        // Create tag if not found
+        const createRes = await fetch(`${config.url}/wp-json/wp/v2/tags`, {
+          method: "POST",
+          headers,
+          body: JSON.stringify({ name: cleanName }),
+          signal: AbortSignal.timeout(15000),
+        });
 
-      if (createRes.ok) {
-        const newTag = await createRes.json();
-        if (newTag?.id) {
-          tagIds.push(newTag.id);
+        if (createRes.ok) {
+          const newTag = await createRes.json();
+          if (newTag?.id) {
+            return newTag.id as number;
+          }
         }
+      } catch (err) {
+        console.warn(`Aviso: Erro ao resolver tag "${cleanName}" no WordPress:`, err);
       }
-    } catch (err) {
-      console.warn(`Aviso: Erro ao resolver tag "${cleanName}" no WordPress:`, err);
-    }
-  }
+      return null;
+    })
+  );
 
-  return tagIds;
+  return tagIdResults.filter((id): id is number => typeof id === "number");
 }
 
 /**
@@ -311,6 +314,7 @@ export async function testWordPressConnection(
     method: "GET",
     headers,
     cache: "no-store",
+    signal: AbortSignal.timeout(15000),
   });
 
   if (!res.ok) {
@@ -366,6 +370,7 @@ export async function fetchWordPressCategories(
       method: "GET",
       headers,
       cache: "no-store",
+      signal: AbortSignal.timeout(15000),
     });
 
     if (!res.ok) {
@@ -407,17 +412,19 @@ export async function syncWordPressCategories(
     if (workspaceId === DEFAULT_WORKSPACE_ID) {
       try {
         const categories = await fetchWordPressCategories(workspaceId);
-        const synced = [];
-        for (const cat of categories) {
-          const upserted = await prisma.wordPressCategory.upsert({
-            where: {
-              workspaceId_wordpressId: { workspaceId, wordpressId: cat.id },
-            },
-            update: { name: cat.name, slug: cat.slug },
-            create: { workspaceId, wordpressId: cat.id, name: cat.name, slug: cat.slug },
-          });
-          synced.push(upserted);
-        }
+        const synced = categories.length > 0
+          ? await prisma.$transaction(
+              categories.map((cat) =>
+                prisma.wordPressCategory.upsert({
+                  where: {
+                    workspaceId_wordpressId: { workspaceId, wordpressId: cat.id },
+                  },
+                  update: { name: cat.name, slug: cat.slug },
+                  create: { workspaceId, wordpressId: cat.id, name: cat.name, slug: cat.slug },
+                })
+              )
+            )
+          : [];
         return { success: true, syncedCount: synced.length, categories: synced };
       } catch (err) {
         throw new Error("Configuração do WordPress não encontrada para esta Empresa.");
@@ -430,28 +437,32 @@ export async function syncWordPressCategories(
   for (const site of sites) {
     try {
       const categories = await fetchWordPressCategories(workspaceId, site.id);
-      for (const cat of categories) {
-        const upserted = await prisma.wordPressCategory.upsert({
-          where: {
-            workspaceId_wordpressId: {
-              workspaceId,
-              wordpressId: cat.id,
-            },
-          },
-          update: {
-            name: cat.name,
-            slug: cat.slug,
-            wordpressSiteId: site.id,
-          },
-          create: {
-            workspaceId,
-            wordpressSiteId: site.id,
-            wordpressId: cat.id,
-            name: cat.name,
-            slug: cat.slug,
-          },
-        });
-        synced.push(upserted);
+      if (categories.length > 0) {
+        const batchSynced = await prisma.$transaction(
+          categories.map((cat) =>
+            prisma.wordPressCategory.upsert({
+              where: {
+                workspaceId_wordpressId: {
+                  workspaceId,
+                  wordpressId: cat.id,
+                },
+              },
+              update: {
+                name: cat.name,
+                slug: cat.slug,
+                wordpressSiteId: site.id,
+              },
+              create: {
+                workspaceId,
+                wordpressSiteId: site.id,
+                wordpressId: cat.id,
+                name: cat.name,
+                slug: cat.slug,
+              },
+            })
+          )
+        );
+        synced.push(...batchSynced);
       }
     } catch (err) {
       console.warn(`Erro ao sincronizar categorias do site ${site.id}:`, err);
@@ -618,13 +629,11 @@ export async function publishArticleToWordPress(
     selectedImageUrl = article.originalImageUrl;
   }
 
-  let featuredMediaId: number | null = null;
-  if (selectedImageUrl) {
-    featuredMediaId = await uploadMediaToWordPress(config, selectedImageUrl, articleId);
-  }
-
-  // 3. Resolve tags
-  const wpTagIds = await getOrCreateWordPressTagIds(config, headers, article.tags || []);
+  // 2 & 3. Upload featured media and resolve tags in parallel
+  const [featuredMediaId, wpTagIds] = await Promise.all([
+    selectedImageUrl ? uploadMediaToWordPress(config, selectedImageUrl, articleId) : Promise.resolve(null),
+    getOrCreateWordPressTagIds(config, headers, article.tags || []),
+  ]);
 
   // 4. Map Yoast SEO post meta fields
   const meta: Record<string, string> = {};
@@ -662,6 +671,7 @@ export async function publishArticleToWordPress(
     method: "POST",
     headers,
     body: JSON.stringify(wpPostData),
+    signal: AbortSignal.timeout(20000),
   });
 
   if (!res.ok) {

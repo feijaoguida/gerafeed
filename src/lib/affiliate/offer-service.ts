@@ -261,15 +261,28 @@ export class ProductOfferService {
       },
     });
 
-    // If critical fields changed (price, status, affiliateUrl), mark dependent published articles as outdated
+    // If critical fields changed (price, status, affiliateUrl), schedule non-blocking republish marking
     if (
       (input.price !== undefined && input.price !== existing.price) ||
       (input.status !== undefined && input.status !== existing.status) ||
       (input.affiliateUrl !== undefined && input.affiliateUrl !== existing.affiliateUrl)
     ) {
-      await PublicationSyncService.markDependentArticlesForRepublish(workspaceId, existing.productId).catch((err: unknown) => {
-        console.error("Erro ao marcar artigos dependentes para republicação:", err);
-      });
+      const scheduleTask = () =>
+        PublicationSyncService.markDependentArticlesForRepublish(workspaceId, existing.productId).catch((err: unknown) => {
+          console.error("Erro ao marcar artigos dependentes para republicação:", err);
+        });
+
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-require-imports
+        const { after } = require("next/server");
+        if (typeof after === "function") {
+          after(scheduleTask);
+        } else {
+          Promise.resolve().then(scheduleTask);
+        }
+      } catch {
+        Promise.resolve().then(scheduleTask);
+      }
     }
 
     return updated;
@@ -292,8 +305,27 @@ export class ProductOfferService {
       throw new Error("Oferta não encontrada no workspace.");
     }
 
-    return prisma.productOffer.delete({
+    const deleted = await prisma.productOffer.delete({
       where: { id: offerId },
     });
+
+    const scheduleTask = () =>
+      PublicationSyncService.markDependentArticlesForRepublish(workspaceId, existing.productId).catch((err: unknown) => {
+        console.error("Erro ao marcar artigos dependentes para republicação na exclusão da oferta:", err);
+      });
+
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const { after } = require("next/server");
+      if (typeof after === "function") {
+        after(scheduleTask);
+      } else {
+        Promise.resolve().then(scheduleTask);
+      }
+    } catch {
+      Promise.resolve().then(scheduleTask);
+    }
+
+    return deleted;
   }
 }

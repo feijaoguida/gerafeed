@@ -19,6 +19,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { PageHeader } from "@/components/design-system/page-header";
+import { useDebounce } from "@/hooks/use-debounce";
 
 export interface ErrorLogItem {
   id: string;
@@ -61,6 +62,7 @@ export function ErrorLogsViewer() {
   const [selectedModule, setSelectedModule] = useState<string>("all");
   const [selectedPeriod, setSelectedPeriod] = useState<string>("7d");
   const [searchTerm, setSearchTerm] = useState<string>("");
+  const debouncedSearchTerm = useDebounce(searchTerm, 400);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
@@ -92,8 +94,8 @@ export function ErrorLogsViewer() {
         if (selectedModule !== "all") {
           params.append("module", selectedModule);
         }
-        if (searchTerm.trim()) {
-          params.append("search", searchTerm.trim());
+        if (debouncedSearchTerm.trim()) {
+          params.append("search", debouncedSearchTerm.trim());
         }
 
         const res = await fetch(`/api/backoffice/error-logs?${params.toString()}`);
@@ -126,7 +128,7 @@ export function ErrorLogsViewer() {
     return () => {
       ignore = true;
     };
-  }, [page, selectedWorkspace, selectedModule, selectedPeriod, searchTerm]);
+  }, [page, selectedWorkspace, selectedModule, selectedPeriod, debouncedSearchTerm]);
 
   const handleRefresh = async () => {
     setLoading(true);

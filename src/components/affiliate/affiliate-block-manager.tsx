@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo, useId } from "react";
+import { useState, useEffect, useCallback, useMemo, useId, useRef } from "react";
 import {
   Sparkles,
   Search,
@@ -176,6 +176,7 @@ export function AffiliateBlockManager({
   );
 
   const modalTitleId = useId();
+  const attemptedProductIdsRef = useRef<Set<string>>(new Set());
 
   // Check entitlement on mount
   useEffect(() => {
@@ -247,20 +248,25 @@ export function AffiliateBlockManager({
     }
   }, []);
 
-  // Ensure all products referenced in content are in catalogCache
+  // Ensure all products referenced in content are in catalogCache without duplicate loops
   useEffect(() => {
     const occurrences = parseBlockOccurrences(content);
     const missingIds: string[] = [];
     for (const occ of occurrences) {
       if (occ.block.type === "PRODUCT_GROUP") {
         for (const p of occ.block.data.products) {
-          if (!catalogCache[p.productId] && !missingIds.includes(p.productId)) {
+          if (
+            !catalogCache[p.productId] &&
+            !missingIds.includes(p.productId) &&
+            !attemptedProductIdsRef.current.has(p.productId)
+          ) {
             missingIds.push(p.productId);
           }
         }
       }
     }
     if (missingIds.length > 0) {
+      missingIds.forEach((id) => attemptedProductIdsRef.current.add(id));
       fetch("/api/affiliate/products?limit=100")
         .then((r) => r.json())
         .then((data) => {

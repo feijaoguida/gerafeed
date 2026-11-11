@@ -46,6 +46,7 @@ export class OpenAICompatibleProvider implements AIProvider {
         ],
         temperature: 0.7,
       }),
+      signal: AbortSignal.timeout(45000),
     });
 
     if (!res.ok) {
@@ -107,6 +108,7 @@ export class OpenAICompatibleProvider implements AIProvider {
           messages: [{ role: "user", content: "Responda: {\"status\":\"ok\"}" }],
           max_tokens: 15,
         }),
+        signal: AbortSignal.timeout(10000),
       });
 
       if (!res.ok) {
